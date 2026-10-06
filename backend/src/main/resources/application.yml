@@ -1,0 +1,58 @@
+server:
+  port: ${SERVER_PORT:8080}
+  servlet:
+    context-path: /api
+
+spring:
+  application:
+    name: openforum-backend
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 60MB
+  datasource:
+    url: ${DB_URL:jdbc:mysql://localhost:3306/openforum?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true}
+    username: ${DB_USER:root}
+    password: ${DB_PASSWORD:root123456}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    hibernate:
+      ddl-auto: ${JPA_DDL_AUTO:update}
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: false
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      database: 1
+      timeout: 2s
+
+openforum:
+  jwt:
+    secret: ${JWT_SECRET:openforum-dev-secret-key-change-me-2026-abcdefgh}
+    expiration-hours: ${JWT_EXPIRATION_HOURS:168}
+  ai:
+    enabled: ${AI_ENABLED:false}
+    api-key: ${OPENAI_API_KEY:}
+    api-base: ${OPENAI_API_BASE:https://api.openai.com/v1}
+    model: ${OPENAI_API_MODEL:gpt-4o-mini}
+    timeout-seconds: ${AI_TIMEOUT_SECONDS:20}
+  minio:
+    enabled: ${MINIO_ENABLED:false}
+    endpoint: ${MINIO_ENDPOINT:http://localhost:9000}
+    access-key: ${MINIO_ACCESS_KEY:minioadmin}
+    secret-key: ${MINIO_SECRET_KEY:minioadmin}
+    bucket: ${MINIO_BUCKET:openforum-auth}
+  auth:
+    challenge-ttl-minutes: ${AUTH_CHALLENGE_TTL_MINUTES:10}
+    max-document-count: ${AUTH_MAX_DOCUMENT_COUNT:5}
+    max-image-bytes: ${AUTH_MAX_IMAGE_BYTES:10485760}
+    max-video-bytes: ${AUTH_MAX_VIDEO_BYTES:52428800}
+    auto-approve-threshold: ${AUTH_AUTO_APPROVE_THRESHOLD:0.85}
+
+logging:
+  level:
+    com.openforum: INFO

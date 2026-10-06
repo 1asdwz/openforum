@@ -1,0 +1,165 @@
+name: Deploy OpenForum
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'frontend/**'
+      - 'backend/**'
+      - '.github/workflows/deploy.yml'
+  workflow_dispatch:
+
+# 同一时间只允许一个部署，避免并发重建容器/覆盖静态资源
+concurrency:
+  group: deploy-openforum
+  cancel-in-progress: false
+
+jobs:
+  frontend:
+    name: Build & deploy frontend
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build
+        working-directory: frontend
+        run: npm run build
+
+      - name: Pack dist
+        run: tar -czf /tmp/openforum-frontend.tar.gz -C frontend/dist .
+
+      - name: Setup SSH key
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          # 支持两种 secret 形式：
+          #   A) 原始 OpenSSH 私钥（含 -----BEGIN ... PRIVATE KEY----- 头尾）
+          #   B) 私钥文件的 base64 单行文本（推荐）
+          if printf '%s' "$SSH_PRIVATE_KEY" | grep -q 'BEGIN .*PRIVATE KEY'; then
+            printf '%s' "$SSH_PRIVATE_KEY" \
+              | sed 's/^\xEF\xBB\xBF//' \
+              | tr -d '\r' \
+              | sed 's/\\n/\n/g' \
+              > ~/.ssh/deploy_key
+          else
+            printf '%s' "$SSH_PRIVATE_KEY" | tr -d '\r\n \t' | base64 -d > ~/.ssh/deploy_key
+          fi
+          printf '\n' >> ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keygen -y -f ~/.ssh/deploy_key < /dev/null > /dev/null
+          echo "SSH key loaded OK"
+
+      - name: Add known hosts
+        run: ssh-keyscan -t rsa 43.157.5.182 >> ~/.ssh/known_hosts
+
+      - name: Upload bundle
+        run: |
+          scp -i ~/.ssh/deploy_key -o ServerAliveInterval=15 -o ServerAliveCountMax=8 \
+            /tmp/openforum-frontend.tar.gz root@43.157.5.182:/tmp/
+
+      - name: Deploy on server
+        run: |
+          ssh -i ~/.ssh/deploy_key root@43.157.5.182 << 'EOF'
+            set -e
+            cd /mydata/nginx/html/forum
+            TS=$(date +%Y%m%d%H%M%S)
+            # 备份当前版本（保留最近 5 份，便于快速回滚）
+            [ -f index.html ] && cp index.html "index.html.bak.$TS"
+            [ -d static ] && mv static "static.bak.$TS"
+            tar -xzf /tmp/openforum-frontend.tar.gz -C /mydata/nginx/html/forum
+            rm -f /tmp/openforum-frontend.tar.gz
+            ls -1dt static.bak.* 2>/dev/null | tail -n +6 | xargs -r rm -rf
+            ls -1t index.html.bak.* 2>/dev/null | tail -n +6 | xargs -r rm -f
+            docker exec nginx nginx -t
+            docker exec nginx nginx -s reload
+            echo "frontend deployed -> /mydata/nginx/html/forum"
+          EOF
+
+  backend:
+    name: Build & deploy backend
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+
+      - name: Build jar
+        working-directory: backend
+        run: mvn -B -DskipTests clean package
+
+      - name: Collect artifact
+        run: |
+          cp backend/target/openforum-backend-1.0.0.jar /tmp/app.jar
+          ls -lh /tmp/app.jar
+
+      - name: Setup SSH key
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          if printf '%s' "$SSH_PRIVATE_KEY" | grep -q 'BEGIN .*PRIVATE KEY'; then
+            printf '%s' "$SSH_PRIVATE_KEY" \
+              | sed 's/^\xEF\xBB\xBF//' \
+              | tr -d '\r' \
+              | sed 's/\\n/\n/g' \
+              > ~/.ssh/deploy_key
+          else
+            printf '%s' "$SSH_PRIVATE_KEY" | tr -d '\r\n \t' | base64 -d > ~/.ssh/deploy_key
+          fi
+          printf '\n' >> ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keygen -y -f ~/.ssh/deploy_key < /dev/null > /dev/null
+          echo "SSH key loaded OK"
+
+      - name: Add known hosts
+        run: ssh-keyscan -t rsa 43.157.5.182 >> ~/.ssh/known_hosts
+
+      - name: Upload jar
+        run: |
+          scp -C -i ~/.ssh/deploy_key -o ServerAliveInterval=15 -o ServerAliveCountMax=8 \
+            /tmp/app.jar root@43.157.5.182:/root/openforum-build/app.jar
+
+      - name: Rebuild image & restart container
+        run: |
+          ssh -i ~/.ssh/deploy_key root@43.157.5.182 << 'EOF'
+            set -e
+            cd /root/openforum-build
+            docker build -t openforum-backend:latest .
+            docker stop openforum-backend >/dev/null 2>&1 || true
+            docker rm openforum-backend >/dev/null 2>&1 || true
+            docker run -d --name openforum-backend \
+              --network openforum-net \
+              --restart unless-stopped \
+              -p 8090:8080 \
+              --memory 512m --memory-swap 768m \
+              --env-file /root/openforum-build/openforum.env \
+              openforum-backend:latest
+            sleep 8
+            docker ps --filter name=openforum-backend --format '{{.Names}} {{.Status}}'
+            docker image prune -f >/dev/null 2>&1 || true
+          EOF

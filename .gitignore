@@ -1,0 +1,39 @@
+.gitignore
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Frontend
+node_modules/
+dist/
+.env.local
+.env.*.local
+*.log
+
+# Backend
+target/
+*.jar
+*.class
+.classpath
+.project
+.settings/
+*.iml
+
+# Maven
+.m2/
+
+# Database
+*.sql
+*.db
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Temp
+*.tmp
+temp/
