@@ -1,8 +1,9 @@
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
-import ElementPlus from 'element-plus'
-import 'element-plus/dist/index.css'
-import zhCn from 'element-plus/es/locale/lang/zh-cn'
+// Element Plus 按需引入：命令式调用的组件需显式引入样式，
+// 模板中的 el-* 组件样式由 unplugin-vue-components 自动注入
+import 'element-plus/es/components/message/style/css'
+import 'element-plus/es/components/message-box/style/css'
 
 import App from './App.vue'
 import router from './router'
@@ -13,7 +14,6 @@ const app = createApp(App)
 
 app.use(createPinia())
 app.use(router)
-app.use(ElementPlus, { locale: zhCn })
 
 // 启动时恢复登录态（异步，不阻塞挂载）
 useAuthStore().bootstrap()

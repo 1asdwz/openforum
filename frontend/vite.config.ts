@@ -1,5 +1,7 @@
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
+import Components from 'unplugin-vue-components/vite'
+import { ElementPlusResolver } from 'unplugin-vue-components/resolvers'
 import { viteStaticCopy } from 'vite-plugin-static-copy'
 import { fileURLToPath, URL } from 'node:url'
 
@@ -8,6 +10,11 @@ export default defineConfig({
   base: '/forum/',
   plugins: [
     vue(),
+    // Element Plus 按需引入：模板中出现的 el-* 组件自动注册并携带其样式
+    Components({
+      resolvers: [ElementPlusResolver()],
+      dts: 'src/components.d.ts',
+    }),
     // 将 MediaPipe 的 wasm 运行时复制到 dist/mediapipe，运行时可从 /forum/mediapipe 加载
     viteStaticCopy({
       targets: [

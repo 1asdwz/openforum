@@ -85,7 +85,8 @@ const emit = defineEmits<{
   (e: 'change', data: Record<string, unknown>): void
 }>()
 
-const model = reactive<Record<string, unknown>>({})
+// 字段类型由后端 meta 动态决定，故用 any 承载 v-model 绑定
+const model = reactive<Record<string, any>>({})
 const rows = reactive<{ key: string; value: string }[]>([{ key: '', value: '' }])
 
 const hasFields = computed(() => (props.meta.fields?.length || 0) > 0)
