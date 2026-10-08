@@ -13,18 +13,23 @@
           clearable
           @keyup.enter="onSearch"
         >
-          <template #prefix><span class="search-icon">🔍</span></template>
+          <template #prefix>
+            <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="11" cy="11" r="7" />
+              <path d="m20 20-3.2-3.2" />
+            </svg>
+          </template>
         </el-input>
       </div>
 
       <div class="topnav-actions">
-        <el-button type="primary" round @click="goCreate">
+        <el-button type="primary" @click="goCreate">
           + 创建子论坛
         </el-button>
 
         <template v-if="!auth.isAuthenticated">
           <el-button text @click="router.push('/login')">登录</el-button>
-          <el-button round plain @click="router.push('/register')">注册</el-button>
+          <el-button plain @click="router.push('/register')">注册</el-button>
         </template>
 
         <el-dropdown v-else trigger="click" @command="onCommand">

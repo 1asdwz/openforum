@@ -42,14 +42,13 @@
             <el-button
               v-if="!forum.isMember"
               type="primary"
-              round
               @click="toggleMembership(true)"
             >
               加入
             </el-button>
-            <el-button v-else round @click="toggleMembership(false)">退出</el-button>
+            <el-button v-else @click="toggleMembership(false)">退出</el-button>
 
-            <el-button type="primary" round plain @click="openCreatePost">
+            <el-button type="primary" plain @click="openCreatePost">
               发帖
             </el-button>
 
@@ -102,7 +101,6 @@
               :href="link.url"
               target="_blank"
               rel="noopener"
-              round
             >
               {{ link.label }}
             </el-button>
@@ -127,7 +125,7 @@
             {{ t.label }}
           </button>
         </div>
-        <el-button size="small" round @click="loadPosts(true)">刷新</el-button>
+        <el-button size="small" @click="loadPosts(true)">刷新</el-button>
       </div>
 
       <el-skeleton v-if="postsLoading" :rows="4" animated />

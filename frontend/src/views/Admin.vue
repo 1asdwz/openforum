@@ -373,7 +373,7 @@ onBeforeUnmount(() => {
   width: 72px;
   height: 72px;
   object-fit: cover;
-  border-radius: 6px;
+  border-radius: 4px;
   border: 1px solid var(--el-border-color, #dcdfe6);
   cursor: pointer;
   background: #f5f7fa;

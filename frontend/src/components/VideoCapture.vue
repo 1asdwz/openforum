@@ -351,7 +351,7 @@ onBeforeUnmount(() => {
   max-width: 480px;
   aspect-ratio: 4 / 3;
   background: #000;
-  border-radius: 8px;
+  border-radius: 4px;
   overflow: hidden;
 }
 .video-el {
@@ -375,7 +375,7 @@ onBeforeUnmount(() => {
 }
 .video-action-list li {
   padding: 4px 12px;
-  border-radius: 14px;
+  border-radius: 4px;
   border: 1px solid var(--el-border-color, #dcdfe6);
   font-size: 13px;
   color: var(--of-text-muted);
@@ -406,7 +406,7 @@ onBeforeUnmount(() => {
 .video-preview {
   width: 100%;
   max-width: 320px;
-  border-radius: 8px;
+  border-radius: 4px;
   background: #000;
 }
 </style>

@@ -51,7 +51,7 @@
             {{ t.label }}
           </button>
         </div>
-        <el-button size="small" round @click="loadPosts(true)">刷新</el-button>
+        <el-button size="small" @click="loadPosts(true)">刷新</el-button>
       </div>
 
       <el-skeleton v-if="loading" :rows="6" animated />

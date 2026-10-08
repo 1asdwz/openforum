@@ -28,7 +28,6 @@
           <el-button
             v-if="isSelf"
             style="margin-left: auto"
-            round
             @click="editVisible = true"
           >
             编辑资料

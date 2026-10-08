@@ -162,7 +162,7 @@ onBeforeUnmount(() => {
 .doc-upload-item {
   position: relative;
   border: 1px solid var(--el-border-color, #dcdfe6);
-  border-radius: 6px;
+  border-radius: 4px;
   overflow: hidden;
   background: #f5f7fa;
 }

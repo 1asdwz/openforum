@@ -28,7 +28,6 @@
               :key="f.id"
               class="sidebar-item"
               :to="`/f/${f.slug}`"
-              style="border: 1px solid var(--of-border); border-radius: 10px"
             >
               <span class="sidebar-item-icon">
                 <img v-if="isImageUrl(f.icon)" :src="f.icon" alt="" />
