@@ -184,7 +184,8 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
-import { EditorContent, useEditor } from '@tiptap/vue-3'
+import { EditorContent, useEditor, type Editor } from '@tiptap/vue-3'
+import { TextSelection } from '@tiptap/pm/state'
 import StarterKit from '@tiptap/starter-kit'
 import { Markdown } from '@tiptap/markdown'
 import { Placeholder } from '@tiptap/extension-placeholder'
@@ -505,6 +506,16 @@ function pickVideo() {
   if (!uploading.value) videoInputRef.value?.click()
 }
 
+/**
+ * 插入图片/视频后 tiptap 会留下节点选区，直接再次插入会覆盖上一张。
+ * 这里把光标折叠到插入内容之后，保证连续插入（多图粘贴/拖拽）逐张追加。
+ */
+function collapseSelection(ed: Editor) {
+  const { state, view } = ed
+  const next = TextSelection.near(state.doc.resolve(state.selection.to), 1)
+  view.dispatch(state.tr.setSelection(next))
+}
+
 async function uploadAndInsert(file: File, kind: 'image' | 'video') {
   uploading.value = true
   try {
@@ -518,6 +529,7 @@ async function uploadAndInsert(file: File, kind: 'image' | 'video') {
       } else {
         ed.chain().focus().setVideo({ src: url }).run()
       }
+      collapseSelection(ed)
     } else if (kind === 'image') {
       const name = file.name.replace(/\.[^.]+$/, '')
       insertMarkdown(`![${name}](${url})`)
