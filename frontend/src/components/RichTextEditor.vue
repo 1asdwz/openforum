@@ -160,6 +160,9 @@
       :style="{ minHeight: `${resolvedMinHeight}px` }"
       :placeholder="placeholder || '使用 Markdown 语法书写…'"
       @input="onMarkdownInput"
+      @paste="onMarkdownPaste"
+      @dragover.prevent
+      @drop.prevent="onMarkdownDrop"
     />
 
     <input
@@ -291,6 +294,19 @@ const editor = useEditor({
   ],
   editorProps: {
     attributes: { class: 'rte-content' },
+    handlePaste: (_view, event) => {
+      const media = mediaFiles(event.clipboardData?.files)
+      if (!media.length) return false
+      event.preventDefault()
+      return handleMediaFiles(media)
+    },
+    handleDrop: (_view, event, _slice, moved) => {
+      if (moved) return false
+      const media = mediaFiles(event.dataTransfer?.files)
+      if (!media.length) return false
+      event.preventDefault()
+      return handleMediaFiles(media)
+    },
   },
   onUpdate: ({ editor: ed }) => {
     const md = ed.getMarkdown()
@@ -489,12 +505,7 @@ function pickVideo() {
   if (!uploading.value) videoInputRef.value?.click()
 }
 
-async function onFilePicked(event: Event, kind: 'image' | 'video') {
-  const input = event.target as HTMLInputElement
-  const file = input.files?.[0]
-  input.value = ''
-  if (!file) return
-
+async function uploadAndInsert(file: File, kind: 'image' | 'video') {
   uploading.value = true
   try {
     const result = await mediaApi.upload(file)
@@ -518,6 +529,47 @@ async function onFilePicked(event: Event, kind: 'image' | 'video') {
   } finally {
     uploading.value = false
   }
+}
+
+function mediaFiles(files: FileList | File[] | null | undefined): File[] {
+  if (!files) return []
+  return Array.from(files).filter(
+    (f) => f.type.startsWith('image/') || f.type.startsWith('video/')
+  )
+}
+
+function kindOf(file: File): 'image' | 'video' {
+  return file.type.startsWith('video/') ? 'video' : 'image'
+}
+
+/** 依次上传并插入媒体（用于粘贴/拖拽） */
+function handleMediaFiles(files: File[]): boolean {
+  if (!files.length) return false
+  void (async () => {
+    for (const f of files) await uploadAndInsert(f, kindOf(f))
+  })()
+  return true
+}
+
+async function onFilePicked(event: Event, kind: 'image' | 'video') {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  if (!file) return
+  await uploadAndInsert(file, kind)
+}
+
+function onMarkdownPaste(event: ClipboardEvent) {
+  const media = mediaFiles(event.clipboardData?.files)
+  if (!media.length) return
+  event.preventDefault()
+  handleMediaFiles(media)
+}
+
+function onMarkdownDrop(event: DragEvent) {
+  const media = mediaFiles(event.dataTransfer?.files)
+  if (!media.length) return
+  handleMediaFiles(media)
 }
 
 interface ToolbarButton {

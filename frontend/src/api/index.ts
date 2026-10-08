@@ -47,6 +47,9 @@ export const authApi = {
     api.post<AuthResult>('/auth/login', payload),
   register: (payload: RegisterPayload) =>
     api.post<AuthResult>('/auth/register', payload),
+  /** 使用 Google ID Token 登录/注册 */
+  google: (credential: string) =>
+    api.post<AuthResult>('/auth/google', { credential }),
   me: () => api.get<User>('/auth/me', { skipAuthRedirect: true }),
 }
 

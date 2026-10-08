@@ -965,6 +965,89 @@ button {
   background: #fff;
 }
 
+/* ---------- 登录 / 注册 ---------- */
+.auth-page {
+  display: flex;
+  justify-content: center;
+  padding: 48px 16px 64px;
+}
+
+.auth-panel {
+  width: 100%;
+  max-width: 380px;
+}
+
+.auth-head {
+  margin-bottom: 24px;
+}
+
+.auth-head h1 {
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.auth-head p {
+  margin-top: 6px;
+  font-size: 13px;
+  color: var(--of-text-muted);
+}
+
+.auth-panel .el-form-item {
+  margin-bottom: 16px;
+}
+
+.auth-panel .el-form-item__label {
+  padding-bottom: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--of-text);
+}
+
+.auth-submit {
+  width: 100%;
+  margin-top: 4px;
+}
+
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+  color: var(--of-text-subtle);
+  font-size: 12px;
+}
+
+.auth-divider::before,
+.auth-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--of-border);
+}
+
+.auth-switch {
+  margin-top: 20px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--of-text-muted);
+}
+
+.auth-switch a {
+  color: var(--of-primary);
+  font-weight: 600;
+}
+
+.auth-switch a:hover {
+  text-decoration: underline;
+}
+
+.auth-intro {
+  max-width: 640px;
+  margin-bottom: 20px;
+  color: var(--of-text-muted);
+}
+
 /* ---------- Element Plus 组件微调 ---------- */
 .el-input__wrapper,
 .el-select__wrapper,
@@ -1001,5 +1084,87 @@ button {
   }
   .user-name {
     display: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .app-main {
+    padding: 20px 16px 48px;
+  }
+
+  /* 顶栏改为两行：上行 logo + 操作，下行整行搜索框 */
+  .topnav {
+    height: auto;
+  }
+  .topnav-inner {
+    height: auto;
+    flex-wrap: wrap;
+    row-gap: 8px;
+    padding-top: 8px;
+    padding-bottom: 10px;
+  }
+  .topnav-search {
+    order: 3;
+    flex-basis: 100%;
+    max-width: none;
+  }
+  .topnav-actions {
+    gap: 6px;
+  }
+
+  .forum-grid,
+  .auth-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .page-title,
+  .forum-hero-info h1,
+  .post-detail-title {
+    font-size: 20px;
+  }
+
+  .forum-hero-body {
+    gap: 12px;
+    padding-top: 14px;
+  }
+
+  .record-item {
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+
+  .vote-col {
+    width: 34px;
+    padding: 10px 0;
+  }
+
+  .post-body {
+    padding: 12px 12px 12px 4px;
+  }
+
+  .feed-toolbar {
+    flex-wrap: wrap;
+  }
+
+  /* 宽表格在窄屏内横向滚动 */
+  .markdown-body table {
+    display: block;
+    overflow-x: auto;
+  }
+
+  .admin-preview-frame {
+    height: 320px;
+  }
+}
+
+@media (max-width: 400px) {
+  .auth-page {
+    padding: 32px 16px 56px;
+  }
+  .user-trigger {
+    padding: 4px;
+  }
+  .sort-tabs button {
+    padding: 6px 8px;
   }
 }

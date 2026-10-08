@@ -43,6 +43,7 @@ declare module 'vue' {
     ElTag: typeof import('element-plus/es')['ElTag']
     ElTooltip: typeof import('element-plus/es')['ElTooltip']
     ForumSidebar: typeof import('./components/ForumSidebar.vue')['default']
+    GoogleLoginButton: typeof import('./components/GoogleLoginButton.vue')['default']
     MarkdownContent: typeof import('./components/MarkdownContent.vue')['default']
     PostCard: typeof import('./components/PostCard.vue')['default']
     RichTextEditor: typeof import('./components/RichTextEditor.vue')['default']

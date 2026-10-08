@@ -1,7 +1,11 @@
 <template>
   <div class="auth-page">
-    <div class="content-card auth-panel">
-      <h1 class="page-title">登录 OpenForum</h1>
+    <div class="auth-panel">
+      <header class="auth-head">
+        <h1>登录 OpenForum</h1>
+        <p>欢迎回来，继续加入讨论</p>
+      </header>
+
       <el-form label-position="top" @submit.prevent="onSubmit">
         <el-form-item label="用户名或邮箱">
           <el-input
@@ -21,15 +25,18 @@
           />
         </el-form-item>
         <el-button
+          class="auth-submit"
           type="primary"
           size="large"
-          style="width: 100%"
           :loading="auth.loading"
           @click="onSubmit"
         >
           登录
         </el-button>
       </el-form>
+
+      <GoogleLoginButton text="signin_with" @credential="onGoogle" />
+
       <p class="auth-switch">
         还没有账号？
         <router-link :to="{ name: 'register' }">立即注册</router-link>
@@ -42,6 +49,7 @@
 import { reactive } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import GoogleLoginButton from '@/components/GoogleLoginButton.vue'
 import { useAuthStore } from '@/stores/auth'
 import { errorMessage } from '@/utils/format'
 
@@ -50,6 +58,11 @@ const router = useRouter()
 const route = useRoute()
 
 const form = reactive({ usernameOrEmail: '', password: '' })
+
+function redirectAfterLogin() {
+  const redirect = (route.query.redirect as string) || '/'
+  router.push(redirect)
+}
 
 async function onSubmit() {
   if (!form.usernameOrEmail.trim() || !form.password) {
@@ -62,31 +75,19 @@ async function onSubmit() {
       password: form.password,
     })
     ElMessage.success('登录成功')
-    const redirect = (route.query.redirect as string) || '/'
-    router.push(redirect)
+    redirectAfterLogin()
   } catch (e) {
     ElMessage.error(errorMessage(e, '登录失败'))
   }
 }
-</script>
 
-<style scoped>
-.auth-page {
-  display: flex;
-  justify-content: center;
-  padding-top: 40px;
+async function onGoogle(credential: string) {
+  try {
+    await auth.loginWithGoogle(credential)
+    ElMessage.success('登录成功')
+    redirectAfterLogin()
+  } catch (e) {
+    ElMessage.error(errorMessage(e, 'Google 登录失败'))
+  }
 }
-.auth-panel {
-  width: 100%;
-  max-width: 400px;
-}
-.auth-switch {
-  margin-top: 16px;
-  text-align: center;
-  color: var(--of-text-muted);
-}
-.auth-switch a {
-  color: var(--of-primary);
-  font-weight: 600;
-}
-</style>
+</script>

@@ -31,6 +31,9 @@ public class User {
     @Column(name = "password", nullable = false, length = 120)
     private String password;
 
+    @Column(name = "google_id", length = 64, unique = true)
+    private String googleId;
+
     @Column(name = "avatar", length = 500)
     private String avatar;
 
@@ -94,6 +97,14 @@ public class User {
 
     public void setPassword(String password) {
         this.password = password;
+    }
+
+    public String getGoogleId() {
+        return googleId;
+    }
+
+    public void setGoogleId(String googleId) {
+        this.googleId = googleId;
     }
 
     public String getAvatar() {

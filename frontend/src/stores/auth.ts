@@ -75,6 +75,18 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  /** 使用 Google ID Token 登录或自动注册 */
+  async function loginWithGoogle(credential: string) {
+    loading.value = true
+    try {
+      const res = await authApi.google(credential)
+      setAuth(res.token, res.user)
+      return res.user
+    } finally {
+      loading.value = false
+    }
+  }
+
   /** 应用启动时恢复登录态 */
   async function bootstrap() {
     await fetchMe()
@@ -92,6 +104,7 @@ export const useAuthStore = defineStore('auth', () => {
     fetchMe,
     login,
     register,
+    loginWithGoogle,
     bootstrap,
   }
 })

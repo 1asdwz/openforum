@@ -1,7 +1,7 @@
 <template>
   <div>
     <h1 class="page-title">认证中心</h1>
-    <p style="color: var(--of-text-muted); margin-bottom: 20px">
+    <p class="auth-intro">
       完成认证后可解锁设置了门槛的子论坛。等级越高、证据越强：低-填写信息，中-上传证件，高-视频活体+证件。
     </p>
 
@@ -27,7 +27,7 @@
             驳回原因：{{ reasonOf(record) }}
           </div>
         </div>
-        <div style="display: flex; align-items: center; gap: 10px">
+        <div class="record-actions">
           <el-tag :type="statusTag(record.status)" effect="light">
             {{ statusLabel(record.status) }}
           </el-tag>
@@ -308,12 +308,17 @@ onMounted(() => {
   gap: 6px;
   align-items: center;
 }
+.record-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
 .auth-level-picker {
   display: flex;
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
-  margin-top: 8px;
+  margin-top: 12px;
 }
 .auth-level-label {
   font-size: 13px;
@@ -321,6 +326,6 @@ onMounted(() => {
 }
 .auth-extreme-note {
   font-size: 12px;
-  color: var(--of-text-muted);
+  color: var(--of-text-subtle);
 }
 </style>

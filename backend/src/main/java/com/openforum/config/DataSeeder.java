@@ -80,15 +80,15 @@ public class DataSeeder implements ApplicationRunner {
         seedAuthentication(bob, AuthType.NATIONALITY, Map.of("nationality", "中国"), false);
 
         SubForum general = createForum("general", "综合讨论区", "任何话题都可以在这里畅聊",
-                "💬", "#FF4500", null, admin, alice, bob);
+                "", "#FF4500", null, admin, alice, bob);
         SubForum tech = createForum("tech", "技术交流", "编程、架构与开源技术分享",
-                "💻", "#3498DB", null, admin, alice);
+                "", "#3498DB", null, admin, alice);
         SubForum life = createForum("life", "生活百态", "记录生活的点点滴滴",
-                "🌱", "#2ECC71", null, admin, bob);
+                "", "#2ECC71", null, admin, bob);
         SubForum adult = createForum("adult", "成人话题", "仅限实名且年满 18 周岁的用户参与",
-                "🔒", "#9B59B6", "REAL_NAME,AGE_18", admin, alice);
+                "", "#9B59B6", "REAL_NAME,AGE_18", admin, alice);
         SubForum creative = createForum("creative", "创意工坊", "展示你的创作与灵感",
-                "🎨", "#E67E22", null, admin, alice);
+                "", "#E67E22", null, admin, alice);
 
         Post generalWelcome = createPost(general, admin, "欢迎来到 OpenForum！",
                 "这里是开放的社区，欢迎分享你的想法与见解。", true);

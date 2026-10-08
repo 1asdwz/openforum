@@ -1,7 +1,11 @@
 <template>
   <div class="auth-page">
-    <div class="content-card auth-panel">
-      <h1 class="page-title">注册 OpenForum</h1>
+    <div class="auth-panel">
+      <header class="auth-head">
+        <h1>注册 OpenForum</h1>
+        <p>创建账号，加入你感兴趣的子论坛</p>
+      </header>
+
       <el-form label-position="top" @submit.prevent="onSubmit">
         <el-form-item label="用户名">
           <el-input v-model="form.username" placeholder="3-32 位用户名" size="large" />
@@ -20,15 +24,18 @@
           />
         </el-form-item>
         <el-button
+          class="auth-submit"
           type="primary"
           size="large"
-          style="width: 100%"
           :loading="auth.loading"
           @click="onSubmit"
         >
           注册
         </el-button>
       </el-form>
+
+      <GoogleLoginButton text="signup_with" @credential="onGoogle" />
+
       <p class="auth-switch">
         已有账号？
         <router-link :to="{ name: 'login' }">返回登录</router-link>
@@ -41,6 +48,7 @@
 import { reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import GoogleLoginButton from '@/components/GoogleLoginButton.vue'
 import { useAuthStore } from '@/stores/auth'
 import { errorMessage } from '@/utils/format'
 
@@ -70,25 +78,14 @@ async function onSubmit() {
     ElMessage.error(errorMessage(e, '注册失败'))
   }
 }
-</script>
 
-<style scoped>
-.auth-page {
-  display: flex;
-  justify-content: center;
-  padding-top: 40px;
+async function onGoogle(credential: string) {
+  try {
+    await auth.loginWithGoogle(credential)
+    ElMessage.success('注册成功')
+    router.push('/')
+  } catch (e) {
+    ElMessage.error(errorMessage(e, 'Google 登录失败'))
+  }
 }
-.auth-panel {
-  width: 100%;
-  max-width: 400px;
-}
-.auth-switch {
-  margin-top: 16px;
-  text-align: center;
-  color: var(--of-text-muted);
-}
-.auth-switch a {
-  color: var(--of-primary);
-  font-weight: 600;
-}
-</style>
+</script>

@@ -2,6 +2,7 @@ package com.openforum.controller;
 
 import com.openforum.common.ApiResponse;
 import com.openforum.dto.auth.AuthResponse;
+import com.openforum.dto.auth.GoogleLoginRequest;
 import com.openforum.dto.auth.LoginRequest;
 import com.openforum.dto.auth.RegisterRequest;
 import com.openforum.dto.user.UserDTO;
@@ -35,6 +36,11 @@ public class AuthController {
     @PostMapping("/login")
     public ApiResponse<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
         return ApiResponse.ok(authService.login(request));
+    }
+
+    @PostMapping("/google")
+    public ApiResponse<AuthResponse> google(@Valid @RequestBody GoogleLoginRequest request) {
+        return ApiResponse.ok(authService.loginWithGoogle(request.credential()));
     }
 
     @GetMapping("/me")
