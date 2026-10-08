@@ -1,21 +1,46 @@
 :root {
-  --of-primary: #ff4500;
-  --of-primary-dark: #d93a00;
-  --of-primary-soft: #fff0eb;
-  --of-bg: #f6f7f8;
+  /* ---------- C · 无框紧凑 ---------- */
+  --of-primary: #0a0a0a;
+  --of-primary-dark: #000000;
+  --of-primary-soft: #f2f2f2;
+  --of-bg: #ffffff;
   --of-card: #ffffff;
-  --of-border: #e5e6e8;
-  --of-border-soft: #edeff1;
-  --of-text: #1a1a1b;
-  --of-text-muted: #7c7c7c;
-  --of-text-subtle: #a8a8a8;
-  --of-upvote: #ff4500;
-  --of-downvote: #7193ff;
-  --of-radius: 10px;
-  --of-radius-sm: 6px;
-  --of-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  --of-border: #e8e8e8;
+  --of-border-soft: #f0f0f0;
+  --of-text: #0a0a0a;
+  --of-text-muted: #6b7280;
+  --of-text-subtle: #9ca3af;
+  --of-upvote: #e8590c;
+  --of-downvote: #5b7cfa;
+  --of-radius: 4px;
+  --of-radius-sm: 4px;
+  --of-shadow: none;
   --of-nav-height: 56px;
   --of-max-width: 1180px;
+
+  /* ---------- Element Plus 对齐 C 语言 ---------- */
+  --el-color-primary: #0a0a0a;
+  --el-color-primary-light-3: #404040;
+  --el-color-primary-light-5: #737373;
+  --el-color-primary-light-7: #ababab;
+  --el-color-primary-light-8: #c9c9c9;
+  --el-color-primary-light-9: #f2f2f2;
+  --el-color-primary-dark-2: #000000;
+  --el-border-radius-base: 4px;
+  --el-border-radius-small: 4px;
+  --el-border-color: #e8e8e8;
+  --el-border-color-light: #f0f0f0;
+  --el-border-color-lighter: #f4f4f4;
+  --el-border-color-hover: #c0c0c0;
+  --el-text-color-primary: #0a0a0a;
+  --el-text-color-regular: #0a0a0a;
+  --el-text-color-secondary: #6b7280;
+  --el-text-color-placeholder: #9ca3af;
+  --el-text-color-disabled: #b8b8b8;
+  --el-bg-color: #ffffff;
+  --el-bg-color-page: #ffffff;
+  --el-fill-color-light: #f4f4f4;
+  --el-fill-color-blank: #ffffff;
 }
 
 * {
@@ -57,7 +82,7 @@ h2,
 h3,
 h4 {
   margin: 0;
-  font-weight: 600;
+  font-weight: 700;
 }
 
 ul {
@@ -78,13 +103,13 @@ button {
 .app-main {
   max-width: var(--of-max-width);
   margin: 0 auto;
-  padding: 20px 16px 60px;
+  padding: 28px 24px 60px;
 }
 
 .home-layout {
   display: grid;
-  grid-template-columns: 260px minmax(0, 1fr);
-  gap: 20px;
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: 28px;
   align-items: start;
 }
 
@@ -96,22 +121,22 @@ button {
 .forum-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 12px;
+  gap: 0;
 }
 
 .forum-card {
   display: flex;
   gap: 12px;
-  padding: 14px;
-  background: var(--of-card);
-  border: 1px solid var(--of-border);
-  border-radius: var(--of-radius);
-  transition: border-color 0.15s ease, transform 0.15s ease;
+  padding: 14px 0;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--of-border);
+  border-radius: 0;
+  transition: border-color 0.15s ease;
 }
 
 .forum-card:hover {
-  border-color: var(--of-primary);
-  transform: translateY(-1px);
+  border-bottom-color: var(--of-text-subtle);
 }
 
 .forum-card-icon {
@@ -169,14 +194,16 @@ button {
 }
 
 .content-card {
-  background: var(--of-card);
-  border: 1px solid var(--of-border);
-  border-radius: var(--of-radius);
-  padding: 20px;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 0;
 }
 
 .page-title {
-  font-size: 20px;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
   margin-bottom: 16px;
 }
 
@@ -185,15 +212,15 @@ button {
   padding: 40px 20px;
   text-align: center;
   color: var(--of-text-muted);
-  background: var(--of-card);
+  background: transparent;
   border: 1px dashed var(--of-border);
-  border-radius: var(--of-radius);
+  border-radius: 0;
 }
 
 .state-box.error {
-  color: #d03050;
-  border-color: #ffd0cf;
-  background: #fff6f6;
+  color: #b91c1c;
+  border-color: #f0d2d2;
+  background: #fdf7f7;
 }
 
 /* ---------- 顶栏 ---------- */
@@ -226,7 +253,7 @@ button {
 .brand-logo {
   width: 32px;
   height: 32px;
-  border-radius: 50%;
+  border-radius: 8px;
   background: var(--of-primary);
   color: #fff;
   font-weight: 700;
@@ -240,6 +267,7 @@ button {
   font-size: 18px;
   font-weight: 700;
   color: var(--of-text);
+  letter-spacing: -0.01em;
 }
 
 .topnav-search {
@@ -261,7 +289,7 @@ button {
   gap: 8px;
   cursor: pointer;
   padding: 4px 8px;
-  border-radius: 20px;
+  border-radius: 4px;
   outline: none;
 }
 
@@ -290,24 +318,25 @@ button {
 .forum-sidebar {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 24px;
   position: sticky;
   top: calc(var(--of-nav-height) + 20px);
 }
 
 .sidebar-card {
-  background: var(--of-card);
-  border: 1px solid var(--of-border);
-  border-radius: var(--of-radius);
-  padding: 14px 16px;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 0;
 }
 
 .sidebar-card h3 {
   font-size: 12px;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.4px;
+  letter-spacing: 0.09em;
   color: var(--of-text-muted);
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 
 .sidebar-item {
@@ -315,7 +344,7 @@ button {
   align-items: center;
   gap: 10px;
   padding: 8px 6px;
-  border-radius: var(--of-radius-sm);
+  border-radius: 4px;
   transition: background 0.15s;
 }
 
@@ -326,7 +355,7 @@ button {
 .sidebar-item-icon {
   width: 30px;
   height: 30px;
-  border-radius: 50%;
+  border-radius: 4px;
   background: var(--of-primary-soft);
   color: var(--of-primary);
   display: flex;
@@ -374,11 +403,12 @@ button {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  background: var(--of-card);
-  border: 1px solid var(--of-border);
-  border-radius: var(--of-radius);
-  padding: 10px 14px;
-  margin-bottom: 16px;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--of-border);
+  border-radius: 0;
+  padding: 0 0 12px;
+  margin-bottom: 4px;
 }
 
 .sort-tabs {
@@ -389,47 +419,49 @@ button {
 .sort-tabs button {
   border: none;
   background: transparent;
-  padding: 7px 14px;
-  border-radius: 20px;
+  padding: 6px 12px;
+  border-radius: 4px;
   cursor: pointer;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--of-text-muted);
+  transition: background 0.15s, color 0.15s;
 }
 
 .sort-tabs button:hover {
   background: var(--of-border-soft);
+  color: var(--of-text);
 }
 
 .sort-tabs button.active {
-  color: var(--of-primary);
+  color: var(--of-text);
   background: var(--of-primary-soft);
 }
 
 .post-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 0;
 }
 
 .post-card {
   display: flex;
-  background: var(--of-card);
-  border: 1px solid var(--of-border);
-  border-radius: var(--of-radius);
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--of-border);
+  border-radius: 0;
   overflow: hidden;
-  transition: border-color 0.15s, box-shadow 0.15s;
+  transition: border-color 0.15s;
 }
 
 .post-card:hover {
-  border-color: #d3d5d8;
-  box-shadow: var(--of-shadow);
+  border-bottom-color: var(--of-text-subtle);
 }
 
 .post-body {
   flex: 1;
   min-width: 0;
-  padding: 12px 16px 10px 4px;
+  padding: 14px 16px 14px 8px;
 }
 
 .post-meta {
@@ -461,8 +493,9 @@ button {
 
 .post-title {
   display: block;
-  font-size: 17px;
-  font-weight: 600;
+  font-size: 17.5px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
   color: var(--of-text);
   margin-bottom: 4px;
 }
@@ -495,20 +528,20 @@ button {
 
 /* ---------- 投票列 ---------- */
 .vote-col {
-  width: 44px;
+  width: 40px;
   flex-shrink: 0;
-  background: #f8f9fa;
+  background: transparent;
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 8px 0;
+  padding: 12px 0;
   gap: 2px;
 }
 
 .vote-btn {
   border: none;
   background: transparent;
-  color: #9aa0a6;
+  color: var(--of-text-subtle);
   font-size: 15px;
   line-height: 1;
   padding: 3px 6px;
@@ -523,7 +556,7 @@ button {
 
 .vote-btn.down:hover:not(:disabled) {
   color: var(--of-downvote);
-  background: #eef1ff;
+  background: var(--of-primary-soft);
 }
 
 .vote-btn:disabled {
@@ -542,6 +575,7 @@ button {
 .vote-score {
   font-weight: 700;
   font-size: 13px;
+  font-variant-numeric: tabular-nums;
   color: var(--of-text);
 }
 
@@ -555,20 +589,20 @@ button {
 
 /* ---------- 子论坛头部 ---------- */
 .forum-hero {
-  border-radius: var(--of-radius);
+  border-radius: 0;
   overflow: hidden;
   margin-bottom: 18px;
-  border: 1px solid var(--of-border);
-  background: var(--of-card);
+  border: none;
+  background: transparent;
 }
 
 .forum-hero-banner {
-  height: 84px;
+  height: 3px;
   background: var(--of-primary);
 }
 
 .forum-hero-body {
-  padding: 0 20px 18px;
+  padding: 18px 0 14px;
   display: flex;
   align-items: flex-end;
   gap: 16px;
@@ -576,18 +610,18 @@ button {
 }
 
 .forum-hero-icon {
-  width: 72px;
-  height: 72px;
-  border-radius: 50%;
-  border: 4px solid var(--of-card);
+  width: 56px;
+  height: 56px;
+  border-radius: 8px;
+  border: none;
   background: var(--of-primary-soft);
   color: var(--of-primary);
   font-weight: 700;
-  font-size: 26px;
+  font-size: 22px;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-top: -36px;
+  margin-top: 0;
   overflow: hidden;
   flex-shrink: 0;
 }
@@ -605,6 +639,8 @@ button {
 
 .forum-hero-info h1 {
   font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
 }
 
 .forum-hero-desc {
@@ -615,6 +651,7 @@ button {
 .forum-hero-stats {
   color: var(--of-text-muted);
   font-size: 13px;
+  font-variant-numeric: tabular-nums;
   margin-top: 6px;
 }
 
@@ -625,22 +662,26 @@ button {
 }
 
 .section-title {
-  font-size: 16px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--of-text-muted);
   margin: 22px 0 10px;
 }
 
 .template-section {
-  background: var(--of-card);
-  border: 1px solid var(--of-border);
-  border-radius: var(--of-radius);
-  padding: 16px 18px;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 0;
   margin-bottom: 12px;
 }
 
 .template-section h3 {
   font-size: 15px;
   margin-bottom: 8px;
-  color: var(--of-primary-dark);
+  color: var(--of-text);
 }
 
 .template-section .section-content {
@@ -656,10 +697,10 @@ button {
 
 /* ---------- 帖子详情 ---------- */
 .post-detail-card {
-  background: var(--of-card);
-  border: 1px solid var(--of-border);
-  border-radius: var(--of-radius);
-  padding: 20px 22px;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 0;
   margin-bottom: 16px;
 }
 
@@ -669,7 +710,9 @@ button {
 }
 
 .post-detail-title {
-  font-size: 22px;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
   margin-bottom: 8px;
 }
 
@@ -681,25 +724,26 @@ button {
 }
 
 .comment-box {
-  background: var(--of-card);
-  border: 1px solid var(--of-border);
-  border-radius: var(--of-radius);
-  padding: 16px 18px;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 0;
   margin-bottom: 16px;
 }
 
 .comment-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 0;
 }
 
 .comment-node {
-  background: var(--of-card);
-  border: 1px solid var(--of-border-soft);
-  border-radius: var(--of-radius);
-  padding: 12px 14px;
-  margin-top: 8px;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--of-border-soft);
+  border-radius: 0;
+  padding: 12px 0;
+  margin-top: 0;
 }
 
 .comment-head {
@@ -718,7 +762,7 @@ button {
 
 .comment-content {
   font-size: 14px;
-  line-height: 1.6;
+  line-height: 1.65;
 }
 
 .comment-actions {
@@ -756,7 +800,7 @@ button {
 
 .comment-replies {
   margin-left: 22px;
-  border-left: 2px solid var(--of-border-soft);
+  border-left: 2px solid var(--of-border);
   padding-left: 10px;
 }
 
@@ -764,14 +808,15 @@ button {
 .auth-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
-  gap: 16px;
+  gap: 0;
 }
 
 .auth-card {
-  background: var(--of-card);
-  border: 1px solid var(--of-border);
-  border-radius: var(--of-radius);
-  padding: 18px;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--of-border);
+  border-radius: 0;
+  padding: 18px 0;
 }
 
 .auth-card-head {
@@ -795,7 +840,7 @@ button {
 .record-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 0;
 }
 
 .record-item {
@@ -803,14 +848,15 @@ button {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  background: var(--of-card);
-  border: 1px solid var(--of-border);
-  border-radius: var(--of-radius);
-  padding: 12px 16px;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--of-border);
+  border-radius: 0;
+  padding: 14px 0;
 }
 
 .record-reason {
-  color: #d03050;
+  color: #b91c1c;
   font-size: 12px;
   margin-top: 2px;
 }
@@ -832,6 +878,8 @@ button {
 
 .profile-name {
   font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
 }
 
 .profile-sub {
@@ -891,7 +939,7 @@ button {
   width: 100%;
   height: 460px;
   border: 1px solid var(--of-border);
-  border-radius: 8px;
+  border-radius: 4px;
   background: #fff;
 }
 
@@ -899,8 +947,31 @@ button {
   width: 100%;
   min-height: 780px;
   border: 1px solid var(--of-border);
-  border-radius: var(--of-radius);
+  border-radius: 4px;
   background: #fff;
+}
+
+/* ---------- Element Plus 组件微调 ---------- */
+.el-input__wrapper,
+.el-select__wrapper,
+.el-textarea__inner {
+  background-color: #f4f4f4;
+  box-shadow: none !important;
+}
+
+.el-input__wrapper:hover,
+.el-select__wrapper:hover {
+  box-shadow: none !important;
+}
+
+.el-input__wrapper.is-focus,
+.el-select__wrapper.is-focused,
+.el-textarea__inner:focus {
+  box-shadow: 0 0 0 1px var(--of-text) inset !important;
+}
+
+.el-button {
+  border-radius: 4px;
 }
 
 /* ---------- 响应式 ---------- */

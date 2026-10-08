@@ -4,17 +4,17 @@
     <meta charset="UTF-8" />
     <link
       rel="icon"
-      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='16' fill='%23FF4500'/%3E%3Ctext x='16' y='22' font-size='18' text-anchor='middle' fill='white' font-family='Arial'%3EF%3C/text%3E%3C/svg%3E"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230a0a0a'/%3E%3Ctext x='16' y='22' font-size='18' text-anchor='middle' fill='white' font-family='Arial'%3EF%3C/text%3E%3C/svg%3E"
     />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>OpenForum - 开放式论坛系统</title>
     <style>
       :root {
-        --of-primary: #ff4500;
-        --of-bg: #f6f7f8;
+        --of-primary: #0a0a0a;
+        --of-bg: #ffffff;
         --of-card: #ffffff;
-        --of-border: #e5e6e8;
-        --of-border-soft: #edeff1;
+        --of-border: #e8e8e8;
+        --of-border-soft: #f0f0f0;
         --of-nav-height: 56px;
         --of-max-width: 1180px;
       }
@@ -31,7 +31,7 @@
           'Hiragino Sans GB', 'Microsoft YaHei', 'Helvetica Neue', Helvetica, Arial,
           sans-serif;
         background-color: var(--of-bg);
-        color: #1a1a1b;
+        color: #0a0a0a;
         font-size: 14px;
         line-height: 1.5;
         -webkit-font-smoothing: antialiased;
@@ -41,8 +41,8 @@
       }
       /* ---------- 首屏骨架屏（Vue 挂载后自动替换） ---------- */
       .of-skeleton {
-        --sk-base: #eceef1;
-        --sk-hi: #f6f7f9;
+        --sk-base: #ededed;
+        --sk-hi: #f8f8f8;
       }
       .of-sk-shimmer {
         background: linear-gradient(
@@ -53,7 +53,7 @@
         );
         background-size: 400% 100%;
         animation: of-sk-loading 1.4s ease infinite;
-        border-radius: 6px;
+        border-radius: 4px;
       }
       @keyframes of-sk-loading {
         0% {
@@ -83,7 +83,7 @@
       .of-sk-logo {
         width: 32px;
         height: 32px;
-        border-radius: 50%;
+        border-radius: 8px;
         background: var(--of-primary);
         flex-shrink: 0;
       }
@@ -95,7 +95,7 @@
         flex: 1;
         max-width: 560px;
         height: 34px;
-        border-radius: 17px;
+        border-radius: 4px;
       }
       .of-sk-actions {
         margin-left: auto;
@@ -106,7 +106,7 @@
       .of-sk-pill {
         height: 32px;
         width: 96px;
-        border-radius: 16px;
+        border-radius: 4px;
       }
       .of-sk-avatar {
         width: 32px;
@@ -116,24 +116,22 @@
       .of-sk-main {
         max-width: var(--of-max-width);
         margin: 0 auto;
-        padding: 20px 16px 60px;
+        padding: 28px 24px 60px;
       }
       .of-sk-layout {
         display: grid;
-        grid-template-columns: 260px minmax(0, 1fr);
-        gap: 20px;
+        grid-template-columns: 240px minmax(0, 1fr);
+        gap: 28px;
         align-items: start;
       }
       .of-sk-sidebar {
         display: flex;
         flex-direction: column;
-        gap: 16px;
+        gap: 24px;
       }
-      .of-sk-card {
-        background: var(--of-card);
-        border: 1px solid var(--of-border);
-        border-radius: 10px;
-        padding: 16px;
+      .of-sk-group {
+        display: flex;
+        flex-direction: column;
       }
       .of-sk-line {
         height: 12px;
@@ -154,7 +152,7 @@
       .of-sk-dot {
         width: 30px;
         height: 30px;
-        border-radius: 50%;
+        border-radius: 4px;
         flex-shrink: 0;
       }
       .of-sk-col {
@@ -163,22 +161,20 @@
       }
       .of-sk-title {
         width: 90px;
-        height: 16px;
+        height: 12px;
         margin-bottom: 12px;
       }
       .of-sk-grid {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-        gap: 12px;
+        gap: 0;
         margin-bottom: 22px;
       }
       .of-sk-forum {
         display: flex;
         gap: 12px;
-        padding: 14px;
-        background: var(--of-card);
-        border: 1px solid var(--of-border);
-        border-radius: 10px;
+        padding: 14px 0;
+        border-bottom: 1px solid var(--of-border);
       }
       .of-sk-forum-icon {
         width: 44px;
@@ -190,11 +186,9 @@
         display: flex;
         align-items: center;
         justify-content: space-between;
-        background: var(--of-card);
-        border: 1px solid var(--of-border);
-        border-radius: 10px;
-        padding: 10px 14px;
-        margin-bottom: 16px;
+        padding: 0 0 12px;
+        border-bottom: 1px solid var(--of-border);
+        margin-bottom: 4px;
       }
       .of-sk-tabs {
         display: flex;
@@ -202,21 +196,17 @@
       }
       .of-sk-tab {
         width: 64px;
-        height: 30px;
-        border-radius: 16px;
+        height: 28px;
+        border-radius: 4px;
       }
       .of-sk-post {
         display: flex;
-        background: var(--of-card);
-        border: 1px solid var(--of-border);
-        border-radius: 10px;
-        overflow: hidden;
-        margin-bottom: 10px;
+        padding: 2px 0;
+        border-bottom: 1px solid var(--of-border);
       }
       .of-sk-vote {
-        width: 44px;
+        width: 40px;
         flex-shrink: 0;
-        background: #f8f9fa;
       }
       .of-sk-post-body {
         flex: 1;
@@ -253,7 +243,7 @@
         <main class="of-sk-main">
           <div class="of-sk-layout">
             <aside class="of-sk-sidebar">
-              <div class="of-sk-card">
+              <div class="of-sk-group">
                 <div class="of-sk-title of-sk-shimmer"></div>
                 <div class="of-sk-row">
                   <div class="of-sk-dot of-sk-shimmer"></div>
@@ -277,7 +267,7 @@
                   </div>
                 </div>
               </div>
-              <div class="of-sk-card">
+              <div class="of-sk-group">
                 <div class="of-sk-title of-sk-shimmer"></div>
                 <div class="of-sk-row">
                   <div class="of-sk-dot of-sk-shimmer"></div>
