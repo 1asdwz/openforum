@@ -1,4 +1,4 @@
-import type { PageResult, TemplateConfig } from '@/types'
+import type { Comment, PageResult, Post, TemplateConfig } from '@/types'
 
 /** 相对时间格式化 */
 export function formatTime(input?: string | null): string {
@@ -180,4 +180,61 @@ export function isImageUrl(value?: string | null): value is string {
 /** 返回可用于 img / 头像 src 的图片 URL；非图片值（如 emoji）返回 undefined */
 export function imageSrc(value?: string | null): string | undefined {
   return isImageUrl(value) ? value : undefined
+}
+
+/** 将后端 PostSummaryDTO 归一化为前端 Post（补齐 authorName / content 等字段） */
+export function normalizePostSummary(raw: unknown): Post {
+  const p = (raw ?? {}) as Record<string, unknown>
+  const author = (p.author ?? {}) as Record<string, unknown>
+  return {
+    id: asNumber(p.id),
+    forumId: asNumber(p.forumId),
+    forumSlug: asString(p.forumSlug),
+    forumName: asString(p.forumName),
+    authorId: asNumber(p.authorId ?? author.id),
+    authorName: asString(p.authorName ?? author.username),
+    title: asString(p.title),
+    content: asString(p.content ?? p.contentPreview),
+    upvotes: asNumber(p.upvotes),
+    downvotes: asNumber(p.downvotes),
+    score: asNumber(p.score),
+    commentCount: asNumber(p.commentCount),
+    isPinned: p.isPinned === true,
+    createdAt: asString(p.createdAt),
+    myVote: typeof p.myVote === 'number' ? p.myVote : undefined,
+    canVote: typeof p.canVote === 'boolean' ? p.canVote : undefined,
+  }
+}
+
+/** 将后端 CommentDTO（children）归一化为前端 Comment（replies），递归处理子回复 */
+export function normalizeComment(raw: unknown): Comment {
+  const c = (raw ?? {}) as Record<string, unknown>
+  const children = Array.isArray(c.children)
+    ? c.children
+    : Array.isArray(c.replies)
+      ? c.replies
+      : []
+  return {
+    id: asNumber(c.id),
+    postId: asNumber(c.postId),
+    parentId: typeof c.parentId === 'number' ? c.parentId : null,
+    authorId: asNumber(c.authorId),
+    authorName: asString(c.authorName),
+    content: asString(c.content),
+    score: asNumber(c.score),
+    upvotes: asNumber(c.upvotes),
+    downvotes: asNumber(c.downvotes),
+    createdAt: asString(c.createdAt),
+    replies: children.map(normalizeComment),
+    myVote: typeof c.myVote === 'number' ? c.myVote : undefined,
+    canVote: typeof c.canVote === 'boolean' ? c.canVote : undefined,
+  }
+}
+
+function asString(value: unknown): string {
+  return typeof value === 'string' ? value : ''
+}
+
+function asNumber(value: unknown): number {
+  return typeof value === 'number' ? value : 0
 }

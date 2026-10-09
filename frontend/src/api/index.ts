@@ -55,6 +55,10 @@ export const authApi = {
 
 export const userApi = {
   get: (id: number | string) => api.get<User>(`/users/${id}`),
+  posts: (id: number | string, params: { sort?: 'hot' | 'new' | 'top'; page?: number; size?: number } = {}) =>
+    api.get<unknown>(`/users/${id}/posts`, { params: shiftPage(params) }),
+  comments: (id: number | string, params: { page?: number; size?: number } = {}) =>
+    api.get<unknown>(`/users/${id}/comments`, { params: shiftPage(params) }),
   updateMe: (payload: { avatar?: string; bio?: string }) =>
     api.put<User>('/users/me', payload),
 }

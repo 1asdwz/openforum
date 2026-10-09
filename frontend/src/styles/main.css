@@ -1462,6 +1462,48 @@ html.dark .state-box.error {
   color: var(--of-text-subtle);
 }
 
+/* 用户页：评论列表 */
+.profile-comment {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.profile-comment-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: var(--of-text-muted);
+}
+
+.profile-comment-meta .muted,
+.profile-comment-meta .dot {
+  color: var(--of-text-subtle);
+}
+
+.profile-comment-link {
+  color: var(--of-text);
+  font-weight: 600;
+}
+
+.profile-comment-link:hover {
+  color: var(--of-primary);
+  text-decoration: underline;
+}
+
+.profile-comment-body {
+  color: var(--of-text-body);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.profile-comment-score {
+  font-size: 12px;
+  color: var(--of-text-muted);
+}
+
 /* ============================================================
    认证 / 表单卡
    ============================================================ */

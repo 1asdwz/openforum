@@ -91,6 +91,21 @@ export interface Comment {
   canVote?: boolean
 }
 
+/** 用户主页「评论」列表：扁平评论 + 所属帖子标题 */
+export interface UserComment {
+  id: number
+  postId: number
+  parentId?: number | null
+  authorId: number
+  authorName: string
+  content: string
+  score: number
+  upvotes: number
+  downvotes: number
+  createdAt: string
+  postTitle?: string | null
+}
+
 export interface AuthFieldDef {
   name: string
   label: string

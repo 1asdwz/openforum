@@ -112,7 +112,7 @@ import IconMore from '@/components/icons/IconMore.vue'
 import { commentApi, postApi } from '@/api'
 import { useAuthStore } from '@/stores/auth'
 import type { Comment, Post } from '@/types'
-import { errorMessage, formatTime, toArray } from '@/utils/format'
+import { errorMessage, formatTime, normalizeComment, toArray } from '@/utils/format'
 
 const RichTextEditor = defineAsyncComponent(
   () => import('@/components/RichTextEditor.vue')
@@ -176,7 +176,7 @@ async function loadComments() {
   commentsLoading.value = true
   try {
     const data = await commentApi.listByPost(post.value.id)
-    comments.value = toArray<Comment>(data)
+    comments.value = toArray<unknown>(data).map(normalizeComment)
     sortTree(comments.value, commentSort.value)
   } catch (e) {
     ElMessage.error(errorMessage(e, '评论加载失败'))

@@ -15,5 +15,6 @@ public record CommentDTO(
         int downvotes,
         int score,
         LocalDateTime createdAt,
-        List<CommentDTO> children) {
+        List<CommentDTO> children,
+        String postTitle) {
 }

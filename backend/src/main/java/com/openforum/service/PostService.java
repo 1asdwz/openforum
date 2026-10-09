@@ -44,10 +44,24 @@ public class PostService {
         this.accessService = accessService;
     }
 
-    public PageResponse<PostSummaryDTO> list(Long forumId, String sort, int page, int size, Long userId) {
-        List<Post> posts = forumId == null
-                ? new ArrayList<>(postRepository.findByRemovedFalse())
-                : new ArrayList<>(postRepository.findByForumIdAndRemovedFalse(forumId));
+    public PageResponse<PostSummaryDTO> list(Long forumId, String query, String sort, int page, int size, Long userId) {
+        List<Post> posts;
+        if (query != null && !query.isBlank()) {
+            posts = new ArrayList<>(postRepository.findByTitleContainingIgnoreCaseAndRemovedFalse(query.trim()));
+        } else if (forumId == null) {
+            posts = new ArrayList<>(postRepository.findByRemovedFalse());
+        } else {
+            posts = new ArrayList<>(postRepository.findByForumIdAndRemovedFalse(forumId));
+        }
+        return toPage(posts, sort, page, size);
+    }
+
+    public PageResponse<PostSummaryDTO> listByAuthor(Long authorId, String sort, int page, int size) {
+        List<Post> posts = new ArrayList<>(postRepository.findByAuthorIdAndRemovedFalse(authorId));
+        return toPage(posts, sort, page, size);
+    }
+
+    private PageResponse<PostSummaryDTO> toPage(List<Post> posts, String sort, int page, int size) {
         Comparator<Post> comparator = switch (sort == null ? "hot" : sort.toLowerCase()) {
             case "new" -> Comparator.comparing(Post::getCreatedAt).reversed();
             case "top" -> Comparator.comparingInt(Post::getScore).reversed();

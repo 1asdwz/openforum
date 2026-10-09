@@ -118,7 +118,7 @@ import IconPlus from '@/components/icons/IconPlus.vue'
 import { forumApi, postApi } from '@/api'
 import { useAuthStore } from '@/stores/auth'
 import type { Post, SubForum } from '@/types'
-import { avatarText, errorMessage, isImageUrl, normalizePage, toArray } from '@/utils/format'
+import { avatarText, errorMessage, isImageUrl, normalizePage, normalizePostSummary, toArray } from '@/utils/format'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -156,8 +156,9 @@ async function loadPosts(reset = true) {
   error.value = ''
   try {
     const payload = await postApi.list({ sort: sort.value, page: page.value, size })
-    const { items, total: t } = normalizePage<Post>(payload)
-    posts.value = reset ? items : [...posts.value, ...items]
+    const { items, total: t } = normalizePage<unknown>(payload)
+    const mapped = items.map(normalizePostSummary)
+    posts.value = reset ? mapped : [...posts.value, ...mapped]
     total.value = t
   } catch (e) {
     error.value = errorMessage(e)

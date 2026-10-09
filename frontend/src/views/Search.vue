@@ -62,7 +62,7 @@ import SortChips, { type SortOption } from '@/components/SortChips.vue'
 import { forumApi, postApi } from '@/api'
 import { useAuthStore } from '@/stores/auth'
 import type { Post, SubForum } from '@/types'
-import { avatarText, errorMessage, isImageUrl, normalizePage } from '@/utils/format'
+import { avatarText, errorMessage, isImageUrl, normalizePage, normalizePostSummary } from '@/utils/format'
 
 type SearchTab = 'posts' | 'forums'
 
@@ -123,9 +123,7 @@ async function search() {
       postApi.list({ q, sort: 'new', page: 1, size: 30 }),
       forumApi.list({ q, page: 1, size: 30 }),
     ])
-    posts.value = normalizePage<Post>(postPayload).items.filter(
-      (p) => matches(p.title, q) || matches(p.content, q)
-    )
+    posts.value = normalizePage<unknown>(postPayload).items.map(normalizePostSummary)
     forums.value = normalizePage<SubForum>(forumPayload).items.filter(
       (f) => matches(f.name, q) || matches(f.description, q) || matches(f.slug, q)
     )

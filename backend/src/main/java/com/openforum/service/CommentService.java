@@ -1,5 +1,6 @@
 package com.openforum.service;
 
+import com.openforum.common.PageResponse;
 import com.openforum.dto.comment.CommentCreateRequest;
 import com.openforum.dto.comment.CommentDTO;
 import com.openforum.entity.Comment;
@@ -16,6 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -53,6 +55,16 @@ public class CommentService {
             }
         }
         return roots.stream().map(comment -> build(comment, byParent)).toList();
+    }
+
+    public PageResponse<CommentDTO> listByAuthor(Long authorId, int page, int size) {
+        List<Comment> comments = new ArrayList<>(commentRepository.findByAuthorIdAndRemovedFalse(authorId));
+        comments.sort(Comparator.comparing(Comment::getCreatedAt).reversed());
+        int total = comments.size();
+        int from = Math.max(0, Math.min(page * size, total));
+        int to = Math.min(from + size, total);
+        List<CommentDTO> content = comments.subList(from, to).stream().map(this::toFlat).toList();
+        return PageResponse.of(content, page, size, total);
     }
 
     @Transactional
@@ -133,6 +145,19 @@ public class CommentService {
                 author == null ? null : author.getAvatar(),
                 comment.getParentId(), comment.getContent(),
                 comment.getUpvotes(), comment.getDownvotes(), comment.getScore(),
-                comment.getCreatedAt(), children);
+                comment.getCreatedAt(), children, null);
+    }
+
+    /** 用户主页用：扁平评论（不含子回复），带上所属帖子标题 */
+    private CommentDTO toFlat(Comment comment) {
+        User author = userRepository.findById(comment.getAuthorId()).orElse(null);
+        Post post = postRepository.findById(comment.getPostId()).orElse(null);
+        return new CommentDTO(comment.getId(), comment.getPostId(), comment.getAuthorId(),
+                author == null ? null : author.getUsername(),
+                author == null ? null : author.getAvatar(),
+                comment.getParentId(), comment.getContent(),
+                comment.getUpvotes(), comment.getDownvotes(), comment.getScore(),
+                comment.getCreatedAt(), List.of(),
+                post == null ? null : post.getTitle());
     }
 }

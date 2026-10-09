@@ -34,10 +34,11 @@ public class PostController {
     @GetMapping
     public ApiResponse<PageResponse<PostSummaryDTO>> list(
             @RequestParam(required = false) Long forumId,
+            @RequestParam(required = false) String q,
             @RequestParam(defaultValue = "hot") String sort,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
-        return ApiResponse.ok(postService.list(forumId, sort, page, size, currentUserId()));
+        return ApiResponse.ok(postService.list(forumId, q, sort, page, size, currentUserId()));
     }
 
     @GetMapping("/{id}")

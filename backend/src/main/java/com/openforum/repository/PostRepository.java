@@ -22,5 +22,7 @@ public interface PostRepository extends JpaRepository<Post, Long> {
 
     List<Post> findByAuthorIdAndRemovedFalse(Long authorId);
 
+    List<Post> findByTitleContainingIgnoreCaseAndRemovedFalse(String title);
+
     long countByForumIdAndRemovedFalse(Long forumId);
 }

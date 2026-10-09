@@ -230,6 +230,7 @@ import {
   errorMessage,
   isImageUrl,
   normalizePage,
+  normalizePostSummary,
   parseRequiredAuthTypes,
   parseTemplateConfig,
 } from '@/utils/format'
@@ -324,8 +325,9 @@ async function loadPosts(reset = true) {
       page: postsPage.value,
       size: postsSize,
     })
-    const { items, total } = normalizePage<Post>(payload)
-    posts.value = reset ? items : [...posts.value, ...items]
+    const { items, total } = normalizePage<unknown>(payload)
+    const mapped = items.map(normalizePostSummary)
+    posts.value = reset ? mapped : [...posts.value, ...mapped]
     postsTotal.value = total
   } catch (e) {
     postsError.value = errorMessage(e)
