@@ -4,19 +4,52 @@
     <meta charset="UTF-8" />
     <link
       rel="icon"
-      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230a0a0a'/%3E%3Ctext x='16' y='22' font-size='18' text-anchor='middle' fill='white' font-family='Arial'%3EF%3C/text%3E%3C/svg%3E"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23ff4500'/%3E%3Ctext x='16' y='22' font-size='18' text-anchor='middle' fill='white' font-family='Arial'%3EF%3C/text%3E%3C/svg%3E"
     />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>OpenForum - 开放式论坛系统</title>
+    <script>
+      // 首屏前套用主题，避免深色模式下闪白（与 stores/ui.ts 保持一致）
+      (function () {
+        try {
+          var t = localStorage.getItem('of-theme') || 'system';
+          var dark =
+            t === 'dark' ||
+            (t === 'system' &&
+              window.matchMedia &&
+              window.matchMedia('(prefers-color-scheme: dark)').matches);
+          if (dark) {
+            document.documentElement.classList.add('dark');
+          }
+          document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
+        } catch (e) {}
+      })();
+    </script>
     <style>
       :root {
-        --of-primary: #0a0a0a;
-        --of-bg: #ffffff;
+        --of-brand: #ff4500;
+        --of-primary: #d93900;
+        --of-bg: #f6f8f9;
         --of-card: #ffffff;
-        --of-border: #e8e8e8;
-        --of-border-soft: #f0f0f0;
+        --of-border: #e5ebee;
+        --of-text: #181c1f;
+        --of-text-body: #333d42;
         --of-nav-height: 56px;
-        --of-max-width: 1180px;
+        --of-rail-left: 270px;
+        --of-rail-right: 316px;
+        --of-radius: 16px;
+        --of-max-width: 1460px;
+        --sk-base: #e5ebee;
+        --sk-hi: #f2f5f6;
+      }
+      html.dark {
+        --of-bg: #0b1416;
+        --of-card: #181c1f;
+        --of-border: #2a3c42;
+        --of-text: #eef1f3;
+        --of-text-body: #d7dde0;
+        --sk-base: #223237;
+        --sk-hi: #2a3c42;
       }
       * {
         box-sizing: border-box;
@@ -31,7 +64,7 @@
           'Hiragino Sans GB', 'Microsoft YaHei', 'Helvetica Neue', Helvetica, Arial,
           sans-serif;
         background-color: var(--of-bg);
-        color: #0a0a0a;
+        color: var(--of-text-body);
         font-size: 14px;
         line-height: 1.5;
         -webkit-font-smoothing: antialiased;
@@ -40,10 +73,6 @@
         min-height: 100vh;
       }
       /* ---------- 首屏骨架屏（Vue 挂载后自动替换） ---------- */
-      .of-skeleton {
-        --sk-base: #ededed;
-        --sk-hi: #f8f8f8;
-      }
       .of-sk-shimmer {
         background: linear-gradient(
           90deg,
@@ -53,7 +82,7 @@
         );
         background-size: 400% 100%;
         animation: of-sk-loading 1.4s ease infinite;
-        border-radius: 4px;
+        border-radius: 8px;
       }
       @keyframes of-sk-loading {
         0% {
@@ -75,7 +104,7 @@
         max-width: var(--of-max-width);
         height: 100%;
         margin: 0 auto;
-        padding: 0 16px;
+        padding: 0 24px;
         display: flex;
         align-items: center;
         gap: 16px;
@@ -83,8 +112,8 @@
       .of-sk-logo {
         width: 32px;
         height: 32px;
-        border-radius: 4px;
-        background: var(--of-primary);
+        border-radius: 9999px;
+        background: var(--of-brand);
         flex-shrink: 0;
       }
       .of-sk-brand {
@@ -94,8 +123,8 @@
       .of-sk-search {
         flex: 1;
         max-width: 560px;
-        height: 34px;
-        border-radius: 4px;
+        height: 40px;
+        border-radius: 9999px;
       }
       .of-sk-actions {
         margin-left: auto;
@@ -106,7 +135,7 @@
       .of-sk-pill {
         height: 32px;
         width: 96px;
-        border-radius: 4px;
+        border-radius: 9999px;
       }
       .of-sk-avatar {
         width: 32px;
@@ -116,79 +145,65 @@
       .of-sk-main {
         max-width: var(--of-max-width);
         margin: 0 auto;
-        padding: 28px 24px 60px;
+        padding: 20px 24px 64px;
       }
       .of-sk-layout {
         display: grid;
-        grid-template-columns: 240px minmax(0, 1fr);
-        gap: 28px;
+        grid-template-columns: var(--of-rail-left) minmax(0, 1fr) var(--of-rail-right);
+        gap: 24px;
         align-items: start;
       }
-      .of-sk-sidebar {
+      .of-sk-sidebar,
+      .of-sk-aside {
         display: flex;
         flex-direction: column;
-        gap: 24px;
+        gap: 8px;
       }
       .of-sk-group {
         display: flex;
         flex-direction: column;
+        gap: 8px;
+        padding: 12px;
+        background: var(--of-card);
+        border: 1px solid var(--of-border);
+        border-radius: var(--of-radius);
       }
       .of-sk-line {
         height: 12px;
-        margin-bottom: 10px;
-      }
-      .of-sk-line:last-child {
-        margin-bottom: 0;
       }
       .of-sk-row {
         display: flex;
         align-items: center;
         gap: 10px;
-        margin-bottom: 12px;
-      }
-      .of-sk-row:last-child {
-        margin-bottom: 0;
       }
       .of-sk-dot {
-        width: 30px;
-        height: 30px;
-        border-radius: 4px;
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
         flex-shrink: 0;
       }
       .of-sk-col {
         flex: 1;
         min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
       }
       .of-sk-title {
         width: 90px;
         height: 12px;
-        margin-bottom: 12px;
       }
-      .of-sk-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-        gap: 0;
-        margin-bottom: 22px;
-      }
-      .of-sk-forum {
+      .of-sk-feed {
+        min-width: 0;
         display: flex;
-        gap: 12px;
-        padding: 14px 0;
-        border-bottom: 1px solid var(--of-border);
-      }
-      .of-sk-forum-icon {
-        width: 44px;
-        height: 44px;
-        border-radius: 50%;
-        flex-shrink: 0;
+        flex-direction: column;
+        gap: 8px;
       }
       .of-sk-toolbar {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        padding: 0 0 12px;
-        border-bottom: 1px solid var(--of-border);
-        margin-bottom: 4px;
+        padding: 4px 0 8px;
       }
       .of-sk-tabs {
         display: flex;
@@ -197,12 +212,14 @@
       .of-sk-tab {
         width: 64px;
         height: 28px;
-        border-radius: 4px;
+        border-radius: 9999px;
       }
       .of-sk-post {
         display: flex;
-        padding: 2px 0;
-        border-bottom: 1px solid var(--of-border);
+        padding: 8px 8px 8px 0;
+        background: var(--of-card);
+        border: 1px solid var(--of-border);
+        border-radius: var(--of-radius);
       }
       .of-sk-vote {
         width: 40px;
@@ -211,24 +228,44 @@
       .of-sk-post-body {
         flex: 1;
         min-width: 0;
-        padding: 14px 16px 14px 8px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        padding: 6px 12px 6px 0;
       }
-      @media (max-width: 900px) {
+      @media (max-width: 1280px) {
         .of-sk-layout {
-          grid-template-columns: 1fr;
+          grid-template-columns: var(--of-rail-left) minmax(0, 1fr);
+        }
+        .of-sk-aside {
+          display: none;
+        }
+      }
+      @media (max-width: 960px) {
+        .of-sk-layout {
+          grid-template-columns: minmax(0, 1fr);
         }
         .of-sk-sidebar {
           display: none;
         }
-        .of-sk-brand {
+      }
+      @media (max-width: 640px) {
+        .of-sk-brand,
+        .of-sk-pill {
           display: none;
+        }
+        .of-sk-main {
+          padding: 12px 8px 48px;
+        }
+        .of-sk-topnav-inner {
+          padding: 8px 12px;
         }
       }
     </style>
   </head>
   <body>
     <div id="app">
-      <div class="of-skeleton" aria-busy="true" aria-label="加载中">
+      <div aria-busy="true" aria-label="加载中">
         <header class="of-sk-topnav">
           <div class="of-sk-topnav-inner">
             <div class="of-sk-logo"></div>
@@ -243,6 +280,20 @@
         <main class="of-sk-main">
           <div class="of-sk-layout">
             <aside class="of-sk-sidebar">
+              <div class="of-sk-group">
+                <div class="of-sk-row">
+                  <div class="of-sk-dot of-sk-shimmer"></div>
+                  <div class="of-sk-line of-sk-shimmer" style="width: 60%"></div>
+                </div>
+                <div class="of-sk-row">
+                  <div class="of-sk-dot of-sk-shimmer"></div>
+                  <div class="of-sk-line of-sk-shimmer" style="width: 50%"></div>
+                </div>
+                <div class="of-sk-row">
+                  <div class="of-sk-dot of-sk-shimmer"></div>
+                  <div class="of-sk-line of-sk-shimmer" style="width: 66%"></div>
+                </div>
+              </div>
               <div class="of-sk-group">
                 <div class="of-sk-title of-sk-shimmer"></div>
                 <div class="of-sk-row">
@@ -267,43 +318,9 @@
                   </div>
                 </div>
               </div>
-              <div class="of-sk-group">
-                <div class="of-sk-title of-sk-shimmer"></div>
-                <div class="of-sk-row">
-                  <div class="of-sk-dot of-sk-shimmer"></div>
-                  <div class="of-sk-col">
-                    <div class="of-sk-line of-sk-shimmer" style="width: 65%"></div>
-                    <div class="of-sk-line of-sk-shimmer" style="width: 42%"></div>
-                  </div>
-                </div>
-                <div class="of-sk-row">
-                  <div class="of-sk-dot of-sk-shimmer"></div>
-                  <div class="of-sk-col">
-                    <div class="of-sk-line of-sk-shimmer" style="width: 72%"></div>
-                    <div class="of-sk-line of-sk-shimmer" style="width: 38%"></div>
-                  </div>
-                </div>
-              </div>
             </aside>
-            <div>
-              <div class="of-sk-grid">
-                <div class="of-sk-forum">
-                  <div class="of-sk-forum-icon of-sk-shimmer"></div>
-                  <div class="of-sk-col">
-                    <div class="of-sk-line of-sk-shimmer" style="width: 55%"></div>
-                    <div class="of-sk-line of-sk-shimmer" style="width: 80%"></div>
-                    <div class="of-sk-line of-sk-shimmer" style="width: 45%"></div>
-                  </div>
-                </div>
-                <div class="of-sk-forum">
-                  <div class="of-sk-forum-icon of-sk-shimmer"></div>
-                  <div class="of-sk-col">
-                    <div class="of-sk-line of-sk-shimmer" style="width: 48%"></div>
-                    <div class="of-sk-line of-sk-shimmer" style="width: 76%"></div>
-                    <div class="of-sk-line of-sk-shimmer" style="width: 40%"></div>
-                  </div>
-                </div>
-              </div>
+
+            <div class="of-sk-feed">
               <div class="of-sk-toolbar">
                 <div class="of-sk-tabs">
                   <div class="of-sk-tab of-sk-shimmer"></div>
@@ -340,6 +357,32 @@
                 </div>
               </div>
             </div>
+
+            <aside class="of-sk-aside">
+              <div class="of-sk-group">
+                <div class="of-sk-line of-sk-shimmer" style="width: 55%"></div>
+                <div class="of-sk-line of-sk-shimmer" style="width: 90%"></div>
+                <div class="of-sk-line of-sk-shimmer" style="width: 75%"></div>
+                <div class="of-sk-pill of-sk-shimmer" style="width: 100%"></div>
+              </div>
+              <div class="of-sk-group">
+                <div class="of-sk-title of-sk-shimmer"></div>
+                <div class="of-sk-row">
+                  <div class="of-sk-dot of-sk-shimmer"></div>
+                  <div class="of-sk-col">
+                    <div class="of-sk-line of-sk-shimmer" style="width: 65%"></div>
+                    <div class="of-sk-line of-sk-shimmer" style="width: 42%"></div>
+                  </div>
+                </div>
+                <div class="of-sk-row">
+                  <div class="of-sk-dot of-sk-shimmer"></div>
+                  <div class="of-sk-col">
+                    <div class="of-sk-line of-sk-shimmer" style="width: 72%"></div>
+                    <div class="of-sk-line of-sk-shimmer" style="width: 38%"></div>
+                  </div>
+                </div>
+              </div>
+            </aside>
           </div>
         </main>
       </div>
