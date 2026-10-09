@@ -9,16 +9,18 @@
       </div>
     </div>
 
-    <template v-else-if="post">
-      <article class="post-detail-card">
-        <div class="post-detail-head">
+    <div v-else-if="post" class="page-grid no-right">
+      <LeftRail />
+
+      <div class="feed-column">
+        <article class="post-detail-card">
           <VoteColumn
             :score="post.score"
             :my-vote="post.myVote"
             :disabled="post.canVote === false"
             @vote="onVotePost"
           />
-          <div style="flex: 1; min-width: 0">
+          <div class="post-detail-main">
             <div class="post-meta">
               <router-link class="forum-link" :to="`/f/${post.forumSlug}`">
                 {{ post.forumName }}
@@ -30,46 +32,68 @@
             </div>
             <h1 class="post-detail-title">{{ post.title }}</h1>
             <MarkdownContent class="post-detail-content" :markdown="post.content" />
+
+            <div class="post-footer">
+              <span class="post-stat">
+                <IconComment class="ico" />
+                <span>{{ post.commentCount }} 条评论</span>
+              </span>
+              <button class="post-action" type="button" @click="sharePost">
+                <IconShare class="ico" />
+                <span>分享</span>
+              </button>
+              <button class="post-action" type="button" @click="copyPostLink">
+                <IconMore class="ico" />
+              </button>
+            </div>
           </div>
+        </article>
+
+        <div class="comment-box">
+          <h3 style="margin-bottom: 10px">发表评论</h3>
+          <template v-if="auth.isAuthenticated">
+            <RichTextEditor
+              v-model="commentText"
+              compact
+              placeholder="友善地表达你的看法…"
+            />
+            <div class="form-actions">
+              <el-button
+                type="primary"
+                round
+                :loading="submittingComment"
+                @click="submitComment"
+              >
+                评论
+              </el-button>
+            </div>
+          </template>
+          <p v-else style="color: var(--of-text-muted)">
+            <button class="link-btn" @click="goLogin">登录</button> 后参与讨论
+          </p>
         </div>
-      </article>
 
-      <div class="comment-box">
-        <h3 style="margin-bottom: 10px">发表评论</h3>
-        <template v-if="auth.isAuthenticated">
-          <RichTextEditor
-            v-model="commentText"
-            compact
-            placeholder="友善地表达你的看法…"
+        <div class="comment-section-head">
+          <span class="comment-count">{{ post.commentCount }} 条评论</span>
+          <SortChips v-model="commentSort" :options="commentSorts" />
+        </div>
+
+        <el-skeleton v-if="commentsLoading" :rows="4" animated />
+        <div v-else-if="!comments.length" class="state-box">
+          还没有评论，来抢沙发吧
+        </div>
+        <div v-else class="comment-list">
+          <CommentNode
+            v-for="comment in comments"
+            :key="comment.id"
+            :comment="comment"
+            :depth="0"
+            @vote="onVoteComment"
+            @reply="onReply"
           />
-          <div class="form-actions">
-            <el-button type="primary" :loading="submittingComment" @click="submitComment">
-              评论
-            </el-button>
-          </div>
-        </template>
-        <p v-else style="color: var(--of-text-muted)">
-          <button class="link-btn" @click="goLogin">登录</button> 后参与讨论
-        </p>
+        </div>
       </div>
-
-      <h2 class="section-title">{{ post.commentCount }} 条评论</h2>
-
-      <el-skeleton v-if="commentsLoading" :rows="4" animated />
-      <div v-else-if="!comments.length" class="state-box">
-        还没有评论，来抢沙发吧
-      </div>
-      <div v-else class="comment-list">
-        <CommentNode
-          v-for="comment in comments"
-          :key="comment.id"
-          :comment="comment"
-          :depth="0"
-          @vote="onVoteComment"
-          @reply="onReply"
-        />
-      </div>
-    </template>
+    </div>
   </div>
 </template>
 
@@ -80,6 +104,11 @@ import { ElMessage } from 'element-plus'
 import VoteColumn from '@/components/VoteColumn.vue'
 import CommentNode from '@/components/CommentNode.vue'
 import MarkdownContent from '@/components/MarkdownContent.vue'
+import LeftRail from '@/components/LeftRail.vue'
+import SortChips, { type SortOption } from '@/components/SortChips.vue'
+import IconComment from '@/components/icons/IconComment.vue'
+import IconShare from '@/components/icons/IconShare.vue'
+import IconMore from '@/components/icons/IconMore.vue'
 import { commentApi, postApi } from '@/api'
 import { useAuthStore } from '@/stores/auth'
 import type { Comment, Post } from '@/types'
@@ -99,9 +128,34 @@ const error = ref('')
 
 const comments = ref<Comment[]>([])
 const commentsLoading = ref(false)
+const commentSort = ref('best')
+const commentSorts: SortOption[] = [
+  { label: '最佳', value: 'best' },
+  { label: '最新', value: 'new' },
+  { label: '最早', value: 'old' },
+]
 
 const commentText = ref('')
 const submittingComment = ref(false)
+
+/** 递归排序评论树（原地排序，保持对象引用以支持乐观更新） */
+function sortTree(list: Comment[], key: string) {
+  const compare =
+    key === 'new'
+      ? (a: Comment, b: Comment) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      : key === 'old'
+        ? (a: Comment, b: Comment) =>
+            new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+        : (a: Comment, b: Comment) => b.score - a.score
+
+  list.sort(compare)
+  list.forEach((c) => {
+    if (c.replies?.length) sortTree(c.replies, key)
+  })
+}
+
+watch(commentSort, (key) => sortTree(comments.value, key))
 
 async function load() {
   loading.value = true
@@ -123,6 +177,7 @@ async function loadComments() {
   try {
     const data = await commentApi.listByPost(post.value.id)
     comments.value = toArray<Comment>(data)
+    sortTree(comments.value, commentSort.value)
   } catch (e) {
     ElMessage.error(errorMessage(e, '评论加载失败'))
   } finally {
@@ -132,6 +187,33 @@ async function loadComments() {
 
 function goLogin() {
   router.push({ name: 'login', query: { redirect: route.fullPath } })
+}
+
+function postLink() {
+  return `${location.origin}/forum/post/${post.value?.id}`
+}
+
+async function sharePost() {
+  if (!post.value) return
+  try {
+    if (navigator.share) {
+      await navigator.share({ title: post.value.title, url: postLink() })
+      return
+    }
+    await navigator.clipboard.writeText(postLink())
+    ElMessage.success('链接已复制')
+  } catch {
+    // 用户取消分享
+  }
+}
+
+async function copyPostLink() {
+  try {
+    await navigator.clipboard.writeText(postLink())
+    ElMessage.success('链接已复制')
+  } catch {
+    ElMessage.error('复制失败，请手动复制地址栏链接')
+  }
 }
 
 async function onVotePost(value: number) {

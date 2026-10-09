@@ -1,6 +1,15 @@
 <template>
   <header class="topnav">
     <div class="topnav-inner">
+      <button
+        class="nav-icon-btn only-mobile"
+        type="button"
+        aria-label="打开社区导航"
+        @click="ui.toggleDrawer()"
+      >
+        <IconMenu />
+      </button>
+
       <router-link to="/" class="brand">
         <span class="brand-logo">OF</span>
         <span class="brand-name">OpenForum</span>
@@ -9,27 +18,58 @@
       <div class="topnav-search">
         <el-input
           v-model="keyword"
-          placeholder="搜索帖子、子论坛"
+          placeholder="搜索 OpenForum"
           clearable
           @keyup.enter="onSearch"
         >
           <template #prefix>
-            <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="11" cy="11" r="7" />
-              <path d="m20 20-3.2-3.2" />
-            </svg>
+            <IconSearch class="search-icon" />
           </template>
         </el-input>
       </div>
 
       <div class="topnav-actions">
-        <el-button type="primary" @click="goCreate">
-          + 创建子论坛
+        <el-button class="nav-create-btn" type="primary" round @click="goCreate">
+          <IconPlus />
+          <span class="nav-create-text">创建</span>
         </el-button>
 
+        <button
+          class="nav-icon-btn"
+          type="button"
+          :aria-label="ui.isDark ? '切换到浅色模式' : '切换到深色模式'"
+          @click="ui.toggleTheme()"
+        >
+          <svg
+            v-if="ui.isDark"
+            class="of-ico"
+            viewBox="0 0 20 20"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.6"
+            stroke-linecap="round"
+          >
+            <circle cx="10" cy="10" r="3.6" />
+            <path d="M10 2v1.8M10 16.2V18M2 10h1.8M16.2 10H18M4.3 4.3l1.3 1.3M14.4 14.4l1.3 1.3M15.7 4.3l-1.3 1.3M5.6 14.4l-1.3 1.3" />
+          </svg>
+          <svg
+            v-else
+            class="of-ico"
+            viewBox="0 0 20 20"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.6"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M16.5 12.3A6.8 6.8 0 0 1 7.7 3.5a6.8 6.8 0 1 0 8.8 8.8Z" />
+          </svg>
+        </button>
+
         <template v-if="!auth.isAuthenticated">
-          <el-button text @click="router.push('/login')">登录</el-button>
-          <el-button plain @click="router.push('/register')">注册</el-button>
+          <el-button class="nav-login-btn" round @click="router.push('/login')">
+            登录
+          </el-button>
         </template>
 
         <el-dropdown v-else trigger="click" @command="onCommand">
@@ -44,7 +84,7 @@
             <el-dropdown-menu>
               <el-dropdown-item command="profile">个人资料</el-dropdown-item>
               <el-dropdown-item command="auth">认证中心</el-dropdown-item>
-              <el-dropdown-item command="myForums">我的论坛</el-dropdown-item>
+              <el-dropdown-item command="myForums">我的社区</el-dropdown-item>
               <el-dropdown-item v-if="auth.isAdmin" command="admin" divided>
                 管理后台
               </el-dropdown-item>
@@ -62,9 +102,14 @@ import { ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
-import { avatarText, imageSrc } from '@/utils/format'
+import { useUiStore } from '@/stores/ui'
+import { avatarText } from '@/utils/format'
+import IconSearch from '@/components/icons/IconSearch.vue'
+import IconPlus from '@/components/icons/IconPlus.vue'
+import IconMenu from '@/components/icons/IconMenu.vue'
 
 const auth = useAuthStore()
+const ui = useUiStore()
 const router = useRouter()
 const route = useRoute()
 
@@ -114,3 +159,14 @@ function onCommand(command: string) {
   }
 }
 </script>
+
+<style scoped>
+@media (max-width: 640px) {
+  .nav-create-text {
+    display: none;
+  }
+  .nav-create-btn :deep(.of-ico) {
+    margin-right: 0;
+  }
+}
+</style>

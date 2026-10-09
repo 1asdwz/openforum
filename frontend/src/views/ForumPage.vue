@@ -10,144 +10,183 @@
     </div>
 
     <template v-else-if="forum">
-      <section class="forum-hero">
-        <div
-          class="forum-hero-banner"
-          :style="{ background: forum.themeColor || 'var(--of-primary)' }"
-        ></div>
-        <div class="forum-hero-body">
-          <div class="forum-hero-icon">
-            <img v-if="isImageUrl(forum.icon)" :src="forum.icon" alt="" />
-            <template v-else>{{ forum.icon || avatarText(forum.name) }}</template>
-          </div>
-          <div class="forum-hero-info">
-            <h1>{{ forum.name }}</h1>
-            <p class="forum-hero-desc">{{ forum.description || '这个子论坛还没有简介' }}</p>
-            <p class="forum-hero-stats">
-              {{ forum.memberCount }} 成员 · {{ forum.postCount }} 帖子 · f/{{ forum.slug }}
-            </p>
-            <div v-if="requiredAuthTypes.length" class="required-tags">
-              <el-tag
-                v-for="t in requiredAuthTypes"
-                :key="t"
-                size="small"
-                type="warning"
-                effect="plain"
-              >
-                需 {{ authTypeLabel(t) }}
-              </el-tag>
+      <div class="forum-layout">
+        <div class="forum-main">
+          <section class="forum-hero">
+            <div
+              class="forum-hero-banner"
+              :style="{ background: forum.themeColor || 'var(--of-brand)' }"
+            ></div>
+            <div class="forum-hero-body">
+              <div class="forum-hero-icon">
+                <img v-if="isImageUrl(forum.icon)" :src="forum.icon" alt="" />
+                <template v-else>{{ forum.icon || avatarText(forum.name) }}</template>
+              </div>
+              <div class="forum-hero-info">
+                <h1>{{ forum.name }}</h1>
+                <p class="forum-hero-desc">
+                  f/{{ forum.slug
+                  }}<template v-if="forum.description"> · {{ forum.description }}</template>
+                </p>
+                <p class="forum-hero-stats">
+                  {{ forum.memberCount }} 成员 · {{ forum.postCount }} 帖子
+                </p>
+                <div v-if="requiredAuthTypes.length" class="required-tags">
+                  <el-tag
+                    v-for="t in requiredAuthTypes"
+                    :key="t"
+                    size="small"
+                    type="warning"
+                    effect="plain"
+                  >
+                    需 {{ authTypeLabel(t) }}
+                  </el-tag>
+                </div>
+              </div>
+              <div class="forum-hero-actions">
+                <el-button
+                  v-if="!forum.isMember"
+                  type="primary"
+                  round
+                  @click="toggleMembership(true)"
+                >
+                  加入
+                </el-button>
+                <el-button v-else round @click="toggleMembership(false)">已加入</el-button>
+
+                <el-button type="primary" plain round @click="openCreatePost">
+                  <IconPlus />
+                  <span>发帖</span>
+                </el-button>
+
+                <el-button
+                  v-if="isOwner"
+                  text
+                  @click="router.push(`/f/${forum.slug}/settings`)"
+                >
+                  坛主设置
+                </el-button>
+              </div>
             </div>
-          </div>
-          <div class="forum-hero-actions">
-            <el-button
-              v-if="!forum.isMember"
-              type="primary"
-              @click="toggleMembership(true)"
-            >
-              加入
-            </el-button>
-            <el-button v-else @click="toggleMembership(false)">退出</el-button>
+          </section>
 
-            <el-button type="primary" plain @click="openCreatePost">
-              发帖
-            </el-button>
-
-            <el-button
-              v-if="isOwner"
-              text
-              @click="router.push(`/f/${forum.slug}/settings`)"
-            >
-              坛主设置
-            </el-button>
-          </div>
-        </div>
-      </section>
-
-      <el-alert
-        v-if="forum.canPost === false && auth.isAuthenticated"
-        type="warning"
-        show-icon
-        :closable="false"
-        style="margin-bottom: 12px"
-        title="你还未满足本子论坛的发帖/互动门槛，请先完成相应认证"
-      />
-
-      <!-- 已审核通过的自定义页面 -->
-      <template v-if="forum.customPageStatus === 'APPROVED'">
-        <CustomPageRenderer :html="customHtml" />
-      </template>
-
-      <!-- 默认模板 -->
-      <template v-else>
-        <div v-if="template.announcement" class="template-section">
-          <h3>公告</h3>
-          <div class="section-content">{{ template.announcement }}</div>
-        </div>
-        <div
-          v-for="(section, i) in template.sections || []"
-          :key="i"
-          class="template-section"
-        >
-          <h3>{{ section.title }}</h3>
-          <div class="section-content">{{ section.content }}</div>
-        </div>
-        <div v-if="template.links && template.links.length" class="template-section">
-          <h3>相关链接</h3>
-          <div class="template-links">
-            <el-button
-              v-for="(link, i) in template.links"
-              :key="i"
-              tag="a"
-              :href="link.url"
-              target="_blank"
-              rel="noopener"
-            >
-              {{ link.label }}
-            </el-button>
-          </div>
-        </div>
-        <div v-if="forum.rules" class="template-section">
-          <h3>板块规则</h3>
-          <div class="section-content">{{ forum.rules }}</div>
-        </div>
-      </template>
-
-      <h2 class="section-title">帖子</h2>
-
-      <div class="feed-toolbar">
-        <div class="sort-tabs">
-          <button
-            v-for="t in sorts"
-            :key="t.value"
-            :class="{ active: sort === t.value }"
-            @click="changeSort(t.value)"
-          >
-            {{ t.label }}
-          </button>
-        </div>
-        <el-button size="small" @click="loadPosts(true)">刷新</el-button>
-      </div>
-
-      <el-skeleton v-if="postsLoading" :rows="4" animated />
-      <div v-else-if="postsError" class="state-box error">{{ postsError }}</div>
-      <div v-else-if="!posts.length" class="state-box">
-        这个子论坛还没有帖子，来发布第一条吧
-      </div>
-      <template v-else>
-        <div class="post-list">
-          <PostCard
-            v-for="post in posts"
-            :key="post.id"
-            :post="post"
-            @vote="onVote"
+          <el-alert
+            v-if="forum.canPost === false && auth.isAuthenticated"
+            type="warning"
+            show-icon
+            :closable="false"
+            title="你还未满足本社区的发帖/互动门槛，请先完成相应认证"
           />
+
+          <!-- 已审核通过的自定义页面 -->
+          <template v-if="forum.customPageStatus === 'APPROVED'">
+            <CustomPageRenderer :html="customHtml" />
+          </template>
+
+          <!-- 默认模板 -->
+          <template v-else>
+            <div v-if="template.announcement" class="template-section">
+              <h3>公告</h3>
+              <div class="section-content">{{ template.announcement }}</div>
+            </div>
+            <div
+              v-for="(section, i) in template.sections || []"
+              :key="i"
+              class="template-section"
+            >
+              <h3>{{ section.title }}</h3>
+              <div class="section-content">{{ section.content }}</div>
+            </div>
+            <div v-if="template.links && template.links.length" class="template-section">
+              <h3>相关链接</h3>
+              <div class="template-links">
+                <el-button
+                  v-for="(link, i) in template.links"
+                  :key="i"
+                  tag="a"
+                  :href="link.url"
+                  target="_blank"
+                  rel="noopener"
+                  round
+                >
+                  {{ link.label }}
+                </el-button>
+              </div>
+            </div>
+          </template>
+
+          <div class="feed-toolbar">
+            <SortChips v-model="sort" :options="sorts" />
+            <el-button size="small" text @click="loadPosts(true)">刷新</el-button>
+          </div>
+
+          <el-skeleton v-if="postsLoading" :rows="4" animated />
+          <div v-else-if="postsError" class="state-box error">{{ postsError }}</div>
+          <div v-else-if="!posts.length" class="state-box">
+            这个社区还没有帖子，来发布第一条吧
+          </div>
+          <template v-else>
+            <div class="post-list">
+              <PostCard
+                v-for="post in posts"
+                :key="post.id"
+                :post="post"
+                @vote="onVote"
+              />
+            </div>
+            <div v-if="posts.length < postsTotal" class="load-more">
+              <el-button round :loading="postsLoadingMore" @click="loadMorePosts">
+                加载更多
+              </el-button>
+            </div>
+          </template>
         </div>
-        <div v-if="posts.length < postsTotal" class="load-more">
-          <el-button :loading="postsLoadingMore" @click="loadMorePosts">
-            加载更多
-          </el-button>
-        </div>
-      </template>
+
+        <aside class="rail-right">
+          <section class="rail-card about-card">
+            <div
+              class="about-banner"
+              :style="{ background: forum.themeColor || 'var(--of-brand)' }"
+            ></div>
+            <div class="about-body">
+              <h3 class="about-title">关于社区</h3>
+              <p class="about-desc">
+                {{ forum.description || '这个社区还没有简介' }}
+              </p>
+              <div class="about-stats">
+                <div class="about-row">
+                  <span class="k">成员</span>
+                  <span class="v">{{ forum.memberCount }}</span>
+                </div>
+                <div class="about-row">
+                  <span class="k">帖子</span>
+                  <span class="v">{{ forum.postCount }}</span>
+                </div>
+                <div class="about-row">
+                  <span class="k">社区代号</span>
+                  <span class="v">f/{{ forum.slug }}</span>
+                </div>
+              </div>
+              <el-button
+                class="about-cta"
+                :type="forum.isMember ? 'default' : 'primary'"
+                round
+                @click="toggleMembership(!forum.isMember)"
+              >
+                {{ forum.isMember ? '已加入社区' : '加入社区' }}
+              </el-button>
+            </div>
+          </section>
+
+          <section v-if="ruleList.length" class="rail-card">
+            <div class="rail-heading">社区规则</div>
+            <div v-for="(rule, i) in ruleList" :key="i" class="rule-item">
+              <span class="rule-index">{{ i + 1 }}</span>
+              <span>{{ rule }}</span>
+            </div>
+          </section>
+        </aside>
+      </div>
     </template>
 
     <!-- 发帖弹窗 -->
@@ -179,6 +218,8 @@ import { computed, defineAsyncComponent, onMounted, reactive, ref, watch } from 
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import PostCard from '@/components/PostCard.vue'
+import SortChips, { type SortOption } from '@/components/SortChips.vue'
+import IconPlus from '@/components/icons/IconPlus.vue'
 import CustomPageRenderer from '@/components/CustomPageRenderer.vue'
 import { forumApi, postApi } from '@/api'
 import { useAuthStore } from '@/stores/auth'
@@ -193,8 +234,6 @@ import {
   parseTemplateConfig,
 } from '@/utils/format'
 
-type SortKey = 'hot' | 'new' | 'top'
-
 const RichTextEditor = defineAsyncComponent(
   () => import('@/components/RichTextEditor.vue')
 )
@@ -203,7 +242,9 @@ const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
 
-const sorts: { label: string; value: SortKey }[] = [
+type Sort = 'hot' | 'new' | 'top'
+
+const sorts: SortOption<Sort>[] = [
   { label: '热门', value: 'hot' },
   { label: '最新', value: 'new' },
   { label: '最高分', value: 'top' },
@@ -213,7 +254,7 @@ const forum = ref<SubForum | null>(null)
 const loading = ref(true)
 const error = ref('')
 const customHtml = ref('')
-const sort = ref<SortKey>('hot')
+const sort = ref<Sort>('hot')
 
 const posts = ref<Post[]>([])
 const postsTotal = ref(0)
@@ -236,6 +277,12 @@ const requiredAuthTypes = computed(() =>
 const isOwner = computed(
   () => !!forum.value && !!auth.user && forum.value.creatorId === auth.user.id
 )
+const ruleList = computed(() =>
+  (forum.value?.rules || '')
+    .split('\n')
+    .map((r) => r.trim())
+    .filter(Boolean)
+)
 
 async function loadForum() {
   loading.value = true
@@ -255,7 +302,7 @@ async function loadForum() {
     }
     await loadPosts(true)
   } catch (e) {
-    error.value = errorMessage(e, '子论坛加载失败')
+    error.value = errorMessage(e, '社区加载失败')
   } finally {
     loading.value = false
   }
@@ -288,11 +335,7 @@ async function loadPosts(reset = true) {
   }
 }
 
-function changeSort(value: SortKey) {
-  if (sort.value === value) return
-  sort.value = value
-  loadPosts(true)
-}
+watch(sort, () => loadPosts(true))
 
 function loadMorePosts() {
   postsPage.value += 1
@@ -309,7 +352,7 @@ async function toggleMembership(join: boolean) {
   try {
     if (join) await forumApi.join(forum.value.id)
     else await forumApi.leave(forum.value.id)
-    ElMessage.success(join ? '已加入子论坛' : '已退出子论坛')
+    ElMessage.success(join ? '已加入社区' : '已退出社区')
     await loadForum()
   } catch (e) {
     ElMessage.error(errorMessage(e))
@@ -323,7 +366,7 @@ function openCreatePost() {
     return
   }
   if (forum.value?.canPost === false) {
-    ElMessage.warning('你还未满足本子论坛的发言门槛')
+    ElMessage.warning('你还未满足本社区的发言门槛')
     return
   }
   createForm.title = ''

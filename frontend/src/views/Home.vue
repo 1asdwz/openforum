@@ -1,57 +1,11 @@
 <template>
-  <div class="home-layout">
-    <ForumSidebar
-      :popular="popular"
-      :recommended="recommended"
-      :my-forums="myForums"
-      :loading="sidebarLoading"
-      :show-mine="auth.isAuthenticated"
-    />
+  <div class="page-grid">
+    <LeftRail />
 
-    <div class="home-main">
-      <section class="forum-grid-section">
-        <h2 class="section-title">子论坛</h2>
-        <el-skeleton v-if="subforumsLoading" :rows="2" animated />
-        <div v-else-if="subforums.length" class="forum-grid">
-          <router-link
-            v-for="f in subforums"
-            :key="f.id"
-            class="forum-card"
-            :to="`/f/${f.slug}`"
-          >
-            <span
-              class="forum-card-icon"
-              :style="{ background: f.themeColor || 'var(--of-primary)' }"
-            >
-              <img v-if="isImageUrl(f.icon)" :src="f.icon" alt="" />
-              <template v-else>{{ f.icon || avatarText(f.name) }}</template>
-            </span>
-            <span class="forum-card-body">
-              <span class="forum-card-name">{{ f.name }}</span>
-              <span class="forum-card-desc">
-                {{ f.description || `f/${f.slug}` }}
-              </span>
-              <span class="forum-card-meta">
-                {{ f.memberCount }} 成员 · {{ f.postCount }} 帖子
-              </span>
-            </span>
-          </router-link>
-        </div>
-        <div v-else class="state-box">还没有子论坛，点击右上角创建一个吧</div>
-      </section>
-
+    <div class="feed-column">
       <div class="feed-toolbar">
-        <div class="sort-tabs">
-          <button
-            v-for="t in sorts"
-            :key="t.value"
-            :class="{ active: sort === t.value }"
-            @click="changeSort(t.value)"
-          >
-            {{ t.label }}
-          </button>
-        </div>
-        <el-button size="small" @click="loadPosts(true)">刷新</el-button>
+        <SortChips v-model="sort" :options="sorts" />
+        <el-button size="small" text @click="loadPosts(true)">刷新</el-button>
       </div>
 
       <el-skeleton v-if="loading" :rows="6" animated />
@@ -64,7 +18,12 @@
       </div>
 
       <div v-else-if="!posts.length" class="state-box">
-        还没有帖子，快去子论坛发布第一条吧
+        <p>还没有帖子。</p>
+        <div style="margin-top: 12px">
+          <el-button type="primary" round @click="router.push('/create-forum')">
+            创建一个社区
+          </el-button>
+        </div>
       </div>
 
       <template v-else>
@@ -77,31 +36,97 @@
           />
         </div>
         <div v-if="posts.length < total" class="load-more">
-          <el-button :loading="loadingMore" @click="loadMore">加载更多</el-button>
+          <el-button round :loading="loadingMore" @click="loadMore">
+            加载更多
+          </el-button>
         </div>
       </template>
     </div>
+
+    <aside class="rail-right">
+      <section class="rail-card about-card">
+        <div class="about-banner"></div>
+        <div class="about-body">
+          <h3 class="about-title">关于 OpenForum</h3>
+          <p class="about-desc">
+            OpenForum 是一个开放式中文社区，任何人都可以创建社区、发帖与讨论。
+          </p>
+          <div class="about-stats">
+            <div class="about-row">
+              <span class="k">社区</span>
+              <span class="v">{{ forumCount }}</span>
+            </div>
+            <div class="about-row">
+              <span class="k">帖子</span>
+              <span class="v">{{ postCount }}</span>
+            </div>
+          </div>
+          <el-button
+            class="about-cta"
+            type="primary"
+            round
+            @click="router.push('/create-forum')"
+          >
+            <IconPlus />
+            <span>创建社区</span>
+          </el-button>
+        </div>
+      </section>
+
+      <section class="rail-card">
+        <div class="rail-heading">为你推荐</div>
+        <el-skeleton v-if="sideLoading" :rows="3" animated />
+        <template v-else>
+          <router-link
+            v-for="f in recommended"
+            :key="f.id"
+            class="rail-nav-item"
+            :to="`/f/${f.slug}`"
+          >
+            <span
+              class="rail-community-ico"
+              :style="{ background: f.themeColor || 'var(--of-brand)' }"
+            >
+              <img v-if="isImageUrl(f.icon)" :src="f.icon" alt="" />
+              <template v-else>{{ f.icon || avatarText(f.name) }}</template>
+            </span>
+            <span class="rail-community-body">
+              <span class="rail-community-name">f/{{ f.slug }}</span>
+              <span class="rail-community-meta">
+                {{ f.memberCount }} 成员 · {{ f.postCount }} 帖子
+              </span>
+            </span>
+          </router-link>
+          <p v-if="!recommended.length" class="rail-empty">暂无推荐</p>
+          <router-link to="/search?tab=forums" class="rail-more">
+            查看全部社区
+          </router-link>
+        </template>
+      </section>
+    </aside>
   </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import ForumSidebar from '@/components/ForumSidebar.vue'
+import LeftRail from '@/components/LeftRail.vue'
 import PostCard from '@/components/PostCard.vue'
+import SortChips, { type SortOption } from '@/components/SortChips.vue'
+import IconPlus from '@/components/icons/IconPlus.vue'
 import { forumApi, postApi } from '@/api'
 import { useAuthStore } from '@/stores/auth'
 import type { Post, SubForum } from '@/types'
 import { avatarText, errorMessage, isImageUrl, normalizePage, toArray } from '@/utils/format'
 
-type SortKey = 'hot' | 'new' | 'top'
-
 const auth = useAuthStore()
 const router = useRouter()
 const route = useRoute()
 
-const sorts: { label: string; value: SortKey }[] = [
+type Sort = 'hot' | 'new' | 'top'
+
+const sorts: SortOption<Sort>[] = [
   { label: '热门', value: 'hot' },
   { label: '最新', value: 'new' },
   { label: '最高分', value: 'top' },
@@ -111,18 +136,15 @@ const posts = ref<Post[]>([])
 const total = ref(0)
 const page = ref(1)
 const size = 10
-const sort = ref<SortKey>('hot')
+const sort = ref<Sort>('hot')
 const loading = ref(false)
 const loadingMore = ref(false)
 const error = ref('')
 
-const popular = ref<SubForum[]>([])
 const recommended = ref<SubForum[]>([])
-const myForums = ref<SubForum[]>([])
-const sidebarLoading = ref(false)
-
-const subforums = ref<SubForum[]>([])
-const subforumsLoading = ref(false)
+const sideLoading = ref(false)
+const forumCount = ref(0)
+const postCount = ref(0)
 
 async function loadPosts(reset = true) {
   if (reset) {
@@ -145,11 +167,11 @@ async function loadPosts(reset = true) {
   }
 }
 
-function changeSort(value: SortKey) {
-  if (sort.value === value) return
-  sort.value = value
+function changeSort() {
   loadPosts(true)
 }
+
+watch(sort, changeSort)
 
 function loadMore() {
   page.value += 1
@@ -157,19 +179,20 @@ function loadMore() {
 }
 
 async function loadSidebar() {
-  sidebarLoading.value = true
+  sideLoading.value = true
   try {
-    const [p, r] = await Promise.all([forumApi.popular(8), forumApi.recommended(8)])
-    popular.value = toArray<SubForum>(p)
+    const [r, all] = await Promise.all([
+      forumApi.recommended(5),
+      forumApi.list({ page: 1, size: 100 }),
+    ])
     recommended.value = toArray<SubForum>(r)
-    if (auth.isAuthenticated) {
-      const all = await forumApi.list({ page: 1, size: 100 })
-      myForums.value = normalizePage<SubForum>(all).items.filter((f) => f.isMember)
-    }
+    const pageRes = normalizePage<SubForum>(all)
+    forumCount.value = pageRes.total || pageRes.items.length
+    postCount.value = pageRes.items.reduce((sum, f) => sum + (f.postCount || 0), 0)
   } catch {
     // 侧栏失败不阻塞主内容
   } finally {
-    sidebarLoading.value = false
+    sideLoading.value = false
   }
 }
 
@@ -198,20 +221,7 @@ async function onVote(payload: { post: Post; value: number }) {
   }
 }
 
-async function loadSubforums() {
-  subforumsLoading.value = true
-  try {
-    const all = await forumApi.list({ page: 1, size: 50 })
-    subforums.value = normalizePage<SubForum>(all).items
-  } catch {
-    subforums.value = []
-  } finally {
-    subforumsLoading.value = false
-  }
-}
-
 onMounted(() => {
-  loadSubforums()
   loadSidebar()
   loadPosts(true)
 })

@@ -6,6 +6,7 @@
       :disabled="post.canVote === false"
       @vote="emit('vote', { post, value: $event })"
     />
+
     <div class="post-body">
       <div class="post-meta">
         <router-link class="forum-link" :to="`/f/${post.forumSlug}`">
@@ -27,13 +28,27 @@
       <p v-if="excerpt" class="post-excerpt">{{ excerpt }}</p>
 
       <div class="post-footer">
-        <router-link class="comments-link" :to="`/post/${post.id}`">
-          <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 9.3 9.3 0 0 1-3.3-.6L3 21l1.8-5.1A8.4 8.4 0 0 1 3.6 11.5a8.4 8.4 0 0 1 8.4-8.4h.6a8.4 8.4 0 0 1 8.4 8.4Z" />
-          </svg>
-          {{ post.commentCount }} 条评论
+        <router-link class="post-action comments-link" :to="`/post/${post.id}`">
+          <IconComment class="ico" />
+          <span>{{ post.commentCount }} 条评论</span>
         </router-link>
-        <span>得分 {{ post.score }}</span>
+
+        <button class="post-action" type="button" @click="onShare">
+          <IconShare class="ico" />
+          <span>分享</span>
+        </button>
+
+        <el-dropdown trigger="click" @command="onMore">
+          <button class="post-action" type="button" aria-label="更多操作">
+            <IconMore class="ico" />
+          </button>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item command="copy">复制链接</el-dropdown-item>
+              <el-dropdown-item command="open">在新标签页打开</el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
       </div>
     </div>
   </article>
@@ -41,7 +56,11 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { ElMessage } from 'element-plus'
 import VoteColumn from './VoteColumn.vue'
+import IconComment from '@/components/icons/IconComment.vue'
+import IconShare from '@/components/icons/IconShare.vue'
+import IconMore from '@/components/icons/IconMore.vue'
 import type { Post } from '@/types'
 import { formatTime, stripMarkdown } from '@/utils/format'
 
@@ -54,4 +73,33 @@ const excerpt = computed(() => {
   const text = stripMarkdown(props.post.content)
   return text.length > 180 ? `${text.slice(0, 180)}…` : text
 })
+
+const postUrl = () => `${location.origin}/forum/post/${props.post.id}`
+
+async function onShare() {
+  const url = postUrl()
+  try {
+    if (navigator.share) {
+      await navigator.share({ title: props.post.title, url })
+      return
+    }
+    await navigator.clipboard.writeText(url)
+    ElMessage.success('链接已复制')
+  } catch {
+    // 用户取消分享
+  }
+}
+
+async function onMore(command: string) {
+  if (command === 'copy') {
+    try {
+      await navigator.clipboard.writeText(postUrl())
+      ElMessage.success('链接已复制')
+    } catch {
+      ElMessage.error('复制失败，请手动复制地址栏链接')
+    }
+  } else if (command === 'open') {
+    window.open(postUrl(), '_blank')
+  }
+}
 </script>

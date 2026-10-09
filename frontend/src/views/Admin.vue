@@ -373,10 +373,10 @@ onBeforeUnmount(() => {
   width: 72px;
   height: 72px;
   object-fit: cover;
-  border-radius: 4px;
-  border: 1px solid var(--el-border-color, #dcdfe6);
+  border-radius: var(--of-radius-sm);
+  border: 1px solid var(--of-border);
   cursor: pointer;
-  background: #f5f7fa;
+  background: var(--of-surface-weak);
 }
 .admin-media-loading {
   cursor: default;

@@ -5,9 +5,10 @@
       :class="{ active: myVote === 1 }"
       :disabled="disabled"
       title="赞同"
+      aria-label="赞同"
       @click="vote(1)"
     >
-      ▲
+      <IconUpArrow />
     </button>
     <span class="vote-score" :class="scoreClass">{{ score }}</span>
     <button
@@ -15,15 +16,18 @@
       :class="{ active: myVote === -1 }"
       :disabled="disabled"
       title="反对"
+      aria-label="反对"
       @click="vote(-1)"
     >
-      ▼
+      <IconDownArrow />
     </button>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import IconUpArrow from '@/components/icons/IconUpArrow.vue'
+import IconDownArrow from '@/components/icons/IconDownArrow.vue'
 
 const props = defineProps<{
   score: number

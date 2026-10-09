@@ -1,48 +1,54 @@
 <template>
   <div>
-    <h1 class="page-title">搜索：{{ keyword || '（空）' }}</h1>
+    <h1 class="page-title">{{ title }}</h1>
 
     <el-skeleton v-if="loading" :rows="6" animated />
 
     <div v-else-if="error" class="state-box error">{{ error }}</div>
 
     <template v-else>
-      <el-tabs v-model="activeTab">
-        <el-tab-pane :label="`帖子 (${posts.length})`" name="posts">
-          <div v-if="!posts.length" class="state-box">没有找到相关帖子</div>
-          <div v-else class="post-list">
-            <PostCard
-              v-for="post in posts"
-              :key="post.id"
-              :post="post"
-              @vote="onVote"
-            />
-          </div>
-        </el-tab-pane>
+      <div class="feed-toolbar">
+        <SortChips v-model="activeTab" :options="tabs" />
+      </div>
 
-        <el-tab-pane :label="`子论坛 (${forums.length})`" name="forums">
-          <div v-if="!forums.length" class="state-box">没有找到相关子论坛</div>
-          <div v-else class="post-list">
-            <router-link
-              v-for="f in forums"
-              :key="f.id"
-              class="sidebar-item"
-              :to="`/f/${f.slug}`"
-            >
-              <span class="sidebar-item-icon">
-                <img v-if="isImageUrl(f.icon)" :src="f.icon" alt="" />
-                <template v-else>{{ f.icon || avatarText(f.name) }}</template>
+      <template v-if="activeTab === 'posts'">
+        <div v-if="!posts.length" class="state-box">
+          {{ keyword ? '没有找到相关帖子' : '输入关键词以搜索帖子' }}
+        </div>
+        <div v-else class="post-list">
+          <PostCard
+            v-for="post in posts"
+            :key="post.id"
+            :post="post"
+            @vote="onVote"
+          />
+        </div>
+      </template>
+
+      <template v-else>
+        <div v-if="!forums.length" class="state-box">
+          {{ keyword ? '没有找到相关社区' : '还没有社区' }}
+        </div>
+        <div v-else class="post-list">
+          <router-link
+            v-for="f in forums"
+            :key="f.id"
+            class="sidebar-item"
+            :to="`/f/${f.slug}`"
+          >
+            <span class="sidebar-item-icon">
+              <img v-if="isImageUrl(f.icon)" :src="f.icon" alt="" />
+              <template v-else>{{ f.icon || avatarText(f.name) }}</template>
+            </span>
+            <span class="sidebar-item-body">
+              <span class="sidebar-item-name">{{ f.name }}</span>
+              <span class="sidebar-item-meta">
+                {{ f.description || '暂无简介' }} · {{ f.memberCount }} 成员
               </span>
-              <span class="sidebar-item-body">
-                <span class="sidebar-item-name">{{ f.name }}</span>
-                <span class="sidebar-item-meta">
-                  {{ f.description || '暂无简介' }} · {{ f.memberCount }} 成员
-                </span>
-              </span>
-            </router-link>
-          </div>
-        </el-tab-pane>
-      </el-tabs>
+            </span>
+          </router-link>
+        </div>
+      </template>
     </template>
   </div>
 </template>
@@ -52,31 +58,62 @@ import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import PostCard from '@/components/PostCard.vue'
+import SortChips, { type SortOption } from '@/components/SortChips.vue'
 import { forumApi, postApi } from '@/api'
 import { useAuthStore } from '@/stores/auth'
 import type { Post, SubForum } from '@/types'
 import { avatarText, errorMessage, isImageUrl, normalizePage } from '@/utils/format'
+
+type SearchTab = 'posts' | 'forums'
 
 const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
 
 const keyword = computed(() => String(route.query.q || '').trim())
-const activeTab = ref('posts')
+const activeTab = ref<SearchTab>(route.query.tab === 'forums' ? 'forums' : 'posts')
 const loading = ref(false)
 const error = ref('')
 const posts = ref<Post[]>([])
 const forums = ref<SubForum[]>([])
 
+const tabs = computed<SortOption<SearchTab>[]>(() => [
+  { label: `帖子 (${posts.value.length})`, value: 'posts' },
+  { label: `社区 (${forums.value.length})`, value: 'forums' },
+])
+
+const title = computed(() =>
+  keyword.value ? `搜索：${keyword.value}` : '探索社区',
+)
+
 function matches(text: string | undefined | null, q: string) {
   return (text || '').toLowerCase().includes(q.toLowerCase())
+}
+
+/** 无关键词时，论坛页签作为社区目录 */
+async function loadDirectory() {
+  loading.value = true
+  error.value = ''
+  try {
+    const payload = await forumApi.list({ page: 1, size: 50 })
+    forums.value = normalizePage<SubForum>(payload).items
+  } catch (e) {
+    error.value = errorMessage(e, '加载社区失败')
+  } finally {
+    loading.value = false
+  }
 }
 
 async function search() {
   const q = keyword.value
   if (!q) {
     posts.value = []
-    forums.value = []
+    if (activeTab.value === 'forums') {
+      await loadDirectory()
+    } else {
+      forums.value = []
+      loading.value = false
+    }
     return
   }
   loading.value = true
@@ -123,6 +160,10 @@ async function onVote(payload: { post: Post; value: number }) {
     ElMessage.error(errorMessage(e))
   }
 }
+
+watch(activeTab, (tab) => {
+  if (!keyword.value && tab === 'forums' && !forums.value.length) loadDirectory()
+})
 
 watch(keyword, search, { immediate: true })
 </script>
