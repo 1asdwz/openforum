@@ -6,8 +6,9 @@
 </template>
 
 <script setup lang="ts">
-import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
+import { useUiStore } from '@/stores/ui'
 
 type GoogleButtonText = 'signin_with' | 'signup_with' | 'continue_with'
 
@@ -17,7 +18,7 @@ interface GoogleIdConfig {
 }
 interface GoogleButtonOptions {
   type: 'standard'
-  theme: 'outline'
+  theme: 'outline' | 'filled_black'
   size: 'large'
   shape: 'rectangular'
   text: GoogleButtonText
@@ -40,6 +41,7 @@ const emit = defineEmits<{ (e: 'credential', credential: string): void }>()
 
 const SCRIPT_SRC = 'https://accounts.google.com/gsi/client'
 
+const ui = useUiStore()
 const clientId = (import.meta.env.VITE_GOOGLE_CLIENT_ID || '').trim()
 const enabled = !!clientId
 
@@ -79,7 +81,7 @@ function renderButton() {
   el.innerHTML = ''
   api.accounts.id.renderButton(el, {
     type: 'standard',
-    theme: 'outline',
+    theme: ui.isDark ? 'filled_black' : 'outline',
     size: 'large',
     shape: 'rectangular',
     text: props.text,
@@ -117,6 +119,14 @@ onBeforeUnmount(() => {
   window.removeEventListener('resize', onResize)
   if (resizeTimer) window.clearTimeout(resizeTimer)
 })
+
+// 明暗主题切换时用对应主题重绘按钮（dark 下用 filled_black）
+if (enabled) {
+  watch(
+    () => ui.isDark,
+    () => renderButton(),
+  )
+}
 </script>
 
 <style scoped>

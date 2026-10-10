@@ -8,6 +8,9 @@
     />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>OpenForum - 开放式论坛系统</title>
+    <!-- 提前建连，缩短 Google 登录脚本的跨洋 TLS 握手耗时 -->
+    <link rel="preconnect" href="https://accounts.google.com" />
+    <link rel="dns-prefetch" href="https://accounts.google.com" />
     <script>
       // 首屏前套用主题，避免深色模式下闪白（与 stores/ui.ts 保持一致）
       (function () {
@@ -25,6 +28,8 @@
         } catch (e) {}
       })();
     </script>
+    <!-- 全局加载 Google Identity Services，登录/注册页无需等待脚本再渲染按钮 -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
     <style>
       :root {
         --of-brand: #ff4500;
