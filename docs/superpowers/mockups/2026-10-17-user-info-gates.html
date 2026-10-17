@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>OpenForum · 用户信息与板块门槛方案原型</title>
+<style>
+  :root {
+    --bg: #f6f7f9;
+    --card: #ffffff;
+    --line: #e5e7eb;
+    --text: #1c1c1c;
+    --muted: #6b7280;
+    --brand: #ff4500;
+    --brand-soft: #fff1ec;
+    --green: #0f9d58;
+    --green-soft: #e9f7f0;
+    --blue: #2563eb;
+    --blue-soft: #eff4ff;
+    --amber: #b45309;
+    --amber-soft: #fff7e6;
+    --radius: 14px;
+    --shadow: 0 1px 2px rgba(16, 24, 40, 0.06), 0 8px 24px rgba(16, 24, 40, 0.05);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 14px/1.6 "Inter", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  }
+  button { font: inherit; cursor: pointer; }
+  .topbar {
+    position: sticky; top: 0; z-index: 20;
+    background: rgba(255,255,255,.92);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--line);
+  }
+  .topbar-inner {
+    max-width: 1120px; margin: 0 auto; padding: 12px 24px;
+    display: flex; align-items: center; gap: 20px;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 16px; }
+  .brand-mark {
+    width: 28px; height: 28px; border-radius: 9px;
+    background: linear-gradient(135deg, #ff6a33, #ff4500);
+    color: #fff; display: grid; place-items: center; font-size: 15px;
+  }
+  .top-tabs { display: flex; gap: 6px; margin-left: auto; background: #f1f2f4; padding: 4px; border-radius: 999px; }
+  .top-tab {
+    border: 0; background: transparent; padding: 7px 14px; border-radius: 999px;
+    color: var(--muted); font-weight: 600; font-size: 13px;
+  }
+  .top-tab.active { background: #fff; color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+  .page { max-width: 1120px; margin: 0 auto; padding: 28px 24px 80px; }
+  .hero { margin-bottom: 20px; }
+  .hero h1 { margin: 0 0 6px; font-size: 24px; letter-spacing: -0.02em; }
+  .hero p { margin: 0; color: var(--muted); }
+  .layout { display: grid; grid-template-columns: 1fr 320px; gap: 20px; align-items: start; }
+  @media (max-width: 900px) { .layout { grid-template-columns: 1fr; } }
+  .card {
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: var(--radius); box-shadow: var(--shadow);
+  }
+  .card + .card { margin-top: 18px; }
+  .card-head {
+    padding: 18px 20px 14px; border-bottom: 1px solid var(--line);
+    display: flex; align-items: flex-start; gap: 12px;
+  }
+  .card-head h2 { margin: 0; font-size: 16px; }
+  .card-head p { margin: 3px 0 0; color: var(--muted); font-size: 12.5px; }
+  .card-body { padding: 18px 20px; }
+  .group-label {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 12px; font-weight: 700; color: var(--muted);
+    text-transform: uppercase; letter-spacing: .06em;
+    margin: 18px 0 8px;
+  }
+  .group-label:first-child { margin-top: 0; }
+  .info-row {
+    display: grid; grid-template-columns: 150px 1fr auto auto;
+    gap: 12px; align-items: center;
+    padding: 11px 0; border-bottom: 1px dashed #eef0f3;
+  }
+  .info-row:last-child { border-bottom: 0; }
+  .info-label { color: var(--muted); }
+  .info-value { font-weight: 600; }
+  .info-value .sub { color: var(--muted); font-weight: 400; margin-left: 6px; font-size: 12.5px; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 3px 8px; border-radius: 999px; font-size: 12px; font-weight: 600;
+    white-space: nowrap;
+  }
+  .badge.lv-high { background: var(--green-soft); color: var(--green); }
+  .badge.lv-medium { background: var(--blue-soft); color: var(--blue); }
+  .badge.lv-low { background: #f3f4f6; color: #4b5563; }
+  .badge.none { background: var(--amber-soft); color: var(--amber); }
+  .badge.free { background: #f5f3ff; color: #6d28d9; }
+  .mini-btn {
+    border: 1px solid var(--line); background: #fff; border-radius: 8px;
+    padding: 5px 10px; font-size: 12.5px; font-weight: 600; color: #374151;
+  }
+  .mini-btn:hover { border-color: #c7cbd3; background: #fafafa; }
+  .mini-btn.primary { border-color: transparent; background: var(--brand-soft); color: var(--brand); }
+  .privacy { display: flex; align-items: center; gap: 5px; color: var(--muted); font-size: 12px; }
+  .progress-card { position: sticky; top: 76px; }
+  .progress-ring {
+    width: 92px; height: 92px; border-radius: 50%;
+    background: conic-gradient(var(--brand) 0 72%, #f0f1f3 72% 100%);
+    display: grid; place-items: center; margin: 6px auto 10px;
+  }
+  .progress-ring > div {
+    width: 72px; height: 72px; border-radius: 50%; background: #fff;
+    display: grid; place-items: center; font-weight: 800; font-size: 18px;
+  }
+  .progress-ring small { font-size: 10px; font-weight: 600; color: var(--muted); display: block; text-align: center; }
+  .side-note {
+    background: #fafbfc; border: 1px solid var(--line); border-radius: 10px;
+    padding: 10px 12px; font-size: 12.5px; color: var(--muted); margin-top: 12px;
+  }
+  .side-note b { color: var(--text); }
+  .public-preview { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .section-title { display: flex; align-items: baseline; gap: 8px; margin: 26px 0 10px; }
+  .section-title h3 { margin: 0; font-size: 16px; }
+  .section-title span { color: var(--muted); font-size: 12.5px; }
+  /* 门槛编辑器 */
+  .gate-tabs { display: flex; gap: 8px; margin-bottom: 14px; }
+  .gate-tab {
+    flex: 1; border: 1px solid var(--line); background: #fff; border-radius: 10px;
+    padding: 10px 12px; text-align: left;
+  }
+  .gate-tab.active { border-color: #ffb59b; background: var(--brand-soft); }
+  .gate-tab b { display: block; font-size: 13.5px; }
+  .gate-tab small { color: var(--muted); }
+  .rule-list { display: flex; flex-direction: column; gap: 8px; }
+  .rule-row {
+    display: grid; grid-template-columns: 132px 1fr 156px 32px;
+    gap: 8px; align-items: center;
+    background: #fbfbfc; border: 1px solid var(--line); border-radius: 10px; padding: 9px 10px;
+  }
+  .rule-row.inherited { background: #f6f7f9; opacity: .78; }
+  .rule-row select, .rule-row input {
+    width: 100%; border: 1px solid var(--line); background: #fff;
+    border-radius: 7px; padding: 6px 8px; font: inherit; color: var(--text);
+  }
+  .rule-del { border: 0; background: transparent; color: #9ca3af; font-size: 16px; }
+  .rule-del:hover { color: #ef4444; }
+  .chips { display: flex; flex-wrap: wrap; gap: 5px; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 4px;
+    background: #fff; border: 1px solid var(--line); border-radius: 999px;
+    padding: 3px 9px; font-size: 12px;
+  }
+  .chip button { border: 0; background: transparent; color: #9ca3af; padding: 0; font-size: 13px; }
+  .add-rule {
+    width: 100%; border: 1px dashed #cfd4dc; background: #fff; color: var(--muted);
+    border-radius: 10px; padding: 9px; font-weight: 600; margin-top: 8px;
+  }
+  .add-rule:hover { border-color: var(--brand); color: var(--brand); }
+  .rule-preview {
+    margin-top: 14px; background: #fbfbfc; border-left: 3px solid var(--brand);
+    padding: 10px 12px; border-radius: 0 8px 8px 0; font-size: 13px;
+  }
+  .rule-preview b { color: var(--brand); }
+  .estimate { display: flex; gap: 18px; margin-top: 12px; color: var(--muted); font-size: 12.5px; }
+  .estimate strong { color: var(--text); font-size: 15px; }
+  .warn {
+    margin-top: 12px; background: var(--amber-soft); color: #92400e;
+    border-radius: 9px; padding: 9px 11px; font-size: 12.5px;
+  }
+  /* 方案 B */
+  .wizard { display: grid; grid-template-columns: 210px 1fr; gap: 18px; }
+  @media (max-width: 720px) { .wizard { grid-template-columns: 1fr; } }
+  .wizard-steps { display: flex; flex-direction: column; gap: 6px; }
+  .wizard-step {
+    display: flex; gap: 10px; align-items: center; padding: 9px 10px;
+    border-radius: 9px; color: var(--muted); font-size: 13px;
+  }
+  .wizard-step b {
+    width: 22px; height: 22px; border-radius: 50%; background: #eef0f3;
+    display: grid; place-items: center; font-size: 11px; color: var(--muted);
+  }
+  .wizard-step.done { color: var(--text); }
+  .wizard-step.done b { background: var(--green-soft); color: var(--green); }
+  .wizard-step.active { background: var(--brand-soft); color: var(--brand); font-weight: 700; }
+  .wizard-step.active b { background: var(--brand); color: #fff; }
+  .field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media (max-width: 640px) { .field-grid { grid-template-columns: 1fr; } }
+  .field label { display: block; font-size: 12.5px; color: var(--muted); margin-bottom: 5px; }
+  .field .control {
+    border: 1px solid var(--line); border-radius: 9px; padding: 9px 10px;
+    background: #fff; display: flex; justify-content: space-between; align-items: center;
+  }
+  .field .control span { color: #9ca3af; font-size: 12px; }
+  .nl-box {
+    border: 1px solid #ffb59b; background: #fff8f5; border-radius: 10px;
+    padding: 12px; margin-bottom: 12px;
+  }
+  .nl-box textarea {
+    width: 100%; border: 0; background: transparent; resize: vertical; min-height: 54px;
+    font: inherit; color: var(--text); outline: none;
+  }
+  .parsed { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .parsed .chip { background: #fff; border-color: #ffd0bf; }
+  .footnote { margin-top: 14px; color: var(--muted); font-size: 12.5px; }
+  .hidden { display: none !important; }
+  .divider { height: 1px; background: var(--line); margin: 16px 0; }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="brand"><span class="brand-mark">O</span> OpenForum · 方案原型</div>
+    <nav class="top-tabs">
+      <button class="top-tab active" data-view="a">方案 A · 资料卡 + 条件构建器（推荐）</button>
+      <button class="top-tab" data-view="b">方案 B · 向导 + 自然语言</button>
+    </nav>
+  </div>
+</header>
+
+<main class="page">
+  <!-- ================= 方案 A ================= -->
+  <section id="view-a">
+    <div class="hero">
+      <h1>用户资料中心与板块门槛</h1>
+      <p>信息按「身份 / 职业学历 / 房产 / 兴趣」分组，每项独立认证；门槛用同一套字段可视化拼装。</p>
+    </div>
+
+    <div class="layout">
+      <div>
+        <div class="card">
+          <div class="card-head">
+            <div>
+              <h2>我的资料</h2>
+              <p>所有具体信息默认仅自己可见，门槛匹配在服务端完成。</p>
+            </div>
+            <button class="mini-btn primary" style="margin-left:auto">完善资料</button>
+          </div>
+          <div class="card-body">
+            <div class="group-label">身份信息</div>
+            <div class="info-row">
+              <div class="info-label">实名</div>
+              <div class="info-value">张 * 明 <span class="sub">仅自己可见</span></div>
+              <span class="badge lv-high">已认证 · 高</span>
+              <button class="mini-btn">升级认证</button>
+            </div>
+            <div class="info-row">
+              <div class="info-label">性别</div>
+              <div class="info-value">男</div>
+              <span class="badge lv-medium">已认证 · 中</span>
+              <button class="mini-btn">升级认证</button>
+            </div>
+            <div class="info-row">
+              <div class="info-label">年龄</div>
+              <div class="info-value">28 岁 <span class="sub">由身份证自动推算</span></div>
+              <span class="badge lv-medium">已认证 · 中</span>
+              <button class="mini-btn">升级认证</button>
+            </div>
+            <div class="info-row">
+              <div class="info-label">国家 / 城市</div>
+              <div class="info-value">中国 · 上海</div>
+              <span class="badge none">未认证</span>
+              <button class="mini-btn primary">去认证</button>
+            </div>
+
+            <div class="group-label">职业与学历</div>
+            <div class="info-row">
+              <div class="info-label">职业</div>
+              <div class="info-value">互联网 · 产品经理</div>
+              <span class="badge lv-low">已填写 · 低</span>
+              <button class="mini-btn primary">提升认证</button>
+            </div>
+            <div class="info-row">
+              <div class="info-label">学历</div>
+              <div class="info-value">本科</div>
+              <span class="badge lv-medium">已认证 · 中</span>
+              <button class="mini-btn">升级认证</button>
+            </div>
+
+            <div class="group-label">房产</div>
+            <div class="info-row">
+              <div class="info-label">房产区域</div>
+              <div class="info-value">上海 · 浦东新区</div>
+              <span class="badge none">未认证</span>
+              <button class="mini-btn primary">去认证</button>
+            </div>
+            <div class="info-row">
+              <div class="info-label">房产数量</div>
+              <div class="info-value">2 套</div>
+              <span class="badge none">未认证</span>
+              <button class="mini-btn primary">去认证</button>
+            </div>
+
+            <div class="group-label">兴趣爱好</div>
+            <div class="info-row">
+              <div class="info-label">兴趣标签</div>
+              <div class="info-value chips">
+                <span class="chip">徒步</span><span class="chip">摄影</span><span class="chip">咖啡</span>
+              </div>
+              <span class="badge free">免认证</span>
+              <button class="mini-btn">编辑</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="section-title">
+          <h3>板块门槛设置</h3>
+          <span>创建板块时配置，之后可在「板块管理」中修改</span>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <div>
+              <h2>上海地区 · 互联网从业者交流</h2>
+              <p>只有两个权限维度：浏览、操作（发帖 / 评论 / 点赞 / 投票）。</p>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="gate-tabs">
+              <button class="gate-tab active">
+                <b>浏览门槛</b>
+                <small>决定谁能看到板块内容</small>
+              </button>
+              <button class="gate-tab">
+                <b>操作门槛</b>
+                <small>发帖、评论、点赞、投票</small>
+              </button>
+            </div>
+
+            <div class="rule-list">
+              <div class="rule-row">
+                <select><option>性别</option></select>
+                <select><option>等于</option><option>不等于</option></select>
+                <select><option>男</option><option>女</option></select>
+                <button class="rule-del">×</button>
+              </div>
+              <div class="rule-row">
+                <select><option>年龄</option></select>
+                <select><option>介于</option><option>大于等于</option><option>小于等于</option></select>
+                <div style="display:flex;gap:6px"><input value="25" /><input value="40" /></div>
+                <button class="rule-del">×</button>
+              </div>
+              <div class="rule-row">
+                <select><option>国家 / 城市</option></select>
+                <select><option>属于</option></select>
+                <div class="chips">
+                  <span class="chip">上海 <button>×</button></span>
+                  <span class="chip">杭州 <button>×</button></span>
+                </div>
+                <button class="rule-del">×</button>
+              </div>
+              <div class="rule-row">
+                <select><option>职业</option></select>
+                <select><option>属于</option></select>
+                <div class="chips">
+                  <span class="chip">互联网 / 产品 <button>×</button></span>
+                  <span class="chip">互联网 / 研发 <button>×</button></span>
+                </div>
+                <button class="rule-del">×</button>
+              </div>
+              <div class="rule-row">
+                <select><option>学历</option></select>
+                <select><option>至少为</option></select>
+                <select><option>本科</option><option>硕士</option><option>博士</option></select>
+                <button class="rule-del">×</button>
+              </div>
+              <div class="rule-row">
+                <select><option>学历</option></select>
+                <select><option>认证等级 ≥</option></select>
+                <select><option>中（证件 + AI）</option></select>
+                <button class="rule-del">×</button>
+              </div>
+            </div>
+            <button class="add-rule">＋ 添加条件</button>
+
+            <div class="rule-preview">
+              <b>浏览门槛</b>：性别 = 男，且 年龄 25–40，且 城市 ∈ {上海, 杭州}，且 职业 ∈ {互联网/产品, 互联网/研发}，且 学历 ≥ 本科，且 学历认证 ≥ 中。
+              <br /><span style="color:var(--muted)">同一字段多选值之间为「任一满足」，不同字段之间为「同时满足」。</span>
+            </div>
+
+            <div class="divider"></div>
+
+            <div class="rule-row inherited" style="margin-bottom:8px">
+              <div style="font-weight:700">操作门槛</div>
+              <div style="color:var(--muted)">自动包含上方全部浏览条件</div>
+              <div></div><div></div>
+            </div>
+            <div class="rule-list">
+              <div class="rule-row">
+                <select><option>实名</option></select>
+                <select><option>认证等级 ≥</option></select>
+                <select><option>高（视频 + 证件）</option></select>
+                <button class="rule-del">×</button>
+              </div>
+              <div class="rule-row">
+                <select><option>房产数量</option></select>
+                <select><option>大于等于</option></select>
+                <input value="1" />
+                <button class="rule-del">×</button>
+              </div>
+            </div>
+            <button class="add-rule">＋ 添加条件</button>
+
+            <div class="rule-preview">
+              <b>操作门槛</b>：浏览门槛全部满足，且 实名认证 ≥ 高，且 房产数量 ≥ 1。
+            </div>
+
+            <div class="estimate">
+              <span><strong>约 3,210</strong> 人可浏览</span>
+              <span><strong>约 860</strong> 人可操作</span>
+              <span>仅示意，正式版由服务端统计</span>
+            </div>
+
+            <div class="warn">
+              未满足浏览门槛的用户点入后会看到提示页：列出「还差哪些条件」，并提供一键去认证，不展示帖子内容。
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <aside>
+        <div class="card progress-card">
+          <div class="card-body" style="text-align:center">
+            <h3 style="margin:0 0 4px;font-size:14px">资料完善度</h3>
+            <div class="progress-ring"><div>72%<small>8 / 11 项</small></div></div>
+            <p style="color:var(--muted);font-size:12.5px;margin:0">完善认证可在更多板块浏览和发言</p>
+            <div class="side-note" style="text-align:left">
+              <b>完全私密</b><br />
+              信息只用于服务端门槛匹配。其他用户看不到具体值，也看不到任何认证徽章。
+              <div class="public-preview">
+                <span class="chip">对外仅显示：满足 / 不满足当前板块门槛</span>
+              </div>
+            </div>
+            <div class="side-note" style="text-align:left">
+              <b>门槛结果也不泄露信息</b><br />
+              未满足时只告诉本人「还差哪些条件」；其他用户无法通过门槛提示反推资料。
+            </div>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </section>
+
+  <!-- ================= 方案 B ================= -->
+  <section id="view-b" class="hidden">
+    <div class="hero">
+      <h1>方案 B · 向导 + 自然语言</h1>
+      <p>用分步向导降低首次填写压力；板块主可直接描述门槛，由系统解析为规则后确认。</p>
+    </div>
+
+    <div class="layout">
+      <div>
+        <div class="card">
+          <div class="card-head">
+            <div>
+              <h2>完善资料</h2>
+              <p>第 3 步，共 5 步 · 预计还需 2 分钟</p>
+            </div>
+            <button class="mini-btn" style="margin-left:auto">稍后继续</button>
+          </div>
+          <div class="card-body">
+            <div class="wizard">
+              <div class="wizard-steps">
+                <div class="wizard-step done"><b>✓</b> 身份信息</div>
+                <div class="wizard-step done"><b>✓</b> 所在地区</div>
+                <div class="wizard-step active"><b>3</b> 职业与学历</div>
+                <div class="wizard-step"><b>4</b> 房产信息</div>
+                <div class="wizard-step"><b>5</b> 兴趣爱好</div>
+              </div>
+              <div>
+                <div class="field-grid">
+                  <div class="field">
+                    <label>职业分类</label>
+                    <div class="control">互联网 / 产品经理 <span>▾</span></div>
+                  </div>
+                  <div class="field">
+                    <label>学历</label>
+                    <div class="control">本科 <span>▾</span></div>
+                  </div>
+                  <div class="field">
+                    <label>毕业院校（可选）</label>
+                    <div class="control">填写院校名称 <span></span></div>
+                  </div>
+                  <div class="field">
+                    <label>认证等级</label>
+                    <div class="control">中 · 上传学历证明 <span>▾</span></div>
+                  </div>
+                </div>
+                <div class="side-note" style="margin-top:14px">
+                  每一项都可以先「仅填写」跳过认证，之后在资料中心随时升级。兴趣标签不需要认证。
+                </div>
+                <div style="display:flex;gap:8px;margin-top:16px">
+                  <button class="mini-btn">上一步</button>
+                  <button class="mini-btn primary">下一步</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="section-title">
+          <h3>板块门槛设置 · 自然语言</h3>
+          <span>解析结果始终可手动微调</span>
+        </div>
+
+        <div class="card">
+          <div class="card-body">
+            <div class="nl-box">
+              <textarea>只允许上海或杭州、25 到 40 岁、本科以上、从事互联网产品/研发的男性浏览；发帖需要实名高等级认证。</textarea>
+              <div class="parsed">
+                <span class="chip">性别 = 男</span>
+                <span class="chip">年龄 25–40</span>
+                <span class="chip">城市 ∈ {上海, 杭州}</span>
+                <span class="chip">学历 ≥ 本科</span>
+                <span class="chip">职业 ∈ {互联网/产品, 互联网/研发}</span>
+                <span class="chip">操作：实名 ≥ 高</span>
+              </div>
+            </div>
+
+            <div class="rule-preview">
+              <b>浏览门槛</b>：性别 = 男，且 年龄 25–40，且 城市 ∈ {上海, 杭州}，且 学历 ≥ 本科，且 职业 ∈ {互联网/产品, 互联网/研发}。
+            </div>
+            <div class="warn" style="margin-top:10px">
+              自然语言可能存在歧义（例如「本科以上」是否含本科、「产品/研发」是否限互联网行业），必须逐条确认后才能保存。
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <aside>
+        <div class="card">
+          <div class="card-body">
+            <h3 style="margin:0 0 8px;font-size:14px">两种写法的差异</h3>
+            <div class="side-note" style="text-align:left">
+              <b>向导式填写</b><br />
+              首次填写体验好，但修改单项要重新进入对应步骤。
+            </div>
+            <div class="side-note" style="text-align:left">
+              <b>自然语言门槛</b><br />
+              配置快，但依赖解析质量；复杂条件仍需手动构建器兜底。
+            </div>
+            <div class="side-note" style="text-align:left">
+              <b>建议</b><br />
+              资料填写采用「资料卡 + 单项抽屉」，门槛采用「条件构建器 + 可选自然语言快捷输入」。
+            </div>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </section>
+</main>
+
+<script>
+  const tabs = document.querySelectorAll('.top-tab');
+  tabs.forEach((tab) => {
+    tab.addEventListener('click', () => {
+      tabs.forEach((t) => t.classList.remove('active'));
+      tab.classList.add('active');
+      document.getElementById('view-a').classList.toggle('hidden', tab.dataset.view !== 'a');
+      document.getElementById('view-b').classList.toggle('hidden', tab.dataset.view !== 'b');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+  });
+
+  document.querySelectorAll('.gate-tab').forEach((tab) => {
+    tab.addEventListener('click', () => {
+      tab.parentElement.querySelectorAll('.gate-tab').forEach((t) => t.classList.remove('active'));
+      tab.classList.add('active');
+    });
+  });
+</script>
+</body>
+</html>
