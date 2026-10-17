@@ -8,6 +8,7 @@ use sqlx::MySqlPool;
 
 use crate::access;
 use crate::error::{ApiError, ApiResult};
+use crate::gate::{self, GateKind};
 use crate::json as j;
 use crate::models::Comment;
 use crate::routes::posts;
@@ -111,8 +112,22 @@ async fn require_comment(pool: &MySqlPool, id: i64) -> Result<Comment, ApiError>
 /// GET /comments/post/{postId}
 pub async fn tree(
     State(state): State<AppState>,
+    user: CurrentUser,
     Path(post_id): Path<i64>,
 ) -> ApiResult<Json<Value>> {
+    let user_id = user.0.as_ref().map(|u| u.id);
+    let is_admin = user.0.as_ref().map(|u| u.is_admin()).unwrap_or(false);
+    let post: Option<(i64,)> = sqlx::query_as(
+        "SELECT forum_id FROM posts WHERE id = ? AND is_removed = 0",
+    )
+    .bind(post_id)
+    .fetch_optional(&state.pool)
+    .await?;
+    if let Some((forum_id,)) = post {
+        if let Some(forum) = crate::routes::forums::find_by_id(&state.pool, forum_id).await? {
+            gate::ensure(&state.pool, user_id, is_admin, &forum, GateKind::Browse).await?;
+        }
+    }
     let comments: Vec<Comment> = sqlx::query_as::<_, Comment>(
         "SELECT * FROM comments WHERE post_id = ? AND is_removed = 0 ORDER BY created_at ASC",
     )
@@ -152,12 +167,16 @@ pub async fn create(
     let content = req.content.as_deref().unwrap().to_string();
 
     let post: Option<(i64,)> =
-        sqlx::query_as("SELECT id FROM posts WHERE id = ? AND is_removed = 0")
+        sqlx::query_as("SELECT forum_id FROM posts WHERE id = ? AND is_removed = 0")
             .bind(post_id)
             .fetch_optional(&state.pool)
             .await?;
-    if post.is_none() {
-        return Err(ApiError::not_found("帖子不存在"));
+    let forum_id = match post {
+        Some((forum_id,)) => forum_id,
+        None => return Err(ApiError::not_found("帖子不存在")),
+    };
+    if let Some(forum) = crate::routes::forums::find_by_id(&state.pool, forum_id).await? {
+        gate::ensure(&state.pool, Some(me.id), me.is_admin(), &forum, GateKind::Operate).await?;
     }
 
     if let Some(parent_id) = req.parent_id {
@@ -250,6 +269,17 @@ pub async fn comment_vote(
 ) -> ApiResult<Json<Value>> {
     let me = user.require()?;
     let comment = require_comment(&state.pool, id).await?;
+    let forum_id: Option<(i64,)> =
+        sqlx::query_as("SELECT forum_id FROM posts WHERE id = ?")
+            .bind(comment.post_id)
+            .fetch_optional(&state.pool)
+            .await?;
+    if let Some((forum_id,)) = forum_id {
+        if let Some(forum) = crate::routes::forums::find_by_id(&state.pool, forum_id).await? {
+            gate::ensure(&state.pool, Some(me.id), me.is_admin(), &forum, GateKind::Operate)
+                .await?;
+        }
+    }
     let value = req.value.unwrap_or(0);
     if !(-1..=1).contains(&value) {
         return Err(ApiError::bad_request("投票值只能是 1、-1 或 0"));
@@ -283,26 +313,41 @@ pub async fn comment_vote(
 pub async fn list_by_author(
     state: &AppState,
     author_id: i64,
+    user_id: Option<i64>,
+    is_admin: bool,
     page: i32,
     size: i32,
 ) -> ApiResult<Json<Value>> {
-    let mut comments: Vec<Comment> = sqlx::query_as::<_, Comment>(
+    let allowed = gate::allowed_forum_ids(&state.pool, user_id, is_admin).await?;
+    let comments: Vec<Comment> = sqlx::query_as::<_, Comment>(
         "SELECT * FROM comments WHERE author_id = ? AND is_removed = 0 ORDER BY created_at DESC",
     )
     .bind(author_id)
     .fetch_all(&state.pool)
     .await?;
-    let total = comments.len() as i64;
-    let (slice, _) = j::slice_page(std::mem::take(&mut comments), page, size);
 
-    let mut content = Vec::with_capacity(slice.len());
-    for comment in &slice {
-        let (name, avatar) = author_fields(&state.pool, comment.author_id).await?;
-        let post_title: Option<(String,)> =
-            sqlx::query_as("SELECT title FROM posts WHERE id = ?")
+    let mut visible: Vec<(Comment, Option<String>)> = Vec::new();
+    for comment in comments {
+        let post: Option<(String, i64)> =
+            sqlx::query_as("SELECT title, forum_id FROM posts WHERE id = ?")
                 .bind(comment.post_id)
                 .fetch_optional(&state.pool)
                 .await?;
+        let (title, forum_id) = match post {
+            Some(v) => v,
+            None => continue,
+        };
+        if !allowed.contains(&forum_id) {
+            continue;
+        }
+        visible.push((comment, Some(title)));
+    }
+    let total = visible.len() as i64;
+    let (slice, _) = j::slice_page(visible, page, size);
+
+    let mut content = Vec::with_capacity(slice.len());
+    for (comment, post_title) in &slice {
+        let (name, avatar) = author_fields(&state.pool, comment.author_id).await?;
         content.push(json!({
             "id": comment.id,
             "postId": comment.post_id,
@@ -316,7 +361,7 @@ pub async fn list_by_author(
             "score": comment.score,
             "createdAt": j::jts(comment.created_at),
             "children": Vec::<Value>::new(),
-            "postTitle": post_title.map(|(t,)| t),
+            "postTitle": post_title,
         }));
     }
     Ok(j::ok(j::PageResponse::of(content, page, size, total)))

@@ -2,6 +2,34 @@
   <div>
     <el-skeleton v-if="loading" :rows="8" animated />
 
+    <div v-else-if="blocked" class="content-card gate-blocked">
+      <h1 class="page-title" style="margin-top: 0">无法浏览该板块</h1>
+      <p class="gate-blocked-desc">
+        {{ blocked.message }}
+      </p>
+      <div v-if="blocked.missing.length" class="gate-missing">
+        <div class="gate-missing-title">还需要满足：</div>
+        <div v-for="item in blocked.missing" :key="item.fieldKey" class="gate-missing-row">
+          <span class="gate-missing-label">{{ item.label }}</span>
+          <span class="gate-missing-required">{{ item.required }}</span>
+          <el-tag size="small" type="warning" effect="plain">
+            {{ missingReasonLabel(item.reason) }}
+          </el-tag>
+        </div>
+      </div>
+      <div class="form-actions">
+        <el-button
+          v-if="!auth.isAuthenticated"
+          type="primary"
+          @click="router.push({ name: 'login', query: { redirect: route.fullPath } })"
+        >
+          登录后重试
+        </el-button>
+        <el-button type="primary" @click="router.push('/profile')">完善资料与认证</el-button>
+        <el-button @click="router.push('/search')">返回探索</el-button>
+      </div>
+    </div>
+
     <div v-else-if="error" class="state-box error">
       {{ error }}
       <div style="margin-top: 12px">
@@ -31,15 +59,26 @@
                 <p class="forum-hero-stats">
                   {{ forum.memberCount }} 成员 · {{ forum.postCount }} 帖子
                 </p>
-                <div v-if="requiredAuthTypes.length" class="required-tags">
+                <div v-if="browseTags.length" class="required-tags">
                   <el-tag
-                    v-for="t in requiredAuthTypes"
+                    v-for="t in browseTags"
                     :key="t"
                     size="small"
                     type="warning"
                     effect="plain"
                   >
-                    需 {{ authTypeLabel(t) }}
+                    浏览：{{ t }}
+                  </el-tag>
+                </div>
+                <div v-if="operateTags.length" class="required-tags">
+                  <el-tag
+                    v-for="t in operateTags"
+                    :key="t"
+                    size="small"
+                    type="info"
+                    effect="plain"
+                  >
+                    互动：{{ t }}
                   </el-tag>
                 </div>
               </div>
@@ -71,12 +110,18 @@
           </section>
 
           <el-alert
-            v-if="forum.canPost === false && auth.isAuthenticated"
+            v-if="canOperate === false && auth.isAuthenticated"
             type="warning"
             show-icon
             :closable="false"
-            title="你还未满足本社区的发帖/互动门槛，请先完成相应认证"
-          />
+            title="你还未满足本社区的互动门槛，请先完善资料或提升认证等级"
+          >
+            <template #default>
+              <el-button size="small" text type="primary" @click="router.push('/profile')">
+                去完善资料
+              </el-button>
+            </template>
+          </el-alert>
 
           <!-- 已审核通过的自定义页面 -->
           <template v-if="forum.customPageStatus === 'APPROVED'">
@@ -222,8 +267,9 @@ import SortChips, { type SortOption } from '@/components/SortChips.vue'
 import IconPlus from '@/components/icons/IconPlus.vue'
 import CustomPageRenderer from '@/components/CustomPageRenderer.vue'
 import { forumApi, postApi } from '@/api'
+import { ApiError } from '@/api/client'
 import { useAuthStore } from '@/stores/auth'
-import type { Post, SubForum, TemplateConfig } from '@/types'
+import type { GateDeniedData, Post, SubForum, TemplateConfig } from '@/types'
 import {
   authTypeLabel,
   avatarText,
@@ -234,6 +280,7 @@ import {
   parseRequiredAuthTypes,
   parseTemplateConfig,
 } from '@/utils/format'
+import { gateSummary } from '@/utils/gate'
 
 const RichTextEditor = defineAsyncComponent(
   () => import('@/components/RichTextEditor.vue')
@@ -254,6 +301,7 @@ const sorts: SortOption<Sort>[] = [
 const forum = ref<SubForum | null>(null)
 const loading = ref(true)
 const error = ref('')
+const blocked = ref<GateDeniedData | null>(null)
 const customHtml = ref('')
 const sort = ref<Sort>('hot')
 
@@ -275,6 +323,15 @@ const template = computed<TemplateConfig>(() =>
 const requiredAuthTypes = computed(() =>
   parseRequiredAuthTypes(forum.value?.requiredAuthTypes)
 )
+const browseTags = computed(() => {
+  const modern = gateSummary(forum.value?.browseRule)
+  if (modern.length) return modern
+  return requiredAuthTypes.value.map((t) => `需 ${authTypeLabel(t)}`)
+})
+const operateTags = computed(() => gateSummary(forum.value?.operateRule))
+const canOperate = computed(() =>
+  typeof forum.value?.canOperate === 'boolean' ? forum.value.canOperate : forum.value?.canPost
+)
 const isOwner = computed(
   () => !!forum.value && !!auth.user && forum.value.creatorId === auth.user.id
 )
@@ -288,6 +345,7 @@ const ruleList = computed(() =>
 async function loadForum() {
   loading.value = true
   error.value = ''
+  blocked.value = null
   try {
     const slug = String(route.params.slug)
     const data = await forumApi.get(slug)
@@ -303,9 +361,33 @@ async function loadForum() {
     }
     await loadPosts(true)
   } catch (e) {
-    error.value = errorMessage(e, '社区加载失败')
+    if (e instanceof ApiError && e.status === 403) {
+      const data = e.data as GateDeniedData | null
+      if (data?.gate === 'BROWSE') {
+        blocked.value = { ...data, message: e.message }
+      } else {
+        error.value = errorMessage(e, '社区加载失败')
+      }
+    } else {
+      error.value = errorMessage(e, '社区加载失败')
+    }
   } finally {
     loading.value = false
+  }
+}
+
+function missingReasonLabel(reason: string): string {
+  switch (reason) {
+    case 'NOT_FILLED':
+      return '未填写'
+    case 'VALUE_MISMATCH':
+      return '不符合'
+    case 'AUTH_PENDING':
+      return '认证审核中'
+    case 'AUTH_LEVEL_LOW':
+      return '认证等级不足'
+    default:
+      return reason
   }
 }
 
@@ -367,8 +449,8 @@ function openCreatePost() {
     router.push({ name: 'login', query: { redirect: route.fullPath } })
     return
   }
-  if (forum.value?.canPost === false) {
-    ElMessage.warning('你还未满足本社区的发言门槛')
+  if (canOperate.value === false) {
+    ElMessage.warning('你还未满足本社区的互动门槛')
     return
   }
   createForm.title = ''
@@ -433,3 +515,39 @@ watch(
 
 onMounted(loadForum)
 </script>
+
+<style scoped>
+.gate-blocked {
+  max-width: 720px;
+  margin: 0 auto;
+}
+.gate-blocked-desc {
+  color: var(--of-text-muted);
+  margin: 8px 0 16px;
+}
+.gate-missing {
+  border: 1px solid var(--of-border);
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-bottom: 16px;
+}
+.gate-missing-title {
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.gate-missing-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 6px 0;
+  flex-wrap: wrap;
+}
+.gate-missing-label {
+  min-width: 80px;
+  font-weight: 500;
+}
+.gate-missing-required {
+  color: var(--of-text-muted);
+  flex: 1;
+}
+</style>

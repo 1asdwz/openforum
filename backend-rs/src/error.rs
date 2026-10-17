@@ -1,7 +1,7 @@
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::Json;
-use serde_json::json;
+use serde_json::{json, Value};
 
 /// 与 Java `ApiException` 对齐：携带业务 code，HTTP 状态码即 code，body 为 `{code,message,data:null}`。
 ///
@@ -12,15 +12,21 @@ pub struct ApiError {
     pub code: u16,
     pub message: String,
     pub raw: bool,
+    /// 业务错误可携带结构化数据（如门槛缺失条件）。
+    pub data: Option<Value>,
 }
 
 impl ApiError {
     pub fn new(code: u16, message: impl Into<String>) -> Self {
-        Self { code, message: message.into(), raw: false }
+        Self { code, message: message.into(), raw: false, data: None }
     }
     /// 过滤器层风格：`{code,message}`，不带 `data` 字段。
     pub fn raw(code: u16, message: impl Into<String>) -> Self {
-        Self { code, message: message.into(), raw: true }
+        Self { code, message: message.into(), raw: true, data: None }
+    }
+    pub fn with_data(mut self, data: Value) -> Self {
+        self.data = Some(data);
+        self
     }
     pub fn bad_request(message: impl Into<String>) -> Self {
         Self::new(400, message)
@@ -69,7 +75,11 @@ impl IntoResponse for ApiError {
         let body = if self.raw {
             json!({ "code": self.code, "message": self.message })
         } else {
-            json!({ "code": self.code, "message": self.message, "data": null })
+            json!({
+                "code": self.code,
+                "message": self.message,
+                "data": self.data.unwrap_or(Value::Null),
+            })
         };
         (status, Json(body)).into_response()
     }

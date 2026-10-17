@@ -6,9 +6,9 @@ use serde_json::{json, Value};
 use sqlx::MySqlPool;
 
 use crate::access;
-use crate::auth_gate;
 use crate::dto;
 use crate::error::{ApiError, ApiResult};
+use crate::gate::{self, GateKind};
 use crate::json as j;
 use crate::models::Post;
 use crate::security::CurrentUser;
@@ -97,21 +97,19 @@ async fn to_detail(
     state: &AppState,
     post: &Post,
     user_id: Option<i64>,
+    is_admin: bool,
 ) -> Result<Value, ApiError> {
-    let forum: Option<(String, String, Option<String>)> =
-        sqlx::query_as("SELECT slug, name, required_auth_types FROM sub_forums WHERE id = ?")
-            .bind(post.forum_id)
-            .fetch_optional(&state.pool)
-            .await?;
-    let (forum_slug, forum_name, required) = match forum {
-        Some((s, n, r)) => (Some(s), Some(n), r),
-        None => (None, None, None),
-    };
+    let forum = crate::routes::forums::find_by_id(&state.pool, post.forum_id).await?;
     let mut can_vote = false;
-    if let Some(uid) = user_id {
-        let gate = auth_gate::evaluate(&state.pool, Some(uid), required.as_deref()).await?;
-        can_vote = gate.passed;
+    if user_id.is_some() {
+        if let Some(forum) = forum.as_ref() {
+            let verdict =
+                gate::check(&state.pool, user_id, is_admin, forum, GateKind::Operate).await?;
+            can_vote = verdict.passed;
+        }
     }
+    let forum_slug = forum.as_ref().map(|f| f.slug.clone());
+    let forum_name = forum.as_ref().map(|f| f.name.clone());
     let my_vote = vote::my_vote(&state.pool, user_id, "POST", post.id).await?;
     let author = dto::author(&state.pool, post.author_id).await?;
     Ok(json!({
@@ -196,8 +194,18 @@ fn order_posts(posts: &mut [Post], sort: &str) {
 /// GET /posts
 pub async fn list(
     State(state): State<AppState>,
+    user: CurrentUser,
     Query(qp): Query<ListQuery>,
 ) -> ApiResult<Json<Value>> {
+    let user_id = user.0.as_ref().map(|u| u.id);
+    let is_admin = user.0.as_ref().map(|u| u.is_admin()).unwrap_or(false);
+
+    if let Some(fid) = qp.forum_id {
+        if let Some(forum) = crate::routes::forums::find_by_id(&state.pool, fid).await? {
+            gate::ensure(&state.pool, user_id, is_admin, &forum, GateKind::Browse).await?;
+        }
+    }
+
     let mut posts: Vec<Post> = match qp.q.as_deref() {
         Some(q) if !q.trim().is_empty() => {
             let like = format!("%{}%", q.trim());
@@ -225,6 +233,9 @@ pub async fn list(
         },
     };
 
+    let allowed = gate::allowed_forum_ids(&state.pool, user_id, is_admin).await?;
+    posts.retain(|post| allowed.contains(&post.forum_id));
+
     order_posts(&mut posts, &qp.sort);
     let total = posts.len() as i64;
     let (slice, _) = j::slice_page(posts, qp.page, qp.size);
@@ -243,7 +254,11 @@ pub async fn detail(
 ) -> ApiResult<Json<Value>> {
     let post = require_post(&state.pool, id).await?;
     let user_id = user.0.as_ref().map(|u| u.id);
-    Ok(j::ok(to_detail(&state, &post, user_id).await?))
+    let is_admin = user.0.as_ref().map(|u| u.is_admin()).unwrap_or(false);
+    if let Some(forum) = crate::routes::forums::find_by_id(&state.pool, post.forum_id).await? {
+        gate::ensure(&state.pool, user_id, is_admin, &forum, GateKind::Browse).await?;
+    }
+    Ok(j::ok(to_detail(&state, &post, user_id, is_admin).await?))
 }
 
 /// POST /posts
@@ -271,15 +286,7 @@ pub async fn create(
     let forum = crate::routes::forums::find_by_id(&state.pool, forum_id)
         .await?
         .ok_or_else(|| ApiError::not_found("子论坛不存在"))?;
-    let gate = auth_gate::evaluate(
-        &state.pool,
-        Some(me.id),
-        forum.required_auth_types.as_deref(),
-    )
-    .await?;
-    if !gate.passed {
-        return Err(ApiError::forbidden(gate.message));
-    }
+    gate::ensure(&state.pool, Some(me.id), me.is_admin(), &forum, GateKind::Operate).await?;
 
     // 帖子插入与论坛帖子数重算需原子完成（对齐 Java `PostService.create` 的 @Transactional）。
     let mut tx = state.pool.begin().await?;
@@ -298,7 +305,7 @@ pub async fn create(
     tx.commit().await?;
 
     let post = require_post(&state.pool, post_id).await?;
-    Ok(j::ok(to_detail(&state, &post, Some(me.id)).await?))
+    Ok(j::ok(to_detail(&state, &post, Some(me.id), me.is_admin()).await?))
 }
 
 /// PUT /posts/{id}
@@ -326,7 +333,7 @@ pub async fn update(
         .execute(&state.pool)
         .await?;
     let post = require_post(&state.pool, id).await?;
-    Ok(j::ok(to_detail(&state, &post, Some(me.id)).await?))
+    Ok(j::ok(to_detail(&state, &post, Some(me.id), me.is_admin()).await?))
 }
 
 /// DELETE /posts/{id}
@@ -362,15 +369,7 @@ pub async fn post_vote(
     let forum = crate::routes::forums::find_by_id(&state.pool, post.forum_id)
         .await?
         .ok_or_else(|| ApiError::not_found("子论坛不存在"))?;
-    let gate = auth_gate::evaluate(
-        &state.pool,
-        Some(me.id),
-        forum.required_auth_types.as_deref(),
-    )
-    .await?;
-    if !gate.passed {
-        return Err(ApiError::forbidden(gate.message));
-    }
+    gate::ensure(&state.pool, Some(me.id), me.is_admin(), &forum, GateKind::Operate).await?;
     let value = req.value.unwrap_or(0);
     if !(-1..=1).contains(&value) {
         return Err(ApiError::bad_request("投票值只能是 1、-1 或 0"));
@@ -396,7 +395,7 @@ pub async fn post_vote(
         .await?;
     tx.commit().await?;
     let post = require_post(&state.pool, id).await?;
-    Ok(j::ok(to_detail(&state, &post, Some(me.id)).await?))
+    Ok(j::ok(to_detail(&state, &post, Some(me.id), me.is_admin()).await?))
 }
 
 /// POST /posts/{id}/pin
@@ -419,22 +418,26 @@ pub async fn pin(
         .execute(&state.pool)
         .await?;
     let post = require_post(&state.pool, id).await?;
-    Ok(j::ok(to_detail(&state, &post, Some(me.id)).await?))
+    Ok(j::ok(to_detail(&state, &post, Some(me.id), me.is_admin()).await?))
 }
 
 /// 供 users 模块复用：GET /users/{id}/posts
 pub async fn list_by_author(
     state: &AppState,
     author_id: i64,
+    user_id: Option<i64>,
+    is_admin: bool,
     sort: &str,
     page: i32,
     size: i32,
 ) -> ApiResult<Json<Value>> {
+    let allowed = gate::allowed_forum_ids(&state.pool, user_id, is_admin).await?;
     let mut posts: Vec<Post> =
         sqlx::query_as::<_, Post>("SELECT * FROM posts WHERE author_id = ? AND is_removed = 0")
             .bind(author_id)
             .fetch_all(&state.pool)
             .await?;
+    posts.retain(|post| allowed.contains(&post.forum_id));
     order_posts(&mut posts, sort);
     let total = posts.len() as i64;
     let (slice, _) = j::slice_page(posts, page, size);

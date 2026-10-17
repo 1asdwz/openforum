@@ -37,24 +37,11 @@
                 <el-radio value="CUSTOM">自定义 HTML</el-radio>
               </el-radio-group>
             </el-form-item>
-            <el-form-item label="互动门槛（需完成的认证）">
-              <el-select
-                v-model="form.requiredAuthTypes"
-                multiple
-                clearable
-                placeholder="不选择表示无需认证"
-                style="width: 100%"
-              >
-                <el-option
-                  v-for="t in authTypeOptions"
-                  :key="t.value"
-                  :label="t.label"
-                  :value="t.value"
-                />
-              </el-select>
+            <el-form-item label="浏览门槛">
+              <GateRuleEditor v-model="form.browseRule" :fields="flatFields" />
             </el-form-item>
-            <el-form-item label="最低年龄门槛（可选）">
-              <el-input-number v-model="ageGate" :min="0" :max="120" :controls="false" />
+            <el-form-item label="操作门槛（发帖 / 评论 / 投票）">
+              <GateRuleEditor v-model="form.operateRule" :fields="flatFields" />
             </el-form-item>
             <el-form-item label="板块规则">
               <el-input v-model="form.rules" type="textarea" :rows="4" />
@@ -157,28 +144,25 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { forumApi } from '@/api'
+import GateRuleEditor from '@/components/GateRuleEditor.vue'
+import { forumApi, infoApi } from '@/api'
 import { useAuthStore } from '@/stores/auth'
-import type { CustomPageStatus, SubForum } from '@/types'
-import {
-  AUTH_TYPE_LABELS,
-  AUTH_TYPE_ORDER,
-  errorMessage,
-  parseRequiredAuthTypes,
-  parseTemplateConfig,
-} from '@/utils/format'
+import type { CustomPageStatus, GateRule, InfoField, InfoFieldGroup, SubForum } from '@/types'
+import { errorMessage, parseTemplateConfig } from '@/utils/format'
 
 const route = useRoute()
 const auth = useAuthStore()
 
-const authTypeOptions = AUTH_TYPE_ORDER.map((t) => ({ label: AUTH_TYPE_LABELS[t], value: t }))
+const fieldGroups = ref<InfoFieldGroup[]>([])
+const flatFields = computed<InfoField[]>(() =>
+  fieldGroups.value.flatMap((g) => g.fields || [])
+)
 
 const forum = ref<SubForum | null>(null)
 const loading = ref(true)
 const error = ref('')
 const activeTab = ref('basic')
 const saving = ref(false)
-const ageGate = ref<number | undefined>(undefined)
 
 const customHtml = ref('')
 const customStatus = ref<CustomPageStatus | undefined>(undefined)
@@ -192,7 +176,8 @@ const form = reactive({
   icon: '',
   themeColor: '#FF4500',
   templateType: 'DEFAULT',
-  requiredAuthTypes: [] as string[],
+  browseRule: null as GateRule | null,
+  operateRule: null as GateRule | null,
   rules: '',
   announcement: '',
   sections: [] as { title: string; content: string }[],
@@ -243,12 +228,8 @@ async function loadForum() {
     form.themeColor = data.themeColor || '#FF4500'
     form.templateType = data.templateType || 'DEFAULT'
     form.rules = data.rules || ''
-
-    const gates = parseRequiredAuthTypes(data.requiredAuthTypes)
-    const ageItems = gates.filter((g) => g.startsWith('AGE_'))
-    form.requiredAuthTypes = gates.filter((g) => !g.startsWith('AGE_'))
-    const firstAge = ageItems[0]
-    ageGate.value = firstAge ? Number(firstAge.slice(4)) : undefined
+    form.browseRule = data.browseRule || null
+    form.operateRule = data.operateRule || null
 
     const tpl = parseTemplateConfig(data.templateConfig)
     form.announcement = tpl.announcement || ''
@@ -287,8 +268,6 @@ async function saveBasic() {
   if (!forum.value) return
   saving.value = true
   try {
-    const requiredAuthTypes = [...form.requiredAuthTypes]
-    if (ageGate.value && ageGate.value > 0) requiredAuthTypes.push(`AGE_${ageGate.value}`)
     await forumApi.update(forum.value.id, {
       name: form.name.trim(),
       description: form.description.trim(),
@@ -301,7 +280,8 @@ async function saveBasic() {
         links: form.links.filter((l) => l.label.trim() && l.url.trim()),
       }),
       rules: form.rules.trim(),
-      requiredAuthTypes,
+      browseRule: form.browseRule,
+      operateRule: form.operateRule,
     })
     ElMessage.success('已保存')
     await loadForum()
@@ -357,5 +337,12 @@ async function submitCustom() {
   }
 }
 
-onMounted(loadForum)
+onMounted(async () => {
+  loadForum()
+  try {
+    fieldGroups.value = (await infoApi.fields()) || []
+  } catch {
+    // 目录加载失败时门槛编辑器为空，不影响其他管理功能
+  }
+})
 </script>

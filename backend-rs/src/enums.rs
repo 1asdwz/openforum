@@ -51,12 +51,15 @@ impl AuthLevel {
 }
 
 /// 认证类型取值，对应 Java `AuthType`。
-pub const AUTH_TYPES: [(&str, &str); 10] = [
+pub const AUTH_TYPES: [(&str, &str); 13] = [
     ("REAL_NAME", "实名认证"),
     ("ID_CARD", "身份证认证"),
     ("GENDER", "性别认证"),
     ("AGE", "年龄认证"),
     ("NATIONALITY", "国籍认证"),
+    ("CITY", "城市认证"),
+    ("OCCUPATION", "职业认证"),
+    ("EDUCATION", "学历认证"),
     ("DRIVER_LICENSE", "驾照认证"),
     ("MARRIAGE_CERT", "婚姻认证"),
     ("PROPERTY_CERT", "房产认证"),

@@ -112,17 +112,6 @@
             <span class="k">加入时间</span>
             <span class="v">{{ formatDate(profile.createdAt) }}</span>
           </div>
-          <div class="about-row">
-            <span class="k">已通过认证</span>
-            <span class="v">
-              <span v-if="approvedTypes.length" class="badge-row">
-                <el-tag v-for="t in approvedTypes" :key="t" type="success" effect="light">
-                  {{ authTypeLabel(t) }}
-                </el-tag>
-              </span>
-              <span v-else class="muted">暂无认证徽章</span>
-            </span>
-          </div>
         </div>
       </template>
     </div>
@@ -155,7 +144,6 @@ import { postApi, userApi } from '@/api'
 import { useAuthStore } from '@/stores/auth'
 import type { Post, User, UserComment } from '@/types'
 import {
-  authTypeLabel,
   avatarText,
   errorMessage,
   formatDate,
@@ -202,7 +190,6 @@ const editForm = reactive({ avatar: '', bio: '' })
 const isSelf = computed(
   () => !!auth.user && !!profile.value && auth.user.id === profile.value.id
 )
-const approvedTypes = computed(() => profile.value?.approvedAuthTypes || [])
 
 async function load() {
   loading.value = true

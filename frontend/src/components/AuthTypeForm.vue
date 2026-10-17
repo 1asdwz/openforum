@@ -8,7 +8,25 @@
         :required="!!field.required"
       >
         <el-select
-          v-if="field.type === 'select' || (field.options && field.options.length)"
+          v-if="field.type === 'tags'"
+          v-model="model[field.name]"
+          multiple
+          filterable
+          allow-create
+          default-first-option
+          :placeholder="`输入${field.label || field.name}后回车`"
+          style="width: 100%"
+        >
+          <el-option
+            v-for="opt in normOptions(field.options)"
+            :key="opt.value"
+            :label="opt.label"
+            :value="opt.value"
+          />
+        </el-select>
+
+        <el-select
+          v-else-if="field.type === 'select' || (field.options && field.options.length)"
           v-model="model[field.name]"
           :placeholder="`请选择${field.label || field.name}`"
           style="width: 100%"
@@ -107,7 +125,12 @@ function normOptions(
 function initModel() {
   Object.keys(model).forEach((k) => delete model[k])
   props.meta.fields?.forEach((f) => {
-    model[f.name] = isNumberField(f.type) || f.type === 'date' ? undefined : ''
+    model[f.name] =
+      f.type === 'tags'
+        ? []
+        : isNumberField(f.type) || f.type === 'date'
+          ? undefined
+          : ''
   })
 }
 

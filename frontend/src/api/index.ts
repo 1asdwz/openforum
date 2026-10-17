@@ -8,11 +8,14 @@ import type {
   Comment,
   CustomPageInfo,
   ForumMember,
+  GateRule,
+  InfoFieldGroup,
   MediaKind,
   MediaUploadResult,
   Post,
   SubForum,
   User,
+  UserInfoResponse,
 } from '@/types'
 
 /** 前端分页从 1 开始，后端 Spring Pageable 从 0 开始，统一在此转换 */
@@ -40,6 +43,8 @@ export interface CreateForumPayload {
   templateConfig?: string
   rules?: string
   requiredAuthTypes?: string[]
+  browseRule?: GateRule | null
+  operateRule?: GateRule | null
 }
 
 export const authApi = {
@@ -61,6 +66,19 @@ export const userApi = {
     api.get<unknown>(`/users/${id}/comments`, { params: shiftPage(params) }),
   updateMe: (payload: { avatar?: string; bio?: string }) =>
     api.put<User>('/users/me', payload),
+}
+
+export const infoApi = {
+  /** 信息项目录（分组 + 字段元数据） */
+  fields: () => api.get<InfoFieldGroup[]>('/info/fields'),
+  /** 我的资料（含完整度） */
+  me: () => api.get<UserInfoResponse>('/info/me'),
+  /** 填写/更新单个信息项 */
+  update: (fieldKey: string, value: Record<string, unknown>) =>
+    api.put<UserInfoResponse['groups'][number]['items'][number]>(
+      `/info/me/${fieldKey}`,
+      { value }
+    ),
 }
 
 export const forumApi = {

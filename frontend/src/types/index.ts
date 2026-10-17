@@ -19,6 +19,41 @@ export interface AuthResult {
 export type TemplateType = 'DEFAULT' | 'CUSTOM'
 export type CustomPageStatus = 'DRAFT' | 'PENDING' | 'APPROVED' | 'REJECTED'
 
+/** 门槛条件（与后端 GateCondition 对齐） */
+export interface GateCondition {
+  field: string
+  op?: string
+  values?: string[]
+  labels?: string[]
+  value?: string
+  min?: number
+  max?: number
+  authLevel?: string
+}
+
+export interface GateRule {
+  version: number
+  conditions: GateCondition[]
+}
+
+export interface GateMissingItem {
+  fieldKey: string
+  label: string
+  reason: 'NOT_FILLED' | 'VALUE_MISMATCH' | 'AUTH_PENDING' | 'AUTH_LEVEL_LOW' | string
+  required: string
+}
+
+/** 403 门槛拦截附带的数据 */
+export interface GateDeniedData {
+  gate: 'BROWSE' | 'OPERATE' | string
+  forumId?: number
+  forumName?: string
+  loginRequired?: boolean
+  missing: GateMissingItem[]
+  /** 前端补充的错误文案 */
+  message?: string
+}
+
 export interface SubForum {
   id: number
   slug: string
@@ -27,7 +62,11 @@ export interface SubForum {
   icon?: string | null
   themeColor?: string | null
   rules?: string | null
+  /** 旧版认证门槛（仅兼容展示） */
   requiredAuthTypes?: string | string[] | null
+  legacyRequiredAuthTypes?: string | null
+  browseRule?: GateRule | null
+  operateRule?: GateRule | null
   templateType: TemplateType
   templateConfig?: string | TemplateConfig | null
   customPageHtml?: string | null
@@ -37,9 +76,11 @@ export interface SubForum {
   postCount: number
   isMember?: boolean
   canPost?: boolean
+  canOperate?: boolean
   creatorId?: number
   createdAt?: string
 }
+
 
 export interface TemplateConfig {
   announcement?: string
@@ -195,3 +236,44 @@ export interface PageResult<T> {
   items: T[]
   total: number
 }
+
+/** 信息项目录 */
+export interface InfoField {
+  fieldKey: string
+  label: string
+  valueType: 'text' | 'enum' | 'date' | 'region' | 'ordinal' | 'region_multi' | 'int' | 'tags' | string
+  options: { value: string; label: string; order?: number }[]
+  authable: boolean
+  gateOps: string[]
+  authLevels: string[]
+}
+
+export interface InfoFieldGroup {
+  groupKey: string
+  groupLabel: string
+  fields: InfoField[]
+}
+
+/** 我的资料项 */
+export interface UserInfoItem {
+  fieldKey: string
+  label: string
+  value: Record<string, unknown> | null
+  valueText: string
+  authLevel?: string | null
+  authStatus?: string | null
+  canUpgrade?: boolean
+  privacy?: string
+}
+
+export interface UserInfoGroup {
+  groupKey: string
+  groupLabel: string
+  items: UserInfoItem[]
+}
+
+export interface UserInfoResponse {
+  completeness: { filled: number; total: number; percent: number }
+  groups: UserInfoGroup[]
+}
+

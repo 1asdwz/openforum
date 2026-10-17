@@ -3,6 +3,7 @@ pub mod auth;
 pub mod authentications;
 pub mod comments;
 pub mod forums;
+pub mod info;
 pub mod media;
 pub mod plugins;
 pub mod posts;
@@ -26,6 +27,10 @@ pub fn router() -> Router<AppState> {
         .route("/users/:id", get(users::profile))
         .route("/users/:id/posts", get(users::user_posts))
         .route("/users/:id/comments", get(users::user_comments))
+        // -------- 用户资料 --------
+        .route("/info/fields", get(info::fields))
+        .route("/info/me", get(info::me))
+        .route("/info/me/:fieldKey", put(info::update_field))
         // -------- 子论坛 --------
         .route("/forums", get(forums::list).post(forums::create))
         .route("/forums/popular", get(forums::popular))

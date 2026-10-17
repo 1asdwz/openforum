@@ -173,7 +173,9 @@ async fn review_inner(
         if rule.status == "REJECTED" {
             return finish(conn, auth, "REJECTED", "RULE", rule.confidence, &rule.reason, Some(&rule.reason)).await;
         }
-        return finish(conn, auth, "APPROVED", "RULE", rule.confidence, &rule.reason, None).await;
+        let saved = finish(conn, auth, "APPROVED", "RULE", rule.confidence, &rule.reason, None).await?;
+        crate::info::grant_user_info(conn, user_id, auth_type, saved.id, level.name(), &safe_data).await?;
+        return Ok(saved);
     }
 
     // 4. 绑定媒体（带 user_id 过滤，防止越权绑定他人材料）
@@ -224,6 +226,7 @@ async fn review_inner(
         )
         .await?;
         real_name_register(conn, user_id, auth_type, level, &safe_data, &outcome.extracted).await?;
+        crate::info::grant_user_info(conn, user_id, auth_type, saved.id, level.name(), &safe_data).await?;
         return Ok(saved);
     }
     if outcome.status == "REJECTED" {
@@ -491,6 +494,22 @@ pub fn rule_review(auth_type: &str, data: &Map<String, Value>) -> ReviewResult {
         "GENDER" => validate_gender(data, &mut errors),
         "AGE" => validate_age(data, &mut errors),
         "NATIONALITY" => require_text(data, "nationality", "国籍", 1, 50, &mut errors),
+        "CITY" => require_text(data, "city", "城市", 1, 40, &mut errors),
+        "OCCUPATION" => {
+            let category = text(data, "category").unwrap_or_default().to_ascii_uppercase();
+            if !crate::info::is_valid_occupation(&category) {
+                errors.push("请选择职业分类".to_string());
+            }
+            if text(data, "title").map(|t| t.chars().count() > 50).unwrap_or(false) {
+                errors.push("职位名称不能超过 50 字".to_string());
+            }
+        }
+        "EDUCATION" => {
+            let raw = text(data, "education").unwrap_or_default().to_ascii_uppercase();
+            if crate::info::education_rank(&raw).is_none() {
+                errors.push("请选择学历".to_string());
+            }
+        }
         "DRIVER_LICENSE" => require_text(data, "licenseNumber", "驾照号", 6, 40, &mut errors),
         "MARRIAGE_CERT" => {
             require_text(data, "spouseName", "配偶姓名", 1, 50, &mut errors);
@@ -544,6 +563,14 @@ fn validate_gender(data: &Map<String, Value>, errors: &mut Vec<String>) {
 }
 
 fn validate_age(data: &Map<String, Value>, errors: &mut Vec<String>) {
+    if let Some(birth) = text(data, "birthDate") {
+        if !birth.is_empty() {
+            if chrono::NaiveDate::parse_from_str(&birth, "%Y-%m-%d").is_err() {
+                errors.push("出生日期格式应为 YYYY-MM-DD".to_string());
+            }
+            return;
+        }
+    }
     match text(data, "age") {
         None => errors.push("年龄不能为空".to_string()),
         Some(v) if v.is_empty() => errors.push("年龄不能为空".to_string()),

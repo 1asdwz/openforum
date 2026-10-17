@@ -5,7 +5,10 @@ mod db;
 mod dto;
 mod enums;
 mod error;
+mod gate;
+mod info;
 mod json;
+mod migrate;
 mod models;
 mod plugins;
 mod repo;
@@ -74,6 +77,11 @@ async fn main() -> anyhow::Result<()> {
     // 种子数据：仅在数据库为空时执行，失败仅告警（不阻断启动）。
     if let Err(e) = seeder::seed(&state).await {
         tracing::warn!("种子数据初始化失败（忽略）: {e}");
+    }
+
+    // 信息项与板块门槛迁移：幂等执行，失败仅告警（门槛判定会回退旧逻辑）。
+    if let Err(e) = migrate::run(&state).await {
+        tracing::warn!("数据迁移失败（忽略）: {e}");
     }
 
     let cors = CorsLayer::new()

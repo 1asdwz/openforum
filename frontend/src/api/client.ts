@@ -57,6 +57,19 @@ interface ApiEnvelope<T> {
   data: T
 }
 
+/** 业务错误：保留 HTTP 状态与后端结构化 data（如门槛缺失条件） */
+export class ApiError extends Error {
+  status?: number
+  data?: unknown
+
+  constructor(message: string, status?: number, data?: unknown) {
+    super(message)
+    this.name = 'ApiError'
+    this.status = status
+    this.data = data
+  }
+}
+
 function isEnvelope(body: unknown): body is ApiEnvelope<unknown> {
   return !!body && typeof body === 'object' && 'code' in (body as object)
 }
@@ -69,19 +82,22 @@ async function request<T>(config: RequestConfigExtra): Promise<T> {
       const env = body as ApiEnvelope<T>
       if (env.code !== 200 && env.code !== 0) {
         if (env.code === 401) handleUnauthorized()
-        throw new Error(env.message || '请求失败')
+        throw new ApiError(env.message || '请求失败', env.code, env.data)
       }
       return env.data
     }
     return body as T
   } catch (err) {
+    if (err instanceof ApiError) throw err
     // 归一化错误信息，方便页面直接展示
     const anyErr = err as {
-      response?: { data?: { message?: string }; status?: number }
+      response?: { data?: { message?: string; data?: unknown }; status?: number }
       message?: string
     }
     const serverMsg = anyErr?.response?.data?.message
-    if (serverMsg) throw new Error(serverMsg)
+    if (serverMsg) {
+      throw new ApiError(serverMsg, anyErr.response?.status, anyErr.response?.data?.data)
+    }
     if (err instanceof Error) throw err
     throw new Error('请求失败，请稍后重试')
   }

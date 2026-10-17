@@ -8,8 +8,8 @@ use serde_json::{json, Value};
 use sqlx::MySqlPool;
 
 use crate::access;
-use crate::auth_gate;
 use crate::error::{ApiError, ApiResult};
+use crate::gate::{self, GateKind};
 use crate::json as j;
 use crate::models::SubForum;
 use crate::sanitizer;
@@ -57,6 +57,8 @@ pub struct ForumCreateRequest {
     pub template_config: Option<String>,
     pub rules: Option<String>,
     pub required_auth_types: Option<Vec<String>>,
+    pub browse_rule: Option<Value>,
+    pub operate_rule: Option<Value>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -70,6 +72,8 @@ pub struct ForumUpdateRequest {
     pub template_config: Option<String>,
     pub rules: Option<String>,
     pub required_auth_types: Option<Vec<String>>,
+    pub browse_rule: Option<Value>,
+    pub operate_rule: Option<Value>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -102,6 +106,10 @@ fn join_auth_types(list: Option<&Vec<String>>) -> Option<String> {
     } else {
         Some(out.join(","))
     }
+}
+
+fn rule_storage(rule: Option<&gate::GateRule>) -> Option<String> {
+    rule.filter(|r| !r.is_empty()).map(|r| r.to_json_string())
 }
 
 fn parse_template_type(value: Option<&str>) -> String {
@@ -192,13 +200,16 @@ async fn build_detail(
     state: &AppState,
     forum: &SubForum,
     user_id: Option<i64>,
+    is_admin: bool,
 ) -> ApiResult<Value> {
     let is_member = access::is_member(&state.pool, forum.id, user_id).await?;
     let mut can_post = false;
-    if let Some(uid) = user_id {
-        let gate = auth_gate::evaluate(&state.pool, Some(uid), forum.required_auth_types.as_deref()).await?;
-        can_post = gate.passed;
+    if user_id.is_some() {
+        let gate_result =
+            gate::check(&state.pool, user_id, is_admin, forum, GateKind::Operate).await?;
+        can_post = gate_result.passed;
     }
+    let rules = gate::load_rules(&state.pool, forum.id).await?;
     let creator_name: Option<(String,)> =
         sqlx::query_as("SELECT username FROM users WHERE id = ?")
             .bind(forum.creator_id)
@@ -223,6 +234,9 @@ async fn build_detail(
         "themeColor": forum.theme_color,
         "rules": forum.rules,
         "requiredAuthTypes": auth_type_list(forum.required_auth_types.as_deref()),
+        "legacyRequiredAuthTypes": auth_type_list(forum.required_auth_types.as_deref()),
+        "browseRule": rules.browse_json(),
+        "operateRule": rules.operate_json(),
         "templateType": template_type,
         "templateConfig": forum.template_config,
         "customPageStatus": forum.custom_page_status,
@@ -231,6 +245,7 @@ async fn build_detail(
         "postCount": forum.post_count,
         "isMember": is_member,
         "canPost": can_post,
+        "canOperate": can_post,
         "isPublic": forum.public,
         "creatorId": forum.creator_id,
         "creatorName": creator_name.map(|(n,)| n),
@@ -399,12 +414,17 @@ pub async fn create(
         .unwrap_or_else(|| DEFAULT_THEME_COLOR.to_string());
     let template_type = parse_template_type(req.template_type.as_deref());
     let required = join_auth_types(req.required_auth_types.as_ref());
+    let browse_rule = gate::normalize_rule(req.browse_rule.as_ref())?;
+    let operate_rule = gate::normalize_rule(req.operate_rule.as_ref())?;
+    let browse_json = rule_storage(browse_rule.as_ref());
+    let operate_json = rule_storage(operate_rule.as_ref());
 
     let result = sqlx::query(
         "INSERT INTO sub_forums (slug, name, description, icon, theme_color, rules, required_auth_types, \
          template_type, template_config, custom_page_html, custom_page_status, custom_page_review_note, \
-         creator_id, member_count, post_count, is_public, created_at, updated_at) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, ?, 0, 0, 1, NOW(), NOW())",
+         creator_id, member_count, post_count, is_public, browse_rule, operate_rule, gate_version, \
+         created_at, updated_at) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, ?, 0, 0, 1, ?, ?, 1, NOW(), NOW())",
     )
     .bind(&slug)
     .bind(&name)
@@ -416,6 +436,8 @@ pub async fn create(
     .bind(&template_type)
     .bind(req.template_config.as_deref())
     .bind(me.id)
+    .bind(&browse_json)
+    .bind(&operate_json)
     .execute(&state.pool)
     .await?;
     let forum_id = result.last_insert_id() as i64;
@@ -433,7 +455,7 @@ pub async fn create(
         .await?;
 
     let forum = require_forum(&state.pool, forum_id).await?;
-    Ok(j::ok(build_detail(&state, &forum, Some(me.id)).await?))
+    Ok(j::ok(build_detail(&state, &forum, Some(me.id), me.is_admin()).await?))
 }
 
 /// GET /forums/{slug}
@@ -448,7 +470,9 @@ pub async fn detail(
         .await?
         .ok_or_else(|| ApiError::not_found("子论坛不存在"))?;
     let user_id = user.0.as_ref().map(|u| u.id);
-    Ok(j::ok(build_detail(&state, &forum, user_id).await?))
+    let is_admin = user.0.as_ref().map(|u| u.is_admin()).unwrap_or(false);
+    gate::ensure(&state.pool, user_id, is_admin, &forum, GateKind::Browse).await?;
+    Ok(j::ok(build_detail(&state, &forum, user_id, is_admin).await?))
 }
 
 /// PUT /forums/{id}
@@ -488,6 +512,23 @@ pub async fn update(
         forum.required_auth_types = join_auth_types(Some(&list));
     }
 
+    if let Some(raw) = req.browse_rule {
+        let rule = gate::normalize_rule(Some(&raw))?;
+        sqlx::query("UPDATE sub_forums SET browse_rule=?, gate_version=1 WHERE id=?")
+            .bind(rule_storage(rule.as_ref()))
+            .bind(forum.id)
+            .execute(&state.pool)
+            .await?;
+    }
+    if let Some(raw) = req.operate_rule {
+        let rule = gate::normalize_rule(Some(&raw))?;
+        sqlx::query("UPDATE sub_forums SET operate_rule=?, gate_version=1 WHERE id=?")
+            .bind(rule_storage(rule.as_ref()))
+            .bind(forum.id)
+            .execute(&state.pool)
+            .await?;
+    }
+
     sqlx::query(
         "UPDATE sub_forums SET name=?, description=?, icon=?, theme_color=?, template_type=?, \
          template_config=?, rules=?, required_auth_types=?, updated_at=NOW() WHERE id=?",
@@ -505,7 +546,7 @@ pub async fn update(
     .await?;
 
     let forum = require_forum(&state.pool, id).await?;
-    Ok(j::ok(build_detail(&state, &forum, Some(me.id)).await?))
+    Ok(j::ok(build_detail(&state, &forum, Some(me.id), me.is_admin()).await?))
 }
 
 /// PUT /forums/{id}/custom-page
@@ -643,9 +684,13 @@ async fn recount_members(conn: &mut sqlx::MySqlConnection, forum_id: i64) -> Res
 /// GET /forums/{id}/members
 pub async fn members(
     State(state): State<AppState>,
+    user: CurrentUser,
     Path(id): Path<i64>,
 ) -> ApiResult<Json<Value>> {
     let forum = require_forum(&state.pool, id).await?;
+    let user_id = user.0.as_ref().map(|u| u.id);
+    let is_admin = user.0.as_ref().map(|u| u.is_admin()).unwrap_or(false);
+    gate::ensure(&state.pool, user_id, is_admin, &forum, GateKind::Browse).await?;
     let rows: Vec<(i64, i64, String, NaiveDateTime)> = sqlx::query_as(
         "SELECT id, user_id, role, joined_at FROM forum_members WHERE forum_id = ? ORDER BY joined_at ASC",
     )

@@ -103,7 +103,23 @@ pub async fn approve_authentication(
     auth.reviewed_at = Some(chrono::Local::now().naive_local());
     auth.reason = Some(reason);
     auth.rejection_reason = None;
-    repo::save_auth(&state.pool, &mut auth).await?;
+
+    // 手动通过同样要把认证结果写入用户信息项，供板块门槛判定使用。
+    let data = j::json_value(auth.auth_data.as_deref());
+    let data_map = data.as_object().cloned().unwrap_or_default();
+    let level_name = auth.level.clone().unwrap_or_else(|| "LOW".to_string());
+    let mut tx = state.pool.begin().await?;
+    repo::save_auth(&mut *tx, &mut auth).await?;
+    crate::info::grant_user_info(
+        &mut *tx,
+        auth.user_id,
+        &auth.auth_type,
+        auth.id,
+        &level_name,
+        &data_map,
+    )
+    .await?;
+    tx.commit().await?;
     Ok(j::ok(auth_dto(&state, &auth).await?))
 }
 

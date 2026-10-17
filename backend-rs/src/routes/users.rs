@@ -48,28 +48,34 @@ pub async fn profile(
     Path(id): Path<i64>,
 ) -> ApiResult<Json<Value>> {
     let user = repo::require_user(&state.pool, id).await?;
-    let auths = repo::approved_type_names(&state.pool, user.id).await?;
-    Ok(j::ok(dto::user_dto(&user, auths, false)))
+    // 隐私：公开资料不返回认证徽章与具体信息项。
+    Ok(j::ok(dto::user_dto(&user, Vec::new(), false)))
 }
 
 /// GET /users/{id}/posts
 pub async fn user_posts(
     State(state): State<AppState>,
+    user: CurrentUser,
     Path(id): Path<i64>,
     Query(q): Query<UserPostsQuery>,
 ) -> ApiResult<Json<Value>> {
     repo::require_user(&state.pool, id).await?;
-    posts::list_by_author(&state, id, &q.sort, q.page, q.size).await
+    let user_id = user.0.as_ref().map(|u| u.id);
+    let is_admin = user.0.as_ref().map(|u| u.is_admin()).unwrap_or(false);
+    posts::list_by_author(&state, id, user_id, is_admin, &q.sort, q.page, q.size).await
 }
 
 /// GET /users/{id}/comments
 pub async fn user_comments(
     State(state): State<AppState>,
+    user: CurrentUser,
     Path(id): Path<i64>,
     Query(q): Query<PageQuery>,
 ) -> ApiResult<Json<Value>> {
     repo::require_user(&state.pool, id).await?;
-    comments::list_by_author(&state, id, q.page, q.size).await
+    let user_id = user.0.as_ref().map(|u| u.id);
+    let is_admin = user.0.as_ref().map(|u| u.is_admin()).unwrap_or(false);
+    comments::list_by_author(&state, id, user_id, is_admin, q.page, q.size).await
 }
 
 /// PUT /users/me

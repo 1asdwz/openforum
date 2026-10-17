@@ -30,6 +30,15 @@
         </el-avatar>
         <span class="rail-nav-ellipsis">我的主页</span>
       </router-link>
+      <router-link
+        v-if="auth.user"
+        to="/profile"
+        class="rail-nav-item"
+        :class="{ active: route.name === 'my-info' }"
+      >
+        <IconUser class="rail-ico" />
+        <span>资料与认证</span>
+      </router-link>
     </nav>
 
     <section class="rail-card">
@@ -88,6 +97,7 @@ import { avatarText, isImageUrl, normalizePage, toArray } from '@/utils/format'
 import IconHome from '@/components/icons/IconHome.vue'
 import IconSearch from '@/components/icons/IconSearch.vue'
 import IconPlus from '@/components/icons/IconPlus.vue'
+import IconUser from '@/components/icons/IconUser.vue'
 
 const auth = useAuthStore()
 const ui = useUiStore()

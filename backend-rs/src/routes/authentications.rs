@@ -68,6 +68,9 @@ fn short_label(t: &str) -> &'static str {
         "GENDER" => "性别",
         "AGE" => "年龄",
         "NATIONALITY" => "国籍",
+        "CITY" => "城市",
+        "OCCUPATION" => "职业",
+        "EDUCATION" => "学历",
         "DRIVER_LICENSE" => "驾照",
         "MARRIAGE_CERT" => "婚姻",
         "PROPERTY_CERT" => "房产",
@@ -85,6 +88,9 @@ fn document_name(t: &str) -> &'static str {
         "MARRIAGE_CERT" => "结婚证",
         "PROPERTY_CERT" => "房产证",
         "NATIONALITY" => "国籍证明",
+        "CITY" => "居住证明",
+        "OCCUPATION" => "在职证明",
+        "EDUCATION" => "学历证书",
         _ => "相关证明材料",
     }
 }
@@ -140,12 +146,63 @@ fn levels_for(t: &str) -> Vec<Value> {
 
 fn fields_for(t: &str) -> Vec<Value> {
     let f = |name: &str, label: &str, ty: &str| json!({ "name": name, "label": label, "type": ty, "required": true });
+    let sel = |name: &str, label: &str, options: Value| json!({
+        "name": name,
+        "label": label,
+        "type": "select",
+        "required": true,
+        "options": options,
+    });
     match t {
         "REAL_NAME" => vec![f("fullName", "真实姓名", "text")],
-        "ID_CARD" => vec![f("idNumber", "身份证号", "text")],
-        "GENDER" => vec![f("gender", "性别", "select")],
-        "AGE" => vec![f("age", "年龄", "number")],
-        "NATIONALITY" => vec![f("nationality", "国籍", "text")],
+        "ID_CARD" => vec![
+            f("fullName", "真实姓名", "text"),
+            f("idNumber", "身份证号", "text"),
+            sel(
+                "gender",
+                "性别",
+                json!([{"value": "MALE", "label": "男"}, {"value": "FEMALE", "label": "女"}]),
+            ),
+            f("birthDate", "出生日期", "date"),
+            sel(
+                "country",
+                "国家/地区",
+                crate::info::options_value(crate::info::find_field("COUNTRY").expect("COUNTRY field")),
+            ),
+            f("city", "城市", "text"),
+        ],
+        "GENDER" => vec![sel(
+            "gender",
+            "性别",
+            json!([{"value": "MALE", "label": "男"}, {"value": "FEMALE", "label": "女"}]),
+        )],
+        "AGE" => vec![f("birthDate", "出生日期", "date")],
+        "NATIONALITY" => vec![sel(
+            "nationality",
+            "国籍",
+            crate::info::options_value(crate::info::find_field("COUNTRY").expect("COUNTRY field")),
+        )],
+        "CITY" => vec![
+            sel(
+                "country",
+                "国家/地区",
+                crate::info::options_value(crate::info::find_field("COUNTRY").expect("COUNTRY field")),
+            ),
+            f("city", "城市", "text"),
+        ],
+        "OCCUPATION" => vec![
+            sel(
+                "category",
+                "职业分类",
+                crate::info::options_value(crate::info::find_field("OCCUPATION").expect("OCCUPATION field")),
+            ),
+            f("title", "职位名称", "text"),
+        ],
+        "EDUCATION" => vec![sel(
+            "education",
+            "学历",
+            crate::info::options_value(crate::info::find_field("EDUCATION").expect("EDUCATION field")),
+        )],
         "DRIVER_LICENSE" => vec![f("licenseNumber", "驾照号", "text")],
         "MARRIAGE_CERT" => vec![
             f("spouseName", "配偶姓名", "text"),
@@ -154,6 +211,9 @@ fn fields_for(t: &str) -> Vec<Value> {
         "PROPERTY_CERT" => vec![
             f("certificateNumber", "产权证号", "text"),
             f("propertyAddress", "房产地址", "text"),
+            f("cities", "房产所在城市", "tags"),
+            f("districts", "房产所在区县", "tags"),
+            f("count", "房产数量", "number"),
         ],
         "ASSETS" => vec![f("amount", "资产金额", "number")],
         "CUSTOM" => vec![f("description", "说明", "textarea")],

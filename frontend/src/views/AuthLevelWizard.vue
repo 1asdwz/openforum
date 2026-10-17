@@ -235,6 +235,10 @@ async function submit() {
 }
 
 function goCenter() {
+  if (route.query.from === 'profile') {
+    router.push('/profile')
+    return
+  }
   router.push({ name: 'authentication' })
 }
 

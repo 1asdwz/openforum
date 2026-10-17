@@ -34,28 +34,12 @@
         </el-radio-group>
       </el-form-item>
 
-      <el-form-item label="互动门槛（需完成的认证）">
-        <el-select
-          v-model="form.requiredAuthTypes"
-          multiple
-          clearable
-          placeholder="不选择表示无需认证"
-          style="width: 100%"
-        >
-          <el-option
-            v-for="t in authTypeOptions"
-            :key="t.value"
-            :label="t.label"
-            :value="t.value"
-          />
-        </el-select>
+      <el-form-item label="浏览门槛">
+        <GateRuleEditor v-model="form.browseRule" :fields="flatFields" />
       </el-form-item>
 
-      <el-form-item label="最低年龄门槛（可选）">
-        <el-input-number v-model="ageGate" :min="0" :max="120" :controls="false" />
-        <span style="margin-left: 10px; color: var(--of-text-muted)">
-          设置后需年龄 ≥ 该值的认证
-        </span>
+      <el-form-item label="操作门槛（发帖 / 评论 / 投票）">
+        <GateRuleEditor v-model="form.operateRule" :fields="flatFields" />
       </el-form-item>
 
       <el-form-item label="板块规则">
@@ -73,15 +57,20 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { forumApi } from '@/api'
-import { AUTH_TYPE_LABELS, AUTH_TYPE_ORDER, errorMessage } from '@/utils/format'
+import GateRuleEditor from '@/components/GateRuleEditor.vue'
+import { forumApi, infoApi } from '@/api'
+import type { GateRule, InfoField, InfoFieldGroup } from '@/types'
+import { errorMessage } from '@/utils/format'
 
 const router = useRouter()
 
-const authTypeOptions = AUTH_TYPE_ORDER.map((t) => ({ label: AUTH_TYPE_LABELS[t], value: t }))
+const fieldGroups = ref<InfoFieldGroup[]>([])
+const flatFields = computed<InfoField[]>(() =>
+  fieldGroups.value.flatMap((g) => g.fields || [])
+)
 
 const form = reactive({
   name: '',
@@ -90,10 +79,10 @@ const form = reactive({
   icon: '',
   themeColor: '#FF4500',
   templateType: 'DEFAULT',
-  requiredAuthTypes: [] as string[],
+  browseRule: null as GateRule | null,
+  operateRule: null as GateRule | null,
   rules: '',
 })
-const ageGate = ref<number | undefined>(undefined)
 const submitting = ref(false)
 
 function genSlug() {
@@ -115,8 +104,6 @@ async function submit() {
   }
   submitting.value = true
   try {
-    const requiredAuthTypes = [...form.requiredAuthTypes]
-    if (ageGate.value && ageGate.value > 0) requiredAuthTypes.push(`AGE_${ageGate.value}`)
     const created = await forumApi.create({
       name: form.name.trim(),
       slug: form.slug.trim(),
@@ -125,7 +112,8 @@ async function submit() {
       themeColor: form.themeColor,
       templateType: form.templateType,
       rules: form.rules.trim(),
-      requiredAuthTypes,
+      browseRule: form.browseRule,
+      operateRule: form.operateRule,
     })
     ElMessage.success('子论坛创建成功')
     router.push(`/f/${created.slug || form.slug}`)
@@ -135,4 +123,12 @@ async function submit() {
     submitting.value = false
   }
 }
+
+onMounted(async () => {
+  try {
+    fieldGroups.value = (await infoApi.fields()) || []
+  } catch {
+    // 目录加载失败时门槛编辑器为空，不影响创建
+  }
+})
 </script>
