@@ -1,0 +1,2929 @@
+openapi: 3.0.3
+info:
+  title: OpenForum API
+  version: 1.0.0
+  description: |
+    OpenForum 论坛后端接口文档。
+
+    本规范基于现有 Spring Boot(Java) 实现编写，用于后续以 Rust(Axum) 重写并逐一对照。
+    所有业务接口均挂载在 servlet context-path `/api` 之下，因此 `servers` 使用 `{ url: "/api" }`，
+    `paths` 中以 `/auth/login` 这类相对路径书写。
+
+    ## 统一响应信封
+    所有非二进制接口返回如下结构（`ApiResponse`）：
+
+    ```json
+    { "code": 200, "message": "ok", "data": { } }
+    ```
+
+    出错时结构相同，`code` 为 HTTP 状态码，`message` 为中文错误文案，`data` 为 `null`。
+
+    ## 分页响应
+    分页接口的 `data` 为 `PageResponse` 结构：
+    `{ "content": [], "page": 0, "size": 20, "totalElements": 0, "totalPages": 0 }`。
+
+    ## 鉴权
+    使用 HS256 签名的 Bearer JWT。登录/注册接口返回 `token`，后续请求放入
+    `Authorization: Bearer <token>` 请求头。`/admin/**` 与部分插件管理接口需要 `ADMIN` 角色。
+
+    ## 时间格式
+    时间字段为无时区的 `LocalDateTime`，JSON 形如 `"2026-10-08T12:34:56"`。
+servers:
+  - url: /api
+    description: 直连后端（server.servlet.context-path = /api）
+tags:
+  - name: 认证
+    description: 注册、登录（密码 / Google）、当前用户
+  - name: 用户
+    description: 用户资料、用户的帖子与评论
+  - name: 子论坛
+    description: 子论坛列表、创建、详情、成员、自定义页面
+  - name: 帖子
+    description: 帖子列表、发布、详情、编辑、删除、投票、置顶
+  - name: 评论
+    description: 评论树、发表、删除、投票
+  - name: 媒体
+    description: 帖子媒体上传与读取
+  - name: 认证中心
+    description: 多类型多等级的用户认证（材料上传、活体挑战、提交与重试）
+  - name: 管理后台
+    description: 认证审核、自定义页审核、用户管理（需要 ADMIN）
+  - name: 插件
+    description: 插件列表与启停
+security:
+  - bearerAuth: []
+paths:
+  /auth/register:
+    post:
+      operationId: register
+      tags:
+        - 认证
+      summary: 注册新账号
+      description: |
+        以用户名 + 邮箱 + 密码注册。成功后直接返回 JWT 与用户信息。
+        用户名重复返回 400「用户名已被占用」，邮箱重复返回 400「邮箱已被占用」。
+        用户名长度需 3-50，密码长度需 6-64，邮箱需符合格式。
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '200':
+          description: 注册成功，返回 token 与用户
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseAuthResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /auth/login:
+    post:
+      operationId: login
+      tags:
+        - 认证
+      summary: 账号密码登录
+      description: |
+        `usernameOrEmail` 同时匹配用户名或邮箱。账号或密码错误返回 401「账号或密码错误」；
+        账号被禁用返回 403「账号已被禁用」。
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: 登录成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseAuthResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /auth/google:
+    post:
+      operationId: loginWithGoogle
+      tags:
+        - 认证
+      summary: Google 登录
+      description: |
+        使用 Google ID Token（`credential`）登录。未配置 `openforum.google.client-id` 时返回
+        400「Google 登录未配置」。凭证非法返回 401「Google 登录凭证无效」；
+        邮箱未验证返回 400「Google 账号邮箱未验证」。首次登录会自动创建账号。
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GoogleLoginRequest'
+      responses:
+        '200':
+          description: 登录成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseAuthResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /auth/me:
+    get:
+      operationId: me
+      tags:
+        - 认证
+      summary: 获取当前登录用户
+      description: 返回当前 JWT 对应的用户信息（含邮箱与已通过的认证类型）。未登录返回 401「请先登录」。
+      responses:
+        '200':
+          description: 当前用户
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseUserDTO'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /users/{id}:
+    get:
+      operationId: getUserProfile
+      tags:
+        - 用户
+      summary: 获取用户公开资料
+      description: 公开接口。公开资料中 `email` 为 null。用户不存在返回 404「用户不存在」。
+      security: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 用户 ID
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 用户资料
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseUserDTO'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /users/me:
+    put:
+      operationId: updateMe
+      tags:
+        - 用户
+      summary: 更新个人资料
+      description: 仅更新传入的非 null 字段（`avatar`、`bio`）。需要登录。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateProfileRequest'
+      responses:
+        '200':
+          description: 更新后的用户
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseUserDTO'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /users/{id}/posts:
+    get:
+      operationId: getUserPosts
+      tags:
+        - 用户
+      summary: 获取某用户的帖子（分页）
+      description: 公开接口。`sort` 支持 `new`、`top`、`hot`（其他值按 `hot` 处理）。
+      security: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 用户 ID
+          schema:
+            type: integer
+            format: int64
+        - name: sort
+          in: query
+          required: false
+          description: 排序方式
+          schema:
+            type: string
+            default: new
+            enum: [new, top, hot]
+        - name: page
+          in: query
+          required: false
+          description: 页码，从 0 开始
+          schema:
+            type: integer
+            format: int32
+            default: 0
+        - name: size
+          in: query
+          required: false
+          description: 每页大小
+          schema:
+            type: integer
+            format: int32
+            default: 20
+      responses:
+        '200':
+          description: 分页帖子摘要
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponsePageResponsePostSummaryDTO'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /users/{id}/comments:
+    get:
+      operationId: getUserComments
+      tags:
+        - 用户
+      summary: 获取某用户的评论（分页）
+      description: 公开接口。返回扁平评论，每条带下属帖子标题 `postTitle`。
+      security: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 用户 ID
+          schema:
+            type: integer
+            format: int64
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int32
+            default: 0
+        - name: size
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int32
+            default: 20
+      responses:
+        '200':
+          description: 分页评论
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponsePageResponseCommentDTO'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /forums:
+    get:
+      operationId: listForums
+      tags:
+        - 子论坛
+      summary: 子论坛列表（分页）
+      description: 公开接口。`q` 对 name 或 slug 做不区分大小写模糊匹配。`sort=new` 按创建时间倒序，其他值按推荐分数。
+      security: []
+      parameters:
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int32
+            default: 0
+        - name: size
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int32
+            default: 20
+        - name: sort
+          in: query
+          required: false
+          description: 排序方式，`new` 或 `hot`（默认）
+          schema:
+            type: string
+            default: hot
+        - name: q
+          in: query
+          required: false
+          description: 关键字（匹配 name 或 slug）
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 分页子论坛摘要
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponsePageResponseForumSummaryDTO'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      operationId: createForum
+      tags:
+        - 子论坛
+      summary: 创建子论坛
+      description: |
+        需要登录。`slug` 只能包含小写字母、数字、`-`、`_`（2-80 位），冲突返回 400「slug 已存在」。
+        `themeColor` 缺省为 `#FF4500`。创建者自动成为 OWNER 成员。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ForumCreateRequest'
+      responses:
+        '200':
+          description: 创建后的子论坛详情
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseForumDetailDTO'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /forums/popular:
+    get:
+      operationId: popularForums
+      tags:
+        - 子论坛
+      summary: 热门子论坛
+      description: 公开接口。按成员数倒序、再按帖子数倒序取前 `limit` 个。
+      security: []
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int32
+            default: 10
+      responses:
+        '200':
+          description: 子论坛摘要列表
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseListForumSummaryDTO'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /forums/recommended:
+    get:
+      operationId: recommendedForums
+      tags:
+        - 子论坛
+      summary: 推荐子论坛
+      description: 公开接口。按推荐插件分数排序，登录用户已加入的板块会被加权置前。
+      security: []
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int32
+            default: 10
+      responses:
+        '200':
+          description: 子论坛摘要列表
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseListForumSummaryDTO'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /forums/{slug}:
+    get:
+      operationId: getForumDetail
+      tags:
+        - 子论坛
+      summary: 子论坛详情（按 slug）
+      description: 公开接口。仅当自定义页审核通过（APPROVED）时才在 `customPageHtml` 返回 HTML。不存在返回 404「子论坛不存在」。
+      security: []
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          description: 子论坛 slug
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 子论坛详情
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseForumDetailDTO'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /forums/{id}:
+    put:
+      operationId: updateForum
+      tags:
+        - 子论坛
+      summary: 更新子论坛
+      description: 需要登录且具备坛主（OWNER）或管理员（MODERATOR）权限，否则 403「需要坛主或管理员权限」。仅更新传入的非 null 字段。
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 子论坛 ID
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ForumUpdateRequest'
+      responses:
+        '200':
+          description: 更新后的子论坛详情
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseForumDetailDTO'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /forums/{id}/custom-page:
+    get:
+      operationId: getCustomPage
+      tags:
+        - 子论坛
+      summary: 读取子论坛自定义页面
+      description: 需要登录且具备坛主或管理员权限，否则 403「需要坛主或管理员权限」，未登录 401「请先登录」。
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 子论坛 ID
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 自定义页面数据
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseCustomPageDTO'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    put:
+      operationId: saveCustomPage
+      tags:
+        - 子论坛
+      summary: 保存自定义页面 HTML（草稿）
+      description: |
+        需要登录且具备坛主或管理员权限。HTML 会先去危险标签/事件后再保存，状态置为 DRAFT，
+        并清空审核备注。`html` 为空返回 400「html 不能为空」。
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 子论坛 ID
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CustomPageUpdateRequest'
+      responses:
+        '200':
+          description: 保存后的自定义页面数据
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseCustomPageDTO'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /forums/{id}/custom-page/submit:
+    post:
+      operationId: submitCustomPage
+      tags:
+        - 子论坛
+      summary: 提交自定义页面审核
+      description: 需要登录且具备坛主或管理员权限。若尚未保存 HTML 返回 400「请先保存自定义页面 HTML」。状态置为 PENDING。
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 子论坛 ID
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 提交后的自定义页面数据
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseCustomPageDTO'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /forums/{id}/join:
+    post:
+      operationId: joinForum
+      tags:
+        - 子论坛
+      summary: 加入子论坛
+      description: 需要登录。重复加入为幂等操作。
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 子论坛 ID
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 成功（data 为 null）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseVoid'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /forums/{id}/leave:
+    post:
+      operationId: leaveForum
+      tags:
+        - 子论坛
+      summary: 退出子论坛
+      description: 需要登录。坛主不能退出自己的子论坛（400「坛主不能退出自己的子论坛」）。
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 子论坛 ID
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 成功（data 为 null）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseVoid'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /forums/{id}/members:
+    get:
+      operationId: listForumMembers
+      tags:
+        - 子论坛
+      summary: 子论坛成员列表
+      description: 公开接口。按加入时间升序返回。不存在返回 404「子论坛不存在」。
+      security: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 子论坛 ID
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 成员列表
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseListMemberDTO'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /posts:
+    get:
+      operationId: listPosts
+      tags:
+        - 帖子
+      summary: 帖子列表（分页）
+      description: |
+        公开接口。`q` 非空时按标题模糊匹配（此时忽略 `forumId`）；否则按 `forumId` 过滤，
+        未提供 `forumId` 时返回全部未删除帖子。`sort` 支持 `new`、`top`、`hot`；置顶帖始终排前。
+      security: []
+      parameters:
+        - name: forumId
+          in: query
+          required: false
+          description: 子论坛 ID
+          schema:
+            type: integer
+            format: int64
+        - name: q
+          in: query
+          required: false
+          description: 标题关键字（不区分大小写）
+          schema:
+            type: string
+        - name: sort
+          in: query
+          required: false
+          description: 排序方式
+          schema:
+            type: string
+            default: hot
+            enum: [new, top, hot]
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int32
+            default: 0
+        - name: size
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int32
+            default: 20
+      responses:
+        '200':
+          description: 分页帖子摘要
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponsePageResponsePostSummaryDTO'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      operationId: createPost
+      tags:
+        - 帖子
+      summary: 发布帖子
+      description: |
+        需要登录。目标子论坛需通过认证门槛（`requiredAuthTypes`），否则 403 并返回缺失项文案
+        （如「需要完成认证: REAL_NAME, AGE_18」）。标题最长 300。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PostCreateRequest'
+      responses:
+        '200':
+          description: 发帖后的帖子详情
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponsePostDetailDTO'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /posts/{id}:
+    get:
+      operationId: getPostDetail
+      tags:
+        - 帖子
+      summary: 帖子详情
+      description: 公开接口。未登录时 `myVote` 为 0、`canVote` 为 false。已删除/不存在返回 404「帖子不存在」。
+      security: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 帖子 ID
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 帖子详情
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponsePostDetailDTO'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    put:
+      operationId: updatePost
+      tags:
+        - 帖子
+      summary: 更新帖子
+      description: 需要登录，且为作者或坛主/管理员，否则 403「只有作者或坛主可以操作」。仅更新传入的非空字段。
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 帖子 ID
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PostUpdateRequest'
+      responses:
+        '200':
+          description: 更新后的帖子详情
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponsePostDetailDTO'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    delete:
+      operationId: deletePost
+      tags:
+        - 帖子
+      summary: 删除帖子（软删除）
+      description: 需要登录，且为作者或坛主/管理员。软删除并清除其投票。
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 帖子 ID
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 成功（data 为 null）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseVoid'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /posts/{id}/vote:
+    post:
+      operationId: votePost
+      tags:
+        - 帖子
+      summary: 帖子投票
+      description: |
+        需要登录，且需通过子论坛认证门槛。`value` 仅允许 `1`（赞同）、`-1`（反对）、`0`（取消），
+        其他值返回 400「投票值只能是 1、-1 或 0」。返回更新后的帖子详情。
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 帖子 ID
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VoteRequest'
+      responses:
+        '200':
+          description: 投票后的帖子详情
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponsePostDetailDTO'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /posts/{id}/pin:
+    post:
+      operationId: pinPost
+      tags:
+        - 帖子
+      summary: 切换帖子置顶
+      description: 需要登录且具备坛主或管理员权限，否则 403「需要坛主或管理员权限」。切换 `isPinned`。
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 帖子 ID
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 置顶切换后的帖子详情
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponsePostDetailDTO'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /comments/post/{postId}:
+    get:
+      operationId: getCommentTree
+      tags:
+        - 评论
+      summary: 帖子的评论树
+      description: 公开接口。按创建时间升序构建嵌套树（`children`）。
+      security: []
+      parameters:
+        - name: postId
+          in: path
+          required: true
+          description: 帖子 ID
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 评论树（顶级评论数组）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseListCommentDTO'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /comments:
+    post:
+      operationId: createComment
+      tags:
+        - 评论
+      summary: 发表评论
+      description: |
+        需要登录。`parentId` 可选；若提供，父评论必须存在（否则 400「父评论不存在」）
+        且属于同一帖子（否则 400「父评论不属于该帖子」）。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommentCreateRequest'
+      responses:
+        '200':
+          description: 新建的评论
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseCommentDTO'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /comments/{id}:
+    delete:
+      operationId: deleteComment
+      tags:
+        - 评论
+      summary: 删除评论（软删除）
+      description: 需要登录，且为作者或坛主/管理员，否则 403「只有作者或坛主可以删除评论」。
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 评论 ID
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 成功（data 为 null）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseVoid'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /comments/{id}/vote:
+    post:
+      operationId: voteComment
+      tags:
+        - 评论
+      summary: 评论投票
+      description: 需要登录。`value` 仅允许 `1`、`-1`、`0`，其他值返回 400「投票值只能是 1、-1 或 0」。
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 评论 ID
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VoteRequest'
+      responses:
+        '200':
+          description: 投票后的评论
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseCommentDTO'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /media:
+    post:
+      operationId: uploadMedia
+      tags:
+        - 媒体
+      summary: 上传帖子媒体
+      description: |
+        需要登录。multipart 表单字段名为 `file`。支持图片 jpeg/png/webp/gif 与视频 mp4/webm；
+        存储未启用返回 400「文件存储未启用，无法上传媒体」。返回媒体 ID 供后续引用。
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: 媒体文件
+      responses:
+        '200':
+          description: 上传结果
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseMediaUploadResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /media/{id}:
+    get:
+      operationId: getMedia
+      tags:
+        - 媒体
+      summary: 读取媒体二进制
+      description: "公开接口。返回原始字节流，带 `Cache-Control: public, max-age=31536000, immutable`。"
+      security: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 媒体 ID
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 媒体二进制流
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /authentications/types:
+    get:
+      operationId: getAuthenticationTypes
+      tags:
+        - 认证中心
+      summary: 认证类型与等级元数据
+      description: 公开接口。返回全部认证类型（含字段定义与各等级说明），是前端表单文案的唯一来源。
+      security: []
+      responses:
+        '200':
+          description: 认证类型元数据列表
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseListAuthTypeMetaDTO'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /authentications/challenge:
+    get:
+      operationId: issueAuthChallenge
+      tags:
+        - 认证中心
+      summary: 申领活体检测挑战
+      description: 需要登录。返回随机的 3 个动作序列、nonce 与过期时间（默认 10 分钟，一次性有效）。
+      responses:
+        '200':
+          description: 挑战数据
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseAuthChallengeDTO'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /authentications/media:
+    post:
+      operationId: uploadAuthMedia
+      tags:
+        - 认证中心
+      summary: 上传认证材料
+      description: |
+        需要登录。multipart 表单字段名 `file`，另需查询参数 `kind`（DOCUMENT/SELFIE/VIDEO）。
+        图片仅 jpeg/png/webp（默认上限 10MB），视频仅 webm/mp4（默认上限 50MB）；
+        存储未启用返回 400「文件存储未启用，无法上传认证材料」。
+      parameters:
+        - name: kind
+          in: query
+          required: true
+          description: 材料类型
+          schema:
+            $ref: '#/components/schemas/MediaKind'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: 认证材料文件
+      responses:
+        '200':
+          description: 上传结果
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseAuthMediaUploadResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /authentications/media/{mediaId}:
+    get:
+      operationId: getAuthMedia
+      tags:
+        - 认证中心
+      summary: 读取认证材料二进制
+      description: "需要登录；仅文件归属者或管理员可读，否则 403「无权访问该媒体文件」。返回 `Content-Disposition: inline`。"
+      parameters:
+        - name: mediaId
+          in: path
+          required: true
+          description: 认证媒体 ID
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 材料二进制流
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /authentications:
+    post:
+      operationId: submitAuthentication
+      tags:
+        - 认证中心
+      summary: 提交认证
+      description: |
+        需要登录。同一类型已存在且未驳回、且等级不高于现有等级时返回
+        400「该类型认证已存在，如需重新提交请使用重试接口」。类型非法返回 400「未知认证类型: X」。
+        提交后经结构校验、规则引擎与专业审核插件，可能直接 APPROVED、REJECTED，或转人工 PENDING。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuthenticationSubmitRequest'
+      responses:
+        '200':
+          description: 认证记录
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseAuthenticationDTO'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /authentications/me:
+    get:
+      operationId: myAuthentications
+      tags:
+        - 认证中心
+      summary: 我的认证记录
+      description: 需要登录。按创建时间倒序返回当前用户的全部认证记录。
+      responses:
+        '200':
+          description: 认证记录列表
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseListAuthenticationDTO'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /authentications/me/approved:
+    get:
+      operationId: myApprovedAuthentications
+      tags:
+        - 认证中心
+      summary: 我已通过的认证类型
+      description: 需要登录。返回已 APPROVED 的认证类型名称列表（升序）。
+      responses:
+        '200':
+          description: 认证类型名称列表
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseListString'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /authentications/{id}/retry:
+    post:
+      operationId: retryAuthentication
+      tags:
+        - 认证中心
+      summary: 重新提交认证
+      description: |
+        需要登录且为记录归属者，否则 403「无权操作该认证」。仅被拒绝的认证或提升等级时可重试，
+        否则 400「仅被拒绝的认证或提升等级时可以重新提交」。记录不存在返回 404「认证记录不存在」。
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 认证记录 ID
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RetryRequest'
+      responses:
+        '200':
+          description: 认证记录
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseAuthenticationDTO'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /admin/authentications:
+    get:
+      operationId: adminListAuthentications
+      tags:
+        - 管理后台
+      summary: 认证审核列表
+      description: 需要 ADMIN 角色。按创建时间升序分页；`level` 非空时按等级精确过滤。
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/AuthStatus'
+            default: PENDING
+        - name: level
+          in: query
+          required: false
+          description: 认证等级过滤
+          schema:
+            $ref: '#/components/schemas/AuthLevel'
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int32
+            default: 0
+        - name: size
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int32
+            default: 20
+      responses:
+        '200':
+          description: 分页认证记录
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponsePageResponseAuthenticationDTO'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /admin/authentications/{id}/approve:
+    post:
+      operationId: approveAuthentication
+      tags:
+        - 管理后台
+      summary: 通过认证
+      description: 需要 ADMIN 角色。审核方式置为 MANUAL；`reason` 缺省为「管理员通过」。请求体可省略。
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 认证记录 ID
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReviewDecisionRequest'
+      responses:
+        '200':
+          description: 认证记录
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseAuthenticationDTO'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /admin/authentications/{id}/reject:
+    post:
+      operationId: rejectAuthentication
+      tags:
+        - 管理后台
+      summary: 驳回认证
+      description: 需要 ADMIN 角色。`reason` 缺省为「管理员驳回」，写入 `rejectionReason`。请求体可省略。
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 认证记录 ID
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReviewDecisionRequest'
+      responses:
+        '200':
+          description: 认证记录
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseAuthenticationDTO'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /admin/custom-pages:
+    get:
+      operationId: adminListCustomPages
+      tags:
+        - 管理后台
+      summary: 自定义页审核列表
+      description: "需要 ADMIN 角色。按更新时间倒序分页。非法状态返回 400「非法的状态: X」。"
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/CustomPageStatus'
+            default: PENDING
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int32
+            default: 0
+        - name: size
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int32
+            default: 20
+      responses:
+        '200':
+          description: 分页自定义页数据
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponsePageResponseCustomPageDTO'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /admin/custom-pages/{id}/approve:
+    post:
+      operationId: approveCustomPage
+      tags:
+        - 管理后台
+      summary: 通过自定义页
+      description: 需要 ADMIN 角色。状态置为 APPROVED，清空审核备注，并将子论坛模板类型置为 CUSTOM。
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 子论坛 ID
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 自定义页数据
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseCustomPageDTO'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /admin/custom-pages/{id}/reject:
+    post:
+      operationId: rejectCustomPage
+      tags:
+        - 管理后台
+      summary: 驳回自定义页
+      description: 需要 ADMIN 角色。状态置为 REJECTED，`reason` 缺省为「管理员驳回」。请求体可省略。
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 子论坛 ID
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReviewDecisionRequest'
+      responses:
+        '200':
+          description: 自定义页数据
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseCustomPageDTO'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /admin/users:
+    get:
+      operationId: adminListUsers
+      tags:
+        - 管理后台
+      summary: 用户列表
+      description: 需要 ADMIN 角色。按创建时间倒序分页，返回的 `UserDTO.email` 为 null。
+      parameters:
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int32
+            default: 0
+        - name: size
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int32
+            default: 20
+      responses:
+        '200':
+          description: 分页用户
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponsePageResponseUserDTO'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /plugins:
+    get:
+      operationId: listPlugins
+      tags:
+        - 插件
+      summary: 插件列表
+      description: 公开接口。返回全部已注册插件的 key、名称、类型与启用状态。
+      security: []
+      responses:
+        '200':
+          description: 插件列表
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseListPluginDTO'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /plugins/{key}/enabled:
+    put:
+      operationId: setPluginEnabled
+      tags:
+        - 插件
+      summary: 启用/停用插件
+      description: "需要 ADMIN 角色。插件不存在返回 404「插件不存在: key」。"
+      parameters:
+        - name: key
+          in: path
+          required: true
+          description: 插件 key
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PluginToggleRequest'
+      responses:
+        '200':
+          description: 更新后的插件
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponsePluginDTO'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: 在 `Authorization` 头中携带 `Bearer <token>`，token 由注册/登录接口返回。
+  responses:
+    BadRequest:
+      description: 请求参数错误（400）
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiResponse'
+          example:
+            code: 400
+            message: 参数校验失败
+            data: null
+    Unauthorized:
+      description: 未登录或凭证无效（401）
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiResponse'
+          example:
+            code: 401
+            message: 请先登录
+            data: null
+    Forbidden:
+      description: 无权限（403）
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiResponse'
+          example:
+            code: 403
+            message: 需要坛主或管理员权限
+            data: null
+    NotFound:
+      description: 资源不存在（404）
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiResponse'
+          example:
+            code: 404
+            message: 资源不存在
+            data: null
+    InternalError:
+      description: 服务器内部错误（500）
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiResponse'
+          example:
+            code: 500
+            message: 服务器内部错误
+            data: null
+  schemas:
+    # ---------- 通用信封 ----------
+    ApiResponse:
+      type: object
+      description: 统一响应信封
+      properties:
+        code:
+          type: integer
+          format: int32
+          description: 状态码（成功为 200，错误为 HTTP 状态码）
+          example: 200
+        message:
+          type: string
+          description: 提示信息（成功为 ok，错误为中文文案）
+          example: ok
+        data:
+          nullable: true
+          description: 业务数据，错误时为 null
+    ApiResponseVoid:
+      type: object
+      description: 统一响应信封（data 恒为 null）
+      properties:
+        code:
+          type: integer
+          format: int32
+          example: 200
+        message:
+          type: string
+          example: ok
+        data:
+          nullable: true
+          example: null
+    # ---------- 枚举 ----------
+    UserRole:
+      type: string
+      description: 用户角色
+      enum: [USER, ADMIN]
+    ForumRole:
+      type: string
+      description: 子论坛成员角色
+      enum: [OWNER, MODERATOR, MEMBER]
+    AuthType:
+      type: string
+      description: 认证类型
+      enum: [REAL_NAME, ID_CARD, GENDER, AGE, NATIONALITY, DRIVER_LICENSE, MARRIAGE_CERT, PROPERTY_CERT, ASSETS, CUSTOM]
+    AuthLevel:
+      type: string
+      description: 认证等级（LOW=低、MEDIUM=中、HIGH=高、EXTREME=极高）
+      enum: [LOW, MEDIUM, HIGH, EXTREME]
+    AuthStatus:
+      type: string
+      description: 认证状态
+      enum: [PENDING, APPROVED, REJECTED]
+    CustomPageStatus:
+      type: string
+      description: 自定义页状态
+      enum: [DRAFT, PENDING, APPROVED, REJECTED]
+    TemplateType:
+      type: string
+      description: 子论坛模板类型
+      enum: [DEFAULT, CUSTOM]
+    MediaKind:
+      type: string
+      description: 认证媒体类型
+      enum: [DOCUMENT, SELFIE, VIDEO]
+    ReviewMethod:
+      type: string
+      description: 审核方式（RULE=规则、AI=AI、MANUAL=人工、SYSTEM=系统）
+      enum: [RULE, AI, MANUAL, SYSTEM]
+    ReviewAction:
+      type: string
+      description: 审核动作
+      enum: [SUBMIT, APPROVE, REJECT, RETRY]
+    VoteTargetType:
+      type: string
+      description: 投票目标类型
+      enum: [POST, COMMENT]
+    PluginType:
+      type: string
+      description: 插件类型
+      enum: [REVIEW, DOCUMENT_REVIEW, RECOMMENDATION, CONTENT_BLOCK]
+    # ---------- 请求体 ----------
+    RegisterRequest:
+      type: object
+      required: [username, email, password]
+      properties:
+        username:
+          type: string
+          description: 用户名（3-50 位）
+        email:
+          type: string
+          format: email
+          description: 邮箱
+        password:
+          type: string
+          description: 密码（6-64 位）
+    LoginRequest:
+      type: object
+      required: [usernameOrEmail, password]
+      properties:
+        usernameOrEmail:
+          type: string
+          description: 用户名或邮箱
+        password:
+          type: string
+          description: 密码
+    GoogleLoginRequest:
+      type: object
+      required: [credential]
+      properties:
+        credential:
+          type: string
+          description: Google ID Token（credential）
+    UpdateProfileRequest:
+      type: object
+      properties:
+        avatar:
+          type: string
+          nullable: true
+          description: 头像 URL
+        bio:
+          type: string
+          nullable: true
+          description: 个人简介
+    ForumCreateRequest:
+      type: object
+      required: [slug, name]
+      properties:
+        slug:
+          type: string
+          description: 唯一标识，仅小写字母/数字/-/_，2-80 位
+        name:
+          type: string
+          description: 名称
+        description:
+          type: string
+          nullable: true
+          description: 简介
+        icon:
+          type: string
+          nullable: true
+          description: 图标 URL
+        themeColor:
+          type: string
+          nullable: true
+          description: 主题色，缺省 #FF4500
+        templateType:
+          $ref: '#/components/schemas/TemplateType'
+        templateConfig:
+          type: string
+          nullable: true
+          description: 模板配置（JSON 字符串）
+        rules:
+          type: string
+          nullable: true
+          description: 版规
+        requiredAuthTypes:
+          type: array
+          nullable: true
+          description: |
+            发帖所需认证门槛。元素可为 `TYPE`（如 REAL_NAME）、`TYPE:LEVEL`（如 REAL_NAME:HIGH）
+            或 `AGE_n`（如 AGE_18）。
+          items:
+            type: string
+    ForumUpdateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        icon:
+          type: string
+          nullable: true
+        themeColor:
+          type: string
+          nullable: true
+        templateType:
+          $ref: '#/components/schemas/TemplateType'
+        templateConfig:
+          type: string
+          nullable: true
+        rules:
+          type: string
+          nullable: true
+        requiredAuthTypes:
+          type: array
+          nullable: true
+          items:
+            type: string
+    CustomPageUpdateRequest:
+      type: object
+      required: [html]
+      properties:
+        html:
+          type: string
+          description: 自定义页 HTML（会被安全过滤）
+    PostCreateRequest:
+      type: object
+      required: [forumId, title, content]
+      properties:
+        forumId:
+          type: integer
+          format: int64
+          description: 目标子论坛 ID
+        title:
+          type: string
+          description: 标题（最长 300）
+        content:
+          type: string
+          description: 正文
+    PostUpdateRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          nullable: true
+          description: 标题
+        content:
+          type: string
+          nullable: true
+          description: 正文
+    CommentCreateRequest:
+      type: object
+      required: [postId, content]
+      properties:
+        postId:
+          type: integer
+          format: int64
+          description: 帖子 ID
+        content:
+          type: string
+          description: 评论内容
+        parentId:
+          type: integer
+          format: int64
+          nullable: true
+          description: 父评论 ID（可选）
+    VoteRequest:
+      type: object
+      required: [value]
+      properties:
+        value:
+          type: integer
+          format: int32
+          description: 投票值：1 赞同、-1 反对、0 取消
+          enum: [1, 0, -1]
+    ReviewDecisionRequest:
+      type: object
+      properties:
+        reason:
+          type: string
+          nullable: true
+          description: 审核意见
+    PluginToggleRequest:
+      type: object
+      required: [enabled]
+      properties:
+        enabled:
+          type: boolean
+          description: 是否启用
+    AuthenticationSubmitRequest:
+      type: object
+      required: [type]
+      properties:
+        type:
+          $ref: '#/components/schemas/AuthType'
+        level:
+          $ref: '#/components/schemas/AuthLevel'
+        data:
+          type: object
+          nullable: true
+          additionalProperties: true
+          description: 业务字段（键随类型不同，如 fullName/age/gender...）
+        mediaIds:
+          type: array
+          nullable: true
+          items:
+            type: integer
+            format: int64
+          description: 已上传的材料媒体 ID 列表
+        videoMediaId:
+          type: integer
+          format: int64
+          nullable: true
+          description: 视频认证媒体 ID（HIGH 及以上必填）
+        challengeId:
+          type: string
+          nullable: true
+          description: 活体检测挑战 ID（HIGH 及以上必填）
+        liveness:
+          type: object
+          nullable: true
+          additionalProperties: true
+          description: 活体检测结果
+        attestation:
+          type: object
+          nullable: true
+          additionalProperties: true
+          description: 防伪录制结果
+    # ---------- 分页包装 ----------
+    PageResponsePostSummaryDTO:
+      type: object
+      description: PostSummaryDTO 分页
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/PostSummaryDTO'
+        page:
+          type: integer
+          format: int32
+          description: 当前页码（从 0 开始）
+        size:
+          type: integer
+          format: int32
+          description: 每页大小
+        totalElements:
+          type: integer
+          format: int64
+          description: 总记录数
+        totalPages:
+          type: integer
+          format: int32
+          description: 总页数
+    PageResponseCommentDTO:
+      type: object
+      description: CommentDTO 分页
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommentDTO'
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int32
+    PageResponseForumSummaryDTO:
+      type: object
+      description: ForumSummaryDTO 分页
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/ForumSummaryDTO'
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int32
+    PageResponseAuthenticationDTO:
+      type: object
+      description: AuthenticationDTO 分页
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/AuthenticationDTO'
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int32
+    PageResponseCustomPageDTO:
+      type: object
+      description: CustomPageDTO 分页
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/CustomPageDTO'
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int32
+    PageResponseUserDTO:
+      type: object
+      description: UserDTO 分页
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/UserDTO'
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int32
+    # ---------- 统一信封的具体化（模拟泛型） ----------
+    ApiResponseAuthResponse:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/AuthResponse'
+    ApiResponseUserDTO:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/UserDTO'
+    ApiResponseForumDetailDTO:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/ForumDetailDTO'
+    ApiResponseCustomPageDTO:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/CustomPageDTO'
+    ApiResponsePostDetailDTO:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/PostDetailDTO'
+    ApiResponseCommentDTO:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/CommentDTO'
+    ApiResponseMediaUploadResponse:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/MediaUploadResponse'
+    ApiResponseAuthChallengeDTO:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/AuthChallengeDTO'
+    ApiResponseAuthMediaUploadResponse:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/AuthMediaUploadResponse'
+    ApiResponseAuthenticationDTO:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/AuthenticationDTO'
+    ApiResponsePluginDTO:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/PluginDTO'
+    ApiResponseListString:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                type: string
+    ApiResponseListForumSummaryDTO:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/ForumSummaryDTO'
+    ApiResponseListMemberDTO:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/MemberDTO'
+    ApiResponseListCommentDTO:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/CommentDTO'
+    ApiResponseListAuthTypeMetaDTO:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/AuthTypeMetaDTO'
+    ApiResponseListAuthenticationDTO:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/AuthenticationDTO'
+    ApiResponseListPluginDTO:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/PluginDTO'
+    ApiResponsePageResponsePostSummaryDTO:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/PageResponsePostSummaryDTO'
+    ApiResponsePageResponseCommentDTO:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/PageResponseCommentDTO'
+    ApiResponsePageResponseForumSummaryDTO:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/PageResponseForumSummaryDTO'
+    ApiResponsePageResponseAuthenticationDTO:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/PageResponseAuthenticationDTO'
+    ApiResponsePageResponseCustomPageDTO:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/PageResponseCustomPageDTO'
+    ApiResponsePageResponseUserDTO:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/PageResponseUserDTO'
+    RetryRequest:
+      type: object
+      properties:
+        level:
+          $ref: '#/components/schemas/AuthLevel'
+        data:
+          type: object
+          nullable: true
+          additionalProperties: true
+        mediaIds:
+          type: array
+          nullable: true
+          items:
+            type: integer
+            format: int64
+        videoMediaId:
+          type: integer
+          format: int64
+          nullable: true
+        challengeId:
+          type: string
+          nullable: true
+        liveness:
+          type: object
+          nullable: true
+          additionalProperties: true
+        attestation:
+          type: object
+          nullable: true
+          additionalProperties: true
+    # ---------- 业务实体 ----------
+    UserDTO:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: 用户 ID
+        username:
+          type: string
+          description: 用户名
+        email:
+          type: string
+          nullable: true
+          description: 邮箱（仅在本人接口返回，公开资料为 null）
+        avatar:
+          type: string
+          nullable: true
+          description: 头像 URL
+        bio:
+          type: string
+          nullable: true
+          description: 简介
+        role:
+          $ref: '#/components/schemas/UserRole'
+        createdAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: 创建时间
+        authentications:
+          type: array
+          description: 已通过的认证类型名称
+          items:
+            type: string
+    AuthorDTO:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: 作者 ID
+        username:
+          type: string
+          description: 作者用户名
+        avatar:
+          type: string
+          nullable: true
+          description: 作者头像
+    AuthResponse:
+      type: object
+      properties:
+        token:
+          type: string
+          description: JWT
+        user:
+          $ref: '#/components/schemas/UserDTO'
+    ForumSummaryDTO:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: 子论坛 ID
+        slug:
+          type: string
+          description: slug
+        name:
+          type: string
+          description: 名称
+        description:
+          type: string
+          nullable: true
+          description: 简介
+        icon:
+          type: string
+          nullable: true
+          description: 图标
+        themeColor:
+          type: string
+          nullable: true
+          description: 主题色
+        requiredAuthTypes:
+          type: array
+          description: 发帖所需认证门槛
+          items:
+            type: string
+        memberCount:
+          type: integer
+          format: int32
+          description: 成员数
+        postCount:
+          type: integer
+          format: int32
+          description: 帖子数
+        isMember:
+          type: boolean
+          description: 当前用户是否已加入
+        createdAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: 创建时间
+    ForumDetailDTO:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: 子论坛 ID
+        slug:
+          type: string
+          description: slug
+        name:
+          type: string
+          description: 名称
+        description:
+          type: string
+          nullable: true
+        icon:
+          type: string
+          nullable: true
+        themeColor:
+          type: string
+          nullable: true
+        rules:
+          type: string
+          nullable: true
+          description: 版规
+        requiredAuthTypes:
+          type: array
+          items:
+            type: string
+        templateType:
+          $ref: '#/components/schemas/TemplateType'
+        templateConfig:
+          type: string
+          nullable: true
+          description: 模板配置
+        customPageStatus:
+          $ref: '#/components/schemas/CustomPageStatus'
+        customPageHtml:
+          type: string
+          nullable: true
+          description: 自定义页 HTML（仅 APPROVED 时返回）
+        memberCount:
+          type: integer
+          format: int32
+        postCount:
+          type: integer
+          format: int32
+        isMember:
+          type: boolean
+        canPost:
+          type: boolean
+          description: 当前用户是否满足发帖认证门槛
+        isPublic:
+          type: boolean
+          description: 是否公开
+        creatorId:
+          type: integer
+          format: int64
+          nullable: true
+          description: 创建者 ID
+        creatorName:
+          type: string
+          nullable: true
+          description: 创建者用户名
+        createdAt:
+          type: string
+          format: date-time
+          nullable: true
+    CustomPageDTO:
+      type: object
+      properties:
+        forumId:
+          type: integer
+          format: int64
+          description: 子论坛 ID
+        forumSlug:
+          type: string
+          description: 子论坛 slug
+        forumName:
+          type: string
+          description: 子论坛名称
+        html:
+          type: string
+          nullable: true
+          description: 自定义页 HTML
+        status:
+          $ref: '#/components/schemas/CustomPageStatus'
+        reviewNote:
+          type: string
+          nullable: true
+          description: 审核备注
+    MemberDTO:
+      type: object
+      properties:
+        userId:
+          type: integer
+          format: int64
+          description: 用户 ID
+        username:
+          type: string
+          nullable: true
+          description: 用户名
+        avatar:
+          type: string
+          nullable: true
+          description: 头像
+        role:
+          $ref: '#/components/schemas/ForumRole'
+        joinedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: 加入时间
+    PostSummaryDTO:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: 帖子 ID
+        forumId:
+          type: integer
+          format: int64
+          description: 子论坛 ID
+        forumSlug:
+          type: string
+          nullable: true
+          description: 子论坛 slug
+        forumName:
+          type: string
+          nullable: true
+          description: 子论坛名称
+        title:
+          type: string
+          description: 标题
+        contentPreview:
+          type: string
+          nullable: true
+          description: 正文预览（最多 200 字）
+        upvotes:
+          type: integer
+          format: int32
+        downvotes:
+          type: integer
+          format: int32
+        score:
+          type: integer
+          format: int32
+          description: 得分（upvotes - downvotes）
+        commentCount:
+          type: integer
+          format: int32
+        isPinned:
+          type: boolean
+          description: 是否置顶
+        author:
+          $ref: '#/components/schemas/AuthorDTO'
+        createdAt:
+          type: string
+          format: date-time
+          nullable: true
+    PostDetailDTO:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        forumId:
+          type: integer
+          format: int64
+        forumSlug:
+          type: string
+          nullable: true
+        forumName:
+          type: string
+          nullable: true
+        title:
+          type: string
+          description: 标题
+        content:
+          type: string
+          nullable: true
+          description: 正文
+        upvotes:
+          type: integer
+          format: int32
+        downvotes:
+          type: integer
+          format: int32
+        score:
+          type: integer
+          format: int32
+          description: 得分（upvotes - downvotes）
+        commentCount:
+          type: integer
+          format: int32
+        isPinned:
+          type: boolean
+          description: 是否置顶
+        author:
+          $ref: '#/components/schemas/AuthorDTO'
+        canVote:
+          type: boolean
+          description: 当前用户是否可投票（满足认证门槛）
+        myVote:
+          type: integer
+          format: int32
+          nullable: true
+          description: 当前用户投票值（1/-1/0）
+        createdAt:
+          type: string
+          format: date-time
+          nullable: true
+        updatedAt:
+          type: string
+          format: date-time
+          nullable: true
+    CommentDTO:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: 评论 ID
+        postId:
+          type: integer
+          format: int64
+          description: 帖子 ID
+        authorId:
+          type: integer
+          format: int64
+          description: 作者 ID
+        authorName:
+          type: string
+          nullable: true
+          description: 作者用户名
+        authorAvatar:
+          type: string
+          nullable: true
+          description: 作者头像
+        parentId:
+          type: integer
+          format: int64
+          nullable: true
+          description: 父评论 ID
+        content:
+          type: string
+          description: 内容
+        upvotes:
+          type: integer
+          format: int32
+        downvotes:
+          type: integer
+          format: int32
+        score:
+          type: integer
+          format: int32
+        createdAt:
+          type: string
+          format: date-time
+          nullable: true
+        children:
+          type: array
+          description: 子评论（评论树）
+          items:
+            $ref: '#/components/schemas/CommentDTO'
+        postTitle:
+          type: string
+          nullable: true
+          description: 所属帖子标题（仅用户评论列表返回）
+    MediaUploadResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: 媒体 ID
+        contentType:
+          type: string
+          description: MIME 类型
+        sizeBytes:
+          type: integer
+          format: int64
+          description: 字节大小
+    PluginDTO:
+      type: object
+      properties:
+        key:
+          type: string
+          description: 插件 key
+        name:
+          type: string
+          description: 插件名称
+        type:
+          $ref: '#/components/schemas/PluginType'
+        enabled:
+          type: boolean
+          description: 是否启用
+        description:
+          type: string
+          nullable: true
+          description: 插件描述
+    AuthFieldDTO:
+      type: object
+      description: 认证表单字段定义
+      properties:
+        name:
+          type: string
+          description: 字段名
+        label:
+          type: string
+          description: 字段中文标签
+        type:
+          type: string
+          description: 字段控件类型（text/select/number/textarea）
+        required:
+          type: boolean
+          description: 是否必填
+    AuthLevelMetaDTO:
+      type: object
+      description: 单个认证等级的说明
+      properties:
+        level:
+          $ref: '#/components/schemas/AuthLevel'
+        label:
+          type: string
+          description: 等级中文标签
+        requirements:
+          type: array
+          description: 达成要求清单
+          items:
+            type: string
+        tips:
+          type: array
+          description: 拍摄/材料注意事项
+          items:
+            type: string
+    AuthTypeMetaDTO:
+      type: object
+      description: 认证类型元数据
+      properties:
+        type:
+          $ref: '#/components/schemas/AuthType'
+        label:
+          type: string
+          description: 类型中文标签
+        fields:
+          type: array
+          items:
+            $ref: '#/components/schemas/AuthFieldDTO'
+        levels:
+          type: array
+          items:
+            $ref: '#/components/schemas/AuthLevelMetaDTO'
+    AuthChallengeDTO:
+      type: object
+      description: 活体检测挑战
+      properties:
+        challengeId:
+          type: string
+          description: 挑战 ID
+        actions:
+          type: array
+          description: 随机动作序列（BLINK/OPEN_MOUTH/TURN_LEFT/TURN_RIGHT/NOD 中的 3 个）
+          items:
+            type: string
+        nonce:
+          type: string
+          description: 一次性随机值
+        expiresAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: 过期时间
+    AuthMediaDTO:
+      type: object
+      description: 认证媒体信息
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: 媒体 ID
+        kind:
+          $ref: '#/components/schemas/MediaKind'
+        contentType:
+          type: string
+          nullable: true
+          description: MIME 类型
+        sizeBytes:
+          type: integer
+          format: int64
+          nullable: true
+          description: 字节大小
+    AuthMediaUploadResponse:
+      type: object
+      description: 认证媒体上传结果
+      properties:
+        mediaId:
+          type: integer
+          format: int64
+          description: 媒体 ID
+        kind:
+          $ref: '#/components/schemas/MediaKind'
+        contentType:
+          type: string
+          nullable: true
+          description: MIME 类型
+        sizeBytes:
+          type: integer
+          format: int64
+          nullable: true
+          description: 字节大小
+    AuthenticationDTO:
+      type: object
+      description: 认证记录
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: 记录 ID
+        userId:
+          type: integer
+          format: int64
+          description: 用户 ID
+        type:
+          $ref: '#/components/schemas/AuthType'
+        typeLabel:
+          type: string
+          nullable: true
+          description: 类型中文标签
+        status:
+          $ref: '#/components/schemas/AuthStatus'
+        reviewMethod:
+          $ref: '#/components/schemas/ReviewMethod'
+        confidence:
+          type: number
+          format: double
+          nullable: true
+          description: 置信度（0-1）
+        reason:
+          type: string
+          nullable: true
+          description: 审核原因
+        rejectionReason:
+          type: string
+          nullable: true
+          description: 驳回原因
+        authData:
+          type: object
+          nullable: true
+          additionalProperties: true
+          description: 提交的业务数据
+        createdAt:
+          type: string
+          format: date-time
+          nullable: true
+        reviewedAt:
+          type: string
+          format: date-time
+          nullable: true
+        level:
+          $ref: '#/components/schemas/AuthLevel'
+        media:
+          type: array
+          items:
+            $ref: '#/components/schemas/AuthMediaDTO'
+        liveness:
+          type: object
+          nullable: true
+          additionalProperties: true
+          description: 活体检测结果
+        attestation:
+          type: object
+          nullable: true
+          additionalProperties: true
+          description: 防伪录制结果

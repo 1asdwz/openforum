@@ -1,0 +1,323 @@
+use std::collections::HashMap;
+
+use axum::extract::{Path, State};
+use axum::Json;
+use serde::Deserialize;
+use serde_json::{json, Value};
+use sqlx::MySqlPool;
+
+use crate::access;
+use crate::error::{ApiError, ApiResult};
+use crate::json as j;
+use crate::models::Comment;
+use crate::routes::posts;
+use crate::security::CurrentUser;
+use crate::state::AppState;
+use crate::vote;
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CommentCreateRequest {
+    pub post_id: Option<i64>,
+    pub content: Option<String>,
+    pub parent_id: Option<i64>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct VoteRequest {
+    pub value: Option<i32>,
+}
+
+async fn author_fields(pool: &MySqlPool, user_id: i64) -> Result<(Option<String>, Option<String>), ApiError> {
+    let row: Option<(String, Option<String>)> =
+        sqlx::query_as("SELECT username, avatar FROM users WHERE id = ?")
+            .bind(user_id)
+            .fetch_optional(pool)
+            .await?;
+    Ok(match row {
+        Some((u, a)) => (Some(u), a),
+        None => (None, None),
+    })
+}
+
+fn build_tree(
+    comment: &Comment,
+    by_parent: &HashMap<i64, Vec<Comment>>,
+    authors: &HashMap<i64, (Option<String>, Option<String>)>,
+) -> Value {
+    let (name, avatar) = authors
+        .get(&comment.author_id)
+        .cloned()
+        .unwrap_or((None, None));
+    let children: Vec<Value> = by_parent
+        .get(&comment.id)
+        .map(|list| list.iter().map(|c| build_tree(c, by_parent, authors)).collect())
+        .unwrap_or_default();
+    json!({
+        "id": comment.id,
+        "postId": comment.post_id,
+        "authorId": comment.author_id,
+        "authorName": name,
+        "authorAvatar": avatar,
+        "parentId": comment.parent_id,
+        "content": comment.content,
+        "upvotes": comment.upvotes,
+        "downvotes": comment.downvotes,
+        "score": comment.score,
+        "createdAt": j::jts(comment.created_at),
+        "children": children,
+        "postTitle": Value::Null,
+    })
+}
+
+fn build_single(comment: &Comment, name: Option<String>, avatar: Option<String>) -> Value {
+    json!({
+        "id": comment.id,
+        "postId": comment.post_id,
+        "authorId": comment.author_id,
+        "authorName": name,
+        "authorAvatar": avatar,
+        "parentId": comment.parent_id,
+        "content": comment.content,
+        "upvotes": comment.upvotes,
+        "downvotes": comment.downvotes,
+        "score": comment.score,
+        "createdAt": j::jts(comment.created_at),
+        "children": Vec::<Value>::new(),
+        "postTitle": Value::Null,
+    })
+}
+
+async fn load_authors(pool: &MySqlPool, comments: &[Comment]) -> Result<HashMap<i64, (Option<String>, Option<String>)>, ApiError> {
+    let mut map: HashMap<i64, (Option<String>, Option<String>)> = HashMap::new();
+    for c in comments {
+        if map.contains_key(&c.author_id) {
+            continue;
+        }
+        let fields = author_fields(pool, c.author_id).await?;
+        map.insert(c.author_id, fields);
+    }
+    Ok(map)
+}
+
+async fn require_comment(pool: &MySqlPool, id: i64) -> Result<Comment, ApiError> {
+    sqlx::query_as::<_, Comment>("SELECT * FROM comments WHERE id = ? AND is_removed = 0")
+        .bind(id)
+        .fetch_optional(pool)
+        .await?
+        .ok_or_else(|| ApiError::not_found("评论不存在"))
+}
+
+/// GET /comments/post/{postId}
+pub async fn tree(
+    State(state): State<AppState>,
+    Path(post_id): Path<i64>,
+) -> ApiResult<Json<Value>> {
+    let comments: Vec<Comment> = sqlx::query_as::<_, Comment>(
+        "SELECT * FROM comments WHERE post_id = ? AND is_removed = 0 ORDER BY created_at ASC",
+    )
+    .bind(post_id)
+    .fetch_all(&state.pool)
+    .await?;
+
+    let mut roots: Vec<Comment> = Vec::new();
+    let mut by_parent: HashMap<i64, Vec<Comment>> = HashMap::new();
+    for c in comments {
+        match c.parent_id {
+            None => roots.push(c),
+            Some(pid) => by_parent.entry(pid).or_default().push(c),
+        }
+    }
+    let authors = load_authors(&state.pool, &roots).await?;
+    let mut content = Vec::with_capacity(roots.len());
+    for root in &roots {
+        content.push(build_tree(root, &by_parent, &authors));
+    }
+    Ok(j::ok(content))
+}
+
+/// POST /comments
+pub async fn create(
+    State(state): State<AppState>,
+    user: CurrentUser,
+    Json(req): Json<CommentCreateRequest>,
+) -> ApiResult<Json<Value>> {
+    let me = user.require()?;
+    let post_id = req
+        .post_id
+        .ok_or_else(|| ApiError::bad_request("postId postId 不能为空"))?;
+    if req.content.as_deref().map(|s| s.trim().is_empty()).unwrap_or(true) {
+        return Err(ApiError::bad_request("content 内容不能为空"));
+    }
+    let content = req.content.as_deref().unwrap().to_string();
+
+    let post: Option<(i64,)> =
+        sqlx::query_as("SELECT id FROM posts WHERE id = ? AND is_removed = 0")
+            .bind(post_id)
+            .fetch_optional(&state.pool)
+            .await?;
+    if post.is_none() {
+        return Err(ApiError::not_found("帖子不存在"));
+    }
+
+    if let Some(parent_id) = req.parent_id {
+        let parent: Option<(i64, i64)> = sqlx::query_as(
+            "SELECT id, post_id FROM comments WHERE id = ? AND is_removed = 0",
+        )
+        .bind(parent_id)
+        .fetch_optional(&state.pool)
+        .await?;
+        match parent {
+            None => return Err(ApiError::bad_request("父评论不存在")),
+            Some((_, ppost)) if ppost != post_id => {
+                return Err(ApiError::bad_request("父评论不属于该帖子"))
+            }
+            _ => {}
+        }
+    }
+
+    // 评论插入与帖子评论数重算需原子完成（对齐 Java `CommentService.create`）。
+    let mut tx = state.pool.begin().await?;
+    let result = sqlx::query(
+        "INSERT INTO comments (post_id, author_id, parent_id, content, upvotes, downvotes, score, is_removed, created_at, updated_at) \
+         VALUES (?, ?, ?, ?, 0, 0, 0, 0, NOW(), NOW())",
+    )
+    .bind(post_id)
+    .bind(me.id)
+    .bind(req.parent_id)
+    .bind(&content)
+    .execute(&mut *tx)
+    .await?;
+    let comment_id = result.last_insert_id() as i64;
+    posts::recount_comments(&mut tx, post_id).await?;
+    tx.commit().await?;
+
+    let comment = require_comment(&state.pool, comment_id).await?;
+    let (name, avatar) = author_fields(&state.pool, comment.author_id).await?;
+    Ok(j::ok(build_single(&comment, name, avatar)))
+}
+
+/// DELETE /comments/{id}
+pub async fn delete(
+    State(state): State<AppState>,
+    user: CurrentUser,
+    Path(id): Path<i64>,
+) -> ApiResult<Json<Value>> {
+    let me = user.require()?;
+    let comment = require_comment(&state.pool, id).await?;
+
+    let mut authorized = me.id == comment.author_id;
+    if !authorized {
+        let post: Option<(i64,)> = sqlx::query_as("SELECT forum_id FROM posts WHERE id = ?")
+            .bind(comment.post_id)
+            .fetch_optional(&state.pool)
+            .await?;
+        if let Some((forum_id,)) = post {
+            if let Some(forum) = crate::routes::forums::find_by_id(&state.pool, forum_id).await? {
+                authorized = access::can_manage(&state.pool, &forum, Some(me.id)).await?;
+            }
+        }
+    }
+    if !authorized {
+        return Err(ApiError::forbidden("只有作者或坛主可以删除评论"));
+    }
+
+    // 软删除、清票与评论数重算需原子完成（对齐 Java `CommentService.delete`）。
+    let mut tx = state.pool.begin().await?;
+    sqlx::query("UPDATE comments SET is_removed = 1, updated_at = NOW() WHERE id = ?")
+        .bind(comment.id)
+        .execute(&mut *tx)
+        .await?;
+    vote::clear_votes(&mut tx, "COMMENT", comment.id).await?;
+
+    let post: Option<(i64,)> = sqlx::query_as("SELECT id FROM posts WHERE id = ?")
+        .bind(comment.post_id)
+        .fetch_optional(&mut *tx)
+        .await?;
+    if post.is_some() {
+        posts::recount_comments(&mut tx, comment.post_id).await?;
+    }
+    tx.commit().await?;
+    Ok(j::ok_empty())
+}
+
+/// POST /comments/{id}/vote
+pub async fn comment_vote(
+    State(state): State<AppState>,
+    user: CurrentUser,
+    Path(id): Path<i64>,
+    Json(req): Json<VoteRequest>,
+) -> ApiResult<Json<Value>> {
+    let me = user.require()?;
+    let comment = require_comment(&state.pool, id).await?;
+    let value = req.value.unwrap_or(0);
+    if !(-1..=1).contains(&value) {
+        return Err(ApiError::bad_request("投票值只能是 1、-1 或 0"));
+    }
+    // 票记录变更与评论计数写回需原子完成（对齐 Java `CommentService.vote`）。
+    let mut tx = state.pool.begin().await?;
+    let outcome = vote::apply(
+        &mut tx,
+        me.id,
+        "COMMENT",
+        comment.id,
+        value,
+        comment.upvotes,
+        comment.downvotes,
+    )
+    .await?;
+    sqlx::query("UPDATE comments SET upvotes = ?, downvotes = ?, score = ? WHERE id = ?")
+        .bind(outcome.upvotes)
+        .bind(outcome.downvotes)
+        .bind(outcome.score)
+        .bind(comment.id)
+        .execute(&mut *tx)
+        .await?;
+    tx.commit().await?;
+    let comment = require_comment(&state.pool, id).await?;
+    let (name, avatar) = author_fields(&state.pool, comment.author_id).await?;
+    Ok(j::ok(build_single(&comment, name, avatar)))
+}
+
+/// 供 users 模块复用：GET /users/{id}/comments
+pub async fn list_by_author(
+    state: &AppState,
+    author_id: i64,
+    page: i32,
+    size: i32,
+) -> ApiResult<Json<Value>> {
+    let mut comments: Vec<Comment> = sqlx::query_as::<_, Comment>(
+        "SELECT * FROM comments WHERE author_id = ? AND is_removed = 0 ORDER BY created_at DESC",
+    )
+    .bind(author_id)
+    .fetch_all(&state.pool)
+    .await?;
+    let total = comments.len() as i64;
+    let (slice, _) = j::slice_page(std::mem::take(&mut comments), page, size);
+
+    let mut content = Vec::with_capacity(slice.len());
+    for comment in &slice {
+        let (name, avatar) = author_fields(&state.pool, comment.author_id).await?;
+        let post_title: Option<(String,)> =
+            sqlx::query_as("SELECT title FROM posts WHERE id = ?")
+                .bind(comment.post_id)
+                .fetch_optional(&state.pool)
+                .await?;
+        content.push(json!({
+            "id": comment.id,
+            "postId": comment.post_id,
+            "authorId": comment.author_id,
+            "authorName": name,
+            "authorAvatar": avatar,
+            "parentId": comment.parent_id,
+            "content": comment.content,
+            "upvotes": comment.upvotes,
+            "downvotes": comment.downvotes,
+            "score": comment.score,
+            "createdAt": j::jts(comment.created_at),
+            "children": Vec::<Value>::new(),
+            "postTitle": post_title.map(|(t,)| t),
+        }));
+    }
+    Ok(j::ok(j::PageResponse::of(content, page, size, total)))
+}

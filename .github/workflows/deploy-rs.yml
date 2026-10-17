@@ -1,0 +1,91 @@
+name: Deploy OpenForum (Rust backend)
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'backend-rs/**'
+      - '.github/workflows/deploy-rs.yml'
+  workflow_dispatch:
+
+# 与 Java 部署相互独立，可并存
+concurrency:
+  group: deploy-openforum-rs
+  cancel-in-progress: false
+
+jobs:
+  backend-rs:
+    name: Build & deploy Rust backend
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build image
+        run: |
+          docker build -t openforum-rs:latest backend-rs
+          docker image inspect openforum-rs:latest --format '{{.Size}}'
+
+      - name: Save image
+        run: |
+          docker save openforum-rs:latest | gzip -1 > /tmp/openforum-rs.tar.gz
+          ls -lh /tmp/openforum-rs.tar.gz
+
+      - name: Setup SSH key
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          if printf '%s' "$SSH_PRIVATE_KEY" | grep -q 'BEGIN .*PRIVATE KEY'; then
+            printf '%s' "$SSH_PRIVATE_KEY" \
+              | sed 's/^\xEF\xBB\xBF//' \
+              | tr -d '\r' \
+              | sed 's/\\n/\n/g' \
+              > ~/.ssh/deploy_key
+          else
+            printf '%s' "$SSH_PRIVATE_KEY" | tr -d '\r\n \t' | base64 -d > ~/.ssh/deploy_key
+          fi
+          printf '\n' >> ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keygen -y -f ~/.ssh/deploy_key < /dev/null > /dev/null
+          echo "SSH key loaded OK"
+
+      - name: Add known hosts
+        run: ssh-keyscan -t rsa 43.157.5.182 >> ~/.ssh/known_hosts
+
+      - name: Upload image
+        run: |
+          scp -C -i ~/.ssh/deploy_key -o ServerAliveInterval=15 -o ServerAliveCountMax=8 \
+            /tmp/openforum-rs.tar.gz root@43.157.5.182:/tmp/
+
+      - name: Deploy on server
+        run: |
+          ssh -i ~/.ssh/deploy_key root@43.157.5.182 << 'EOF'
+            set -e
+            mkdir -p /root/openforum-build-rs
+            if [ ! -f /root/openforum-build-rs/openforum-rs.env ]; then
+              echo "缺少 /root/openforum-build-rs/openforum-rs.env，请先从 openforum-rs.env.example 创建" >&2
+              exit 1
+            fi
+            docker load < /tmp/openforum-rs.tar.gz
+            rm -f /tmp/openforum-rs.tar.gz
+            docker stop openforum-rs >/dev/null 2>&1 || true
+            docker rm openforum-rs >/dev/null 2>&1 || true
+            docker run -d --name openforum-rs \
+              --network openforum-net \
+              --restart unless-stopped \
+              -p 8091:8080 \
+              --memory 256m --memory-swap 384m \
+              --env-file /root/openforum-build-rs/openforum-rs.env \
+              openforum-rs:latest
+            sleep 5
+            docker ps --filter name=openforum-rs --format '{{.Names}} {{.Status}} {{.Ports}}'
+            docker logs --tail 30 openforum-rs || true
+            docker image prune -f >/dev/null 2>&1 || true
+          EOF

@@ -1,0 +1,7 @@
+target
+check.log
+.git
+.gitignore
+Dockerfile
+.dockerignore
+deploy

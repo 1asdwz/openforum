@@ -73,9 +73,6 @@
     <div class="rail-card rail-footer">
       <router-link to="/search?tab=forums">查看全部社区</router-link>
       <router-link to="/authentication">认证中心</router-link>
-      <a href="https://www.reddit.com" target="_blank" rel="noreferrer">
-        Reddit 设计参考
-      </a>
     </div>
   </aside>
 </template>

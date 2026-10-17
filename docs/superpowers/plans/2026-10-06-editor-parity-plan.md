@@ -1,7 +1,7 @@
 # Reddit 式编辑器对齐（布局 + 媒体上传）实现计划
 
 - 日期：2026-10-06
-- 契约来源：[2026-10-06-reddit-editor-parity-design.md](../specs/2026-10-06-reddit-editor-parity-design.md)
+- 契约来源：[2026-10-06-editor-parity-design.md](../specs/2026-10-06-editor-parity-design.md)
 - 目标：编辑器 UI/工具集对齐 Reddit（头部模式行 + 底部工具栏），支持图片/视频上传并插入正文；Markdown 仍为唯一存储格式。
 - 范围：前端（Vue 3 + TipTap v3）+ 后端（Spring Boot，新增媒体上传/公开读取）。
 

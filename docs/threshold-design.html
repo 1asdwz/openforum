@@ -1,0 +1,803 @@
+<title>门槛系统设计方案</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<style>
+:root {
+  --bg: #F4F5FA; --surface: #FFFFFF; --surface-2: #F0F2F8; --border: #E2E5F0;
+  --primary: #3B5BDB; --primary-light: #EEF2FF; --primary-dark: #2C46C7;
+  --text: #1A1D36; --text-muted: #6B7280; --text-light: #9CA3AF;
+  --success: #059669; --success-bg: #ECFDF5;
+  --warning: #B45309; --warning-bg: #FFFBEB;
+  --danger: #DC2626; --danger-bg: #FEF2F2;
+  --nav-bg: #1A1D36; --nav-text: #C7CDE8;
+  --radius: 10px; --radius-sm: 6px;
+  --shadow: 0 1px 3px rgba(0,0,0,0.08);
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0F1117; --surface: #1A1D2E; --surface-2: #232639; --border: #2D3048;
+    --primary: #748FFC; --primary-light: #1E2147; --primary-dark: #5B73E8;
+    --text: #E8EAF6; --text-muted: #9CA3AF; --text-light: #6B7280;
+    --success: #34D399; --success-bg: #064E3B;
+    --warning: #FBBF24; --warning-bg: #3B2000;
+    --danger: #F87171; --danger-bg: #450A0A;
+    --nav-bg: #0B0D1A; --nav-text: #8890B8;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0F1117; --surface: #1A1D2E; --surface-2: #232639; --border: #2D3048;
+  --primary: #748FFC; --primary-light: #1E2147; --primary-dark: #5B73E8;
+  --text: #E8EAF6; --text-muted: #9CA3AF; --text-light: #6B7280;
+  --success: #34D399; --success-bg: #064E3B;
+  --warning: #FBBF24; --warning-bg: #3B2000;
+  --danger: #F87171; --danger-bg: #450A0A;
+  --nav-bg: #0B0D1A; --nav-text: #8890B8;
+  color-scheme: dark;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:'Inter',system-ui,sans-serif;font-size:14px;line-height:1.6;}
+.app{display:flex;min-height:100vh;}
+.nav{width:220px;flex-shrink:0;background:var(--nav-bg);display:flex;flex-direction:column;padding:24px 0;position:sticky;top:env(safe-area-inset-top,0px);height:100vh;overflow-y:auto;}
+.nav-logo{padding:0 20px 20px;font-size:13px;font-weight:700;color:#fff;letter-spacing:.05em;text-transform:uppercase;border-bottom:1px solid rgba(255,255,255,.06);margin-bottom:14px;}
+.nav-logo span{display:block;font-size:10px;font-weight:400;color:var(--nav-text);text-transform:none;letter-spacing:0;margin-top:2px;}
+.nav-label{padding:4px 20px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:rgba(255,255,255,.25);margin-bottom:2px;}
+.nav-item{display:flex;align-items:center;gap:10px;padding:9px 20px;color:var(--nav-text);cursor:pointer;font-size:13.5px;transition:all .15s;border-left:3px solid transparent;}
+.nav-item:hover{background:rgba(255,255,255,.05);color:#fff;}
+.nav-item.active{background:rgba(59,91,219,.15);color:#fff;border-left-color:var(--primary);}
+.nav-item-icon{font-size:16px;width:20px;text-align:center;flex-shrink:0;}
+.content{flex:1;min-width:0;padding:32px;max-width:980px;}
+.section{display:none;}
+.section.active{display:block;}
+.section-header{margin-bottom:28px;}
+.section-header h1{font-size:22px;font-weight:700;margin-bottom:8px;text-wrap:balance;}
+.section-header p{color:var(--text-muted);font-size:14px;max-width:600px;}
+.card{background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);padding:20px;margin-bottom:16px;box-shadow:var(--shadow);}
+.card-title{font-size:15px;font-weight:600;margin-bottom:14px;display:flex;align-items:center;gap:8px;}
+.overview-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;margin-bottom:24px;}
+.overview-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px;display:flex;flex-direction:column;gap:8px;}
+.overview-icon{font-size:26px;line-height:1;}
+.overview-title{font-size:14px;font-weight:600;}
+.overview-desc{font-size:12.5px;color:var(--text-muted);line-height:1.6;}
+.insight{background:var(--surface);border:1px solid var(--border);border-left:4px solid var(--primary);border-radius:var(--radius-sm);padding:14px 16px;margin:16px 0;}
+.insight-title{font-size:11.5px;font-weight:700;color:var(--primary);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;}
+.insight ul{list-style:none;}
+.insight li{padding:3px 0;font-size:13px;color:var(--text-muted);display:flex;gap:8px;}
+.insight li::before{content:'›';color:var(--primary);font-weight:700;flex-shrink:0;}
+.field-category{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:10px;overflow:hidden;}
+.category-header{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;cursor:pointer;transition:background .15s;}
+.category-header:hover{background:var(--surface-2);}
+.category-title{display:flex;align-items:center;gap:10px;font-size:14px;font-weight:600;}
+.category-badge{font-size:11px;color:var(--text-muted);background:var(--surface-2);padding:2px 8px;border-radius:10px;}
+.category-arrow{color:var(--text-muted);font-size:11px;transition:transform .2s;}
+.category-body{display:none;border-top:1px solid var(--border);}
+.category-body.open{display:block;}
+.field-table{width:100%;border-collapse:collapse;}
+.field-table th{padding:8px 14px;text-align:left;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);background:var(--surface-2);border-bottom:1px solid var(--border);}
+.field-table td{padding:10px 14px;border-bottom:1px solid var(--border);font-size:13px;vertical-align:middle;}
+.field-table tr:last-child td{border-bottom:none;}
+.field-table tr:hover td{background:var(--surface-2);}
+.field-table-wrap{overflow-x:auto;}
+.auth-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:12px;font-size:11.5px;font-weight:500;white-space:nowrap;}
+.auth-none{background:var(--surface-2);color:var(--text-muted);}
+.auth-low{background:#EFF6FF;color:#2563EB;}
+.auth-medium{background:#FFFBEB;color:#B45309;}
+.auth-high{background:#FFF7ED;color:#92400E;}
+.auth-extreme{background:#FDF4FF;color:#7E22CE;}
+@media(prefers-color-scheme:dark){
+  :root:not([data-theme="light"]) .auth-low{background:#1E3A5F;color:#93C5FD;}
+  :root:not([data-theme="light"]) .auth-medium{background:#451A03;color:#FCD34D;}
+  :root:not([data-theme="light"]) .auth-high{background:#3B1500;color:#FCA5A5;}
+  :root:not([data-theme="light"]) .auth-extreme{background:#2E1065;color:#E879F9;}
+}
+:root[data-theme="dark"] .auth-low{background:#1E3A5F;color:#93C5FD;}
+:root[data-theme="dark"] .auth-medium{background:#451A03;color:#FCD34D;}
+:root[data-theme="dark"] .auth-high{background:#3B1500;color:#FCA5A5;}
+:root[data-theme="dark"] .auth-extreme{background:#2E1065;color:#E879F9;}
+.perm-tabs{display:flex;background:var(--surface-2);border-radius:var(--radius-sm);padding:4px;margin-bottom:22px;width:fit-content;}
+.perm-tab{padding:8px 20px;border-radius:var(--radius-sm);font-size:13px;font-weight:500;cursor:pointer;color:var(--text-muted);transition:all .15s;border:none;background:none;}
+.perm-tab.active{background:var(--surface);color:var(--text);box-shadow:var(--shadow);font-weight:600;}
+.rule-group{background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:16px;margin-bottom:12px;}
+.rule-group-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;}
+.logic-toggle{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--text-muted);flex-wrap:wrap;}
+.logic-btn{padding:3px 10px;border-radius:4px;cursor:pointer;font-size:11px;font-weight:700;border:1.5px solid var(--border);background:var(--surface);color:var(--text-muted);transition:all .15s;}
+.logic-btn.active{border-color:var(--primary);color:var(--primary);background:var(--primary-light);}
+.rule-row{display:flex;align-items:center;gap:7px;margin-bottom:8px;flex-wrap:wrap;}
+.rule-select,.rule-input{padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);font-size:13px;outline:none;transition:border-color .15s;}
+.rule-select:focus,.rule-input:focus{border-color:var(--primary);}
+.rule-select{min-width:130px;}
+.rule-connector{font-size:11px;font-weight:700;color:var(--text-muted);padding:4px 8px;background:var(--surface-2);border-radius:4px;letter-spacing:.05em;border:1px solid var(--border);}
+.rule-delete{padding:6px 8px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:none;color:var(--text-muted);cursor:pointer;font-size:12px;transition:all .15s;flex-shrink:0;}
+.rule-delete:hover{border-color:var(--danger);color:var(--danger);background:var(--danger-bg);}
+.add-rule-btn{padding:7px 14px;border:1.5px dashed var(--border);border-radius:var(--radius-sm);background:none;color:var(--text-muted);cursor:pointer;font-size:12.5px;display:flex;align-items:center;gap:6px;transition:all .15s;width:100%;justify-content:center;margin-top:4px;}
+.add-rule-btn:hover{border-color:var(--primary);color:var(--primary);background:var(--primary-light);}
+.rule-cert-hint{font-size:11px;padding:2px 7px;border-radius:10px;background:var(--warning-bg);color:var(--warning);font-weight:500;flex-shrink:0;border:1px solid rgba(180,83,9,.2);}
+.preview-box{background:var(--primary-light);border:1px solid var(--primary);border-radius:var(--radius-sm);padding:14px 16px;margin-top:18px;}
+.preview-box h4{font-size:11px;font-weight:700;color:var(--primary);margin-bottom:8px;text-transform:uppercase;letter-spacing:.06em;}
+.preview-text{font-size:13px;color:var(--text);line-height:1.9;}
+.preview-tag{display:inline-block;background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:1px 7px;font-size:12px;font-weight:600;margin:0 2px;color:var(--primary);}
+.progress-bar{height:4px;background:var(--border);border-radius:2px;margin-bottom:8px;overflow:hidden;}
+.progress-fill{height:100%;background:var(--primary);border-radius:2px;}
+.form-group{margin-bottom:16px;}
+.form-label{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;font-size:13px;font-weight:500;}
+.form-hint{font-size:11px;color:var(--text-muted);}
+.form-control{width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);font-size:13.5px;outline:none;transition:border-color .15s;}
+.form-control:focus{border-color:var(--primary);}
+.cert-section{background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px;margin-top:10px;}
+.cert-section-title{font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;}
+.cert-option{display:flex;align-items:flex-start;gap:10px;padding:10px;border-radius:var(--radius-sm);cursor:pointer;transition:background .1s;margin-bottom:6px;border:1.5px solid transparent;}
+.cert-option:last-child{margin-bottom:0;}
+.cert-option:hover{background:var(--surface);}
+.cert-option.selected{background:var(--primary-light);border-color:var(--primary);}
+.cert-radio{width:16px;height:16px;border-radius:50%;border:2px solid var(--border);flex-shrink:0;margin-top:2px;display:flex;align-items:center;justify-content:center;}
+.cert-option.selected .cert-radio{border-color:var(--primary);background:var(--primary);}
+.cert-option.selected .cert-radio::after{content:'';width:6px;height:6px;border-radius:50%;background:#fff;}
+.cert-opt-title{font-size:13px;font-weight:500;display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+.cert-opt-desc{font-size:11.5px;color:var(--text-muted);margin-top:3px;}
+.tag-list{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;}
+.tag{padding:5px 12px;border-radius:20px;font-size:12.5px;cursor:pointer;transition:all .15s;border:1.5px solid var(--border);background:var(--surface);color:var(--text-muted);}
+.tag:hover{border-color:var(--primary);color:var(--primary);}
+.tag.selected{border-color:var(--primary);background:var(--primary-light);color:var(--primary);font-weight:600;}
+.btn{padding:9px 18px;border-radius:var(--radius-sm);font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;border:none;display:inline-flex;align-items:center;gap:6px;}
+.btn-primary{background:var(--primary);color:#fff;}
+.btn-primary:hover{background:var(--primary-dark);}
+.btn-outline{background:none;border:1.5px solid var(--border);color:var(--text);}
+.btn-outline:hover{background:var(--surface-2);}
+.btn-sm{padding:5px 12px;font-size:12px;}
+.btn-group{display:flex;gap:8px;margin-top:16px;flex-wrap:wrap;}
+.schema-block{background:#13152A;border-radius:var(--radius-sm);padding:16px;overflow-x:auto;margin-bottom:12px;}
+.schema-code{font-family:'JetBrains Mono','Fira Code',monospace;font-size:12px;color:#C7D1F5;line-height:1.75;white-space:pre;}
+.sc{color:#6272A4;}.st{color:#BD93F9;}.sf{color:#50FA7B;}.ss{color:#F1FA8C;}.sk{color:#FF79C6;}
+.check-item{display:flex;align-items:center;gap:10px;padding:11px 14px;border-radius:var(--radius-sm);margin-bottom:8px;border:1px solid transparent;}
+.check-pass{background:var(--success-bg);border-color:rgba(5,150,105,.25);}
+.check-warn{background:var(--warning-bg);border-color:rgba(217,119,6,.25);}
+.check-none{background:var(--surface-2);border-color:var(--border);}
+.check-icon{font-size:18px;flex-shrink:0;}
+.check-info{flex:1;min-width:0;}
+.check-title{font-size:13px;font-weight:500;}
+.check-sub{font-size:11px;color:var(--text-muted);margin-top:2px;}
+.group-divider{text-align:center;margin:8px 0;font-size:11.5px;font-weight:700;color:var(--text-muted);}
+.mobile-nav{display:none;overflow-x:auto;gap:6px;padding:12px 16px;background:var(--surface);border-bottom:1px solid var(--border);margin:-32px -32px 24px;-webkit-overflow-scrolling:touch;}
+.mobile-nav-item{padding:6px 14px;border-radius:16px;font-size:12.5px;font-weight:500;white-space:nowrap;cursor:pointer;border:1.5px solid var(--border);background:var(--surface);color:var(--text-muted);transition:all .15s;}
+.mobile-nav-item.active{background:var(--primary);border-color:var(--primary);color:#fff;}
+@media(max-width:680px){
+  .nav{display:none;}
+  .content{padding:20px 16px;}
+  .mobile-nav{display:flex;}
+  .rule-select{min-width:100px;}
+  .overview-grid{grid-template-columns:1fr 1fr;}
+}
+</style>
+
+<div class="app">
+<nav class="nav">
+  <div class="nav-logo">OpenForum<span>门槛系统设计方案</span></div>
+  <div class="nav-label">方案总览</div>
+  <div class="nav-item active" onclick="go('overview')"><span class="nav-item-icon">🗺</span>设计概览</div>
+  <div class="nav-label" style="margin-top:12px">用户信息</div>
+  <div class="nav-item" onclick="go('fields')"><span class="nav-item-icon">👤</span>信息字段体系</div>
+  <div class="nav-item" onclick="go('profile')"><span class="nav-item-icon">✏️</span>填写体验设计</div>
+  <div class="nav-label" style="margin-top:12px">板块门槛</div>
+  <div class="nav-item" onclick="go('builder')"><span class="nav-item-icon">🔒</span>门槛设置器</div>
+  <div class="nav-item" onclick="go('access')"><span class="nav-item-icon">🚪</span>进入验证体验</div>
+  <div class="nav-label" style="margin-top:12px">技术方案</div>
+  <div class="nav-item" onclick="go('datamodel')"><span class="nav-item-icon">🗄</span>数据结构</div>
+</nav>
+<main class="content">
+<div class="mobile-nav">
+  <button class="mobile-nav-item active" onclick="go('overview')">概览</button>
+  <button class="mobile-nav-item" onclick="go('fields')">信息字段</button>
+  <button class="mobile-nav-item" onclick="go('profile')">填写体验</button>
+  <button class="mobile-nav-item" onclick="go('builder')">门槛设置</button>
+  <button class="mobile-nav-item" onclick="go('access')">进入验证</button>
+  <button class="mobile-nav-item" onclick="go('datamodel')">数据结构</button>
+</div>
+
+<!-- ===== OVERVIEW ===== -->
+<div id="sec-overview" class="section active">
+  <div class="section-header">
+    <h1>门槛系统 · 设计概览</h1>
+    <p>用户信息体系 + 板块门槛设置的完整方案，聚焦操作便捷性与规则灵活性的平衡。</p>
+  </div>
+  <div class="overview-grid">
+    <div class="overview-card"><div class="overview-icon">📋</div><div class="overview-title">用户信息分 7 大类</div><div class="overview-desc">基本、身份、学历、职业、资产、个人状况、专业资质，约 22 个字段，分类填写降低认知负担。</div></div>
+    <div class="overview-card"><div class="overview-icon">🏅</div><div class="overview-title">4 级认证强度</div><div class="overview-desc">从「自填无需认证」到「人工+活体验证」，每个字段按信息性质设定最高可达等级。</div></div>
+    <div class="overview-card"><div class="overview-icon">🔒</div><div class="overview-title">2 类访问权限</div><div class="overview-desc">浏览门槛（能看内容）和操作门槛（能发帖/评论/投票），分别独立设置条件组。</div></div>
+    <div class="overview-card"><div class="overview-icon">⚙️</div><div class="overview-title">可视化规则构建</div><div class="overview-desc">AND/OR 条件组，点击添加/删除，实时预览用户看到的准入说明，无需懂技术。</div></div>
+  </div>
+  <div class="insight">
+    <div class="insight-title">★ Insight — 核心设计原则</div>
+    <ul>
+      <li>信息填写与认证解耦：用户先填字段值，随时再选择提升认证等级，不强制一次完成</li>
+      <li>门槛所见即所得：构建规则时实时生成「用户会看到的准入说明」，帮助板块主预判效果</li>
+      <li>精准引导而非粗暴拒绝：访问受限时告知差哪个条件，并提供一键补全入口</li>
+      <li>后端实时匹配：访问时对比用户档案与门槛规则，拒绝结果携带每个条件的满足状态</li>
+    </ul>
+  </div>
+  <div class="card">
+    <div class="card-title">🔄 系统流程总览</div>
+    <div style="overflow-x:auto">
+      <svg viewBox="0 0 800 150" style="width:100%;max-width:800px;height:auto;display:block;min-width:360px">
+        <defs><marker id="arr" markerWidth="7" markerHeight="5" refX="5" refY="2.5" orient="auto"><path d="M0 0 L7 2.5 L0 5Z" fill="#9CA3AF"/></marker></defs>
+        <rect x="8" y="45" width="128" height="60" rx="8" fill="var(--surface-2)" stroke="var(--border)" stroke-width="1.5"/>
+        <text x="72" y="69" text-anchor="middle" font-size="12" font-weight="600" fill="var(--text)">用户填写</text>
+        <text x="72" y="86" text-anchor="middle" font-size="11" fill="var(--text-muted)">个人信息</text>
+        <text x="72" y="100" text-anchor="middle" font-size="11" fill="var(--text-muted)">选择认证等级</text>
+        <line x1="138" y1="75" x2="158" y2="75" stroke="#9CA3AF" stroke-width="1.5" marker-end="url(#arr)"/>
+        <rect x="160" y="45" width="128" height="60" rx="8" fill="var(--warning-bg)" stroke="#D97706" stroke-width="1.5"/>
+        <text x="224" y="69" text-anchor="middle" font-size="12" font-weight="600" fill="#B45309">认证审核</text>
+        <text x="224" y="86" text-anchor="middle" font-size="11" fill="var(--text-muted)">AI 自动 /</text>
+        <text x="224" y="100" text-anchor="middle" font-size="11" fill="var(--text-muted)">人工复核</text>
+        <line x1="290" y1="75" x2="310" y2="75" stroke="#9CA3AF" stroke-width="1.5" marker-end="url(#arr)"/>
+        <rect x="312" y="45" width="128" height="60" rx="8" fill="var(--success-bg)" stroke="var(--success)" stroke-width="1.5"/>
+        <text x="376" y="69" text-anchor="middle" font-size="12" font-weight="600" fill="var(--success)">用户档案</text>
+        <text x="376" y="86" text-anchor="middle" font-size="11" fill="var(--text-muted)">字段值 +</text>
+        <text x="376" y="100" text-anchor="middle" font-size="11" fill="var(--text-muted)">认证等级</text>
+        <line x1="442" y1="75" x2="462" y2="75" stroke="#9CA3AF" stroke-width="1.5" marker-end="url(#arr)"/>
+        <rect x="464" y="45" width="128" height="60" rx="8" fill="var(--primary-light)" stroke="var(--primary)" stroke-width="1.5"/>
+        <text x="528" y="69" text-anchor="middle" font-size="12" font-weight="600" fill="var(--primary)">访问板块</text>
+        <text x="528" y="86" text-anchor="middle" font-size="11" fill="var(--text-muted)">与门槛规则</text>
+        <text x="528" y="100" text-anchor="middle" font-size="11" fill="var(--text-muted)">实时匹配</text>
+        <line x1="594" y1="75" x2="614" y2="75" stroke="#9CA3AF" stroke-width="1.5" marker-end="url(#arr)"/>
+        <rect x="616" y="45" width="170" height="60" rx="8" fill="var(--surface-2)" stroke="var(--border)" stroke-width="1.5"/>
+        <text x="701" y="69" text-anchor="middle" font-size="12" font-weight="600" fill="var(--text)">访问结果</text>
+        <text x="701" y="86" text-anchor="middle" font-size="11" fill="var(--success)">✓ 允许浏览 / 操作</text>
+        <text x="701" y="102" text-anchor="middle" font-size="11" fill="var(--danger)">✗ 引导补全信息</text>
+        <text x="528" y="135" text-anchor="middle" font-size="11" fill="var(--text-muted)">↑ 板块主在后台配置门槛规则</text>
+      </svg>
+    </div>
+  </div>
+</div>
+
+<!-- ===== FIELDS ===== -->
+<div id="sec-fields" class="section">
+  <div class="section-header">
+    <h1>用户信息字段体系</h1>
+    <p>按大类组织，展开每个类别查看字段、认证等级及典型门槛场景。</p>
+  </div>
+  <div class="insight">
+    <div class="insight-title">★ Insight — 认证等级说明</div>
+    <ul>
+      <li><strong>无需认证</strong>：纯自填，系统直接信任（如兴趣爱好、语言偏好）</li>
+      <li><strong>🔵 低级（自填）</strong>：用户自填，系统记录但不核实，门槛可要求「至少填写」</li>
+      <li><strong>🟡 中级（文件）</strong>：上传证件，AI 自动 OCR + 逻辑核验，几分钟内出结果</li>
+      <li><strong>🔴 高级（人工）</strong>：上传后人工复核，适合房产证、身份证等敏感证件</li>
+      <li><strong>⚫ 极高（活体）</strong>：人工 + 视频活体验证，最高可信度（可选配置）</li>
+    </ul>
+  </div>
+  <div class="field-category">
+    <div class="category-header" onclick="toggleCat(this)"><div class="category-title"><span>🧍</span>基本信息<span class="category-badge">6 字段</span></div><span class="category-arrow">▼</span></div>
+    <div class="category-body open"><div class="field-table-wrap"><table class="field-table">
+      <tr><th>字段</th><th>说明 / 示例</th><th>最低可用</th><th>最高可达</th><th>典型门槛场景</th></tr>
+      <tr><td><strong>性别</strong></td><td>男 / 女 / 其他</td><td><span class="auth-badge auth-none">无需认证</span></td><td><span class="auth-badge auth-low">🔵 低级</span></td><td>「仅限男性」「女性专属」</td></tr>
+      <tr><td><strong>出生年份 → 年龄</strong></td><td>存年份，展示年龄区间</td><td><span class="auth-badge auth-none">无需认证</span></td><td><span class="auth-badge auth-medium">🟡 中级</span></td><td>「25–45 岁」「18 岁以上」</td></tr>
+      <tr><td><strong>国籍 / 地区</strong></td><td>中国大陆 / 香港 / 美国…</td><td><span class="auth-badge auth-low">🔵 低级</span></td><td><span class="auth-badge auth-high">🔴 高级</span></td><td>「中国大陆」「限海外华人」</td></tr>
+      <tr><td><strong>所在城市</strong></td><td>北京 / 上海 / 深圳…</td><td><span class="auth-badge auth-low">🔵 低级</span></td><td><span class="auth-badge auth-medium">🟡 中级</span></td><td>「上海及周边」</td></tr>
+      <tr><td><strong>语言</strong></td><td>中文 / 英文 / 粤语（多选）</td><td><span class="auth-badge auth-none">无需认证</span></td><td><span class="auth-badge auth-none">无需认证</span></td><td>「仅英文用户」</td></tr>
+      <tr><td><strong>注册时长</strong></td><td>系统自动计算，无需填写</td><td><span class="auth-badge auth-none">无需认证</span></td><td><span class="auth-badge auth-none">无需认证</span></td><td>「注册满 6 个月」防刷号</td></tr>
+    </table></div></div>
+  </div>
+  <div class="field-category">
+    <div class="category-header" onclick="toggleCat(this)"><div class="category-title"><span>🪪</span>身份认证<span class="category-badge">2 字段</span></div><span class="category-arrow">▶</span></div>
+    <div class="category-body"><div class="field-table-wrap"><table class="field-table">
+      <tr><th>字段</th><th>说明</th><th>最低可用</th><th>最高可达</th><th>典型门槛场景</th></tr>
+      <tr><td><strong>真实姓名</strong></td><td>身份证上的姓名</td><td><span class="auth-badge auth-medium">🟡 中级</span></td><td><span class="auth-badge auth-extreme">⚫ 极高</span></td><td>「实名用户专属」</td></tr>
+      <tr><td><strong>身份证（脱敏）</strong></td><td>存哈希 / 部分号段，不明文</td><td><span class="auth-badge auth-high">🔴 高级</span></td><td><span class="auth-badge auth-extreme">⚫ 极高</span></td><td>「高级实名认证」</td></tr>
+    </table></div></div>
+  </div>
+  <div class="field-category">
+    <div class="category-header" onclick="toggleCat(this)"><div class="category-title"><span>🎓</span>学历信息<span class="category-badge">3 字段</span></div><span class="category-arrow">▶</span></div>
+    <div class="category-body"><div class="field-table-wrap"><table class="field-table">
+      <tr><th>字段</th><th>说明</th><th>最低可用</th><th>最高可达</th><th>典型门槛场景</th></tr>
+      <tr><td><strong>最高学历</strong></td><td>高中 / 本科 / 硕士 / 博士</td><td><span class="auth-badge auth-low">🔵 低级</span></td><td><span class="auth-badge auth-high">🔴 高级</span></td><td>「本科及以上」「研究生论坛」</td></tr>
+      <tr><td><strong>毕业院校</strong></td><td>北京大学 / MIT…</td><td><span class="auth-badge auth-low">🔵 低级</span></td><td><span class="auth-badge auth-medium">🟡 中级</span></td><td>「985 高校校友」</td></tr>
+      <tr><td><strong>专业领域</strong></td><td>计算机 / 金融 / 医学…</td><td><span class="auth-badge auth-low">🔵 低级</span></td><td><span class="auth-badge auth-medium">🟡 中级</span></td><td>「理工科背景」</td></tr>
+    </table></div></div>
+  </div>
+  <div class="field-category">
+    <div class="category-header" onclick="toggleCat(this)"><div class="category-title"><span>💼</span>职业信息<span class="category-badge">4 字段</span></div><span class="category-arrow">▶</span></div>
+    <div class="category-body"><div class="field-table-wrap"><table class="field-table">
+      <tr><th>字段</th><th>说明</th><th>最低可用</th><th>最高可达</th><th>典型门槛场景</th></tr>
+      <tr><td><strong>职业类别</strong></td><td>医生 / 律师 / 工程师 / 教师…</td><td><span class="auth-badge auth-low">🔵 低级</span></td><td><span class="auth-badge auth-high">🔴 高级</span></td><td>「医疗从业者专区」</td></tr>
+      <tr><td><strong>所在行业</strong></td><td>互联网 / 金融 / 房地产…</td><td><span class="auth-badge auth-low">🔵 低级</span></td><td><span class="auth-badge auth-medium">🟡 中级</span></td><td>「金融从业者」</td></tr>
+      <tr><td><strong>公司名称</strong></td><td>腾讯 / 阿里 / 某小公司…</td><td><span class="auth-badge auth-low">🔵 低级</span></td><td><span class="auth-badge auth-medium">🟡 中级</span></td><td>「大厂员工专属」</td></tr>
+      <tr><td><strong>职级 / 职称</strong></td><td>P6 / 总监 / 高级工程师…</td><td><span class="auth-badge auth-low">🔵 低级</span></td><td><span class="auth-badge auth-medium">🟡 中级</span></td><td>「管理层讨论区」</td></tr>
+    </table></div></div>
+  </div>
+  <div class="field-category">
+    <div class="category-header" onclick="toggleCat(this)"><div class="category-title"><span>🏠</span>资产信息<span class="category-badge">4 字段</span></div><span class="category-arrow">▶</span></div>
+    <div class="category-body"><div class="field-table-wrap"><table class="field-table">
+      <tr><th>字段</th><th>说明</th><th>最低可用</th><th>最高可达</th><th>典型门槛场景</th></tr>
+      <tr><td><strong>房产数量</strong></td><td>0 套 / 1 套 / 2 套以上</td><td><span class="auth-badge auth-low">🔵 低级</span></td><td><span class="auth-badge auth-high">🔴 高级</span></td><td>「有房用户」「多套业主」</td></tr>
+      <tr><td><strong>房产城市</strong></td><td>上海 / 北京…（多选）</td><td><span class="auth-badge auth-low">🔵 低级</span></td><td><span class="auth-badge auth-high">🔴 高级</span></td><td>「上海业主专区」</td></tr>
+      <tr><td><strong>车辆</strong></td><td>无 / 有（+ 品牌可选）</td><td><span class="auth-badge auth-low">🔵 低级</span></td><td><span class="auth-badge auth-medium">🟡 中级</span></td><td>「有车族」</td></tr>
+      <tr><td><strong>收入水平</strong></td><td>普通 / 中等 / 较高（3 档）</td><td><span class="auth-badge auth-low">🔵 低级</span></td><td><span class="auth-badge auth-high">🔴 高级</span></td><td>「高净值用户专区」</td></tr>
+    </table></div></div>
+  </div>
+  <div class="field-category">
+    <div class="category-header" onclick="toggleCat(this)"><div class="category-title"><span>🎯</span>个人状况<span class="category-badge">2 字段</span></div><span class="category-arrow">▶</span></div>
+    <div class="category-body"><div class="field-table-wrap"><table class="field-table">
+      <tr><th>字段</th><th>说明</th><th>最低可用</th><th>最高可达</th><th>典型门槛场景</th></tr>
+      <tr><td><strong>婚姻状况</strong></td><td>未婚 / 已婚 / 离异</td><td><span class="auth-badge auth-none">无需认证</span></td><td><span class="auth-badge auth-medium">🟡 中级</span></td><td>「已婚人士交流区」</td></tr>
+      <tr><td><strong>兴趣爱好</strong></td><td>股票 / 跑步 / 摄影…（多选标签）</td><td><span class="auth-badge auth-none">无需认证</span></td><td><span class="auth-badge auth-none">无需认证</span></td><td>「投资爱好者」（含"股票"或"基金"标签）</td></tr>
+    </table></div></div>
+  </div>
+  <div class="field-category">
+    <div class="category-header" onclick="toggleCat(this)"><div class="category-title"><span>🏆</span>专业资质<span class="category-badge">1 字段</span></div><span class="category-arrow">▶</span></div>
+    <div class="category-body"><div class="field-table-wrap"><table class="field-table">
+      <tr><th>字段</th><th>说明</th><th>最低可用</th><th>最高可达</th><th>典型门槛场景</th></tr>
+      <tr><td><strong>职业资质证书</strong></td><td>CFA / 注册会计师 / 医师执照…</td><td><span class="auth-badge auth-medium">🟡 中级</span></td><td><span class="auth-badge auth-high">🔴 高级</span></td><td>「持证医生」「CFA 持证人」</td></tr>
+    </table></div></div>
+  </div>
+</div>
+
+<!-- ===== PROFILE UX ===== -->
+<div id="sec-profile" class="section">
+  <div class="section-header">
+    <h1>用户信息填写体验</h1>
+    <p>分步向导 + 按需认证的两层设计，让用户先完成基础填写，再按需补充认证。</p>
+  </div>
+  <div class="insight">
+    <div class="insight-title">★ Insight — 填写体验原则</div>
+    <ul>
+      <li>渐进式补全：注册时只填基本信息，进入受限板块时才提示补全对应字段</li>
+      <li>认证与填写分离：字段值和认证等级是独立操作，用户可先填再决定是否认证</li>
+      <li>明确告知动机：每个字段旁提示「填写后可访问 X 类板块」，提升填写意愿</li>
+      <li>资料完整度指引：顶部进度条 + 「完善后可解锁 N 个专属板块」激励用户主动补全</li>
+    </ul>
+  </div>
+  <div style="max-width:600px">
+    <div class="perm-tabs">
+      <button class="perm-tab active" onclick="swTab(this,'pbasic')">📝 填写字段</button>
+      <button class="perm-tab" onclick="swTab(this,'pcert')">🏅 认证状态</button>
+    </div>
+    <div id="pbasic">
+      <div class="progress-bar"><div class="progress-fill" style="width:45%"></div></div>
+      <p style="font-size:12px;color:var(--text-muted);margin-bottom:18px">资料完整度 45% · 完善后可解锁更多专属板块 🎯</p>
+      <div class="card">
+        <div class="card-title">🧍 基本信息</div>
+        <div class="form-group">
+          <div class="form-label">性别 <span class="form-hint">解锁限定性别的板块</span></div>
+          <div class="tag-list">
+            <div class="tag selected" onclick="toggleTag(this)">男性</div>
+            <div class="tag" onclick="toggleTag(this)">女性</div>
+            <div class="tag" onclick="toggleTag(this)">不透露</div>
+          </div>
+        </div>
+        <div class="form-group" style="margin-top:14px">
+          <div class="form-label">出生年份 <span class="form-hint">仅展示年龄区间，不显示具体年份</span></div>
+          <select class="form-control" style="max-width:200px"><option>1990 年</option><option selected>1988 年</option><option>1985 年</option></select>
+          <p style="font-size:11px;color:var(--text-muted);margin-top:4px">将对外展示为：30–40 岁 区间</p>
+        </div>
+        <div class="form-group" style="margin-top:14px">
+          <div class="form-label">所在城市</div>
+          <input class="form-control" value="上海市" style="max-width:280px"/>
+        </div>
+        <div class="form-group" style="margin-top:14px">
+          <div class="form-label">兴趣爱好 <span class="auth-badge auth-none" style="margin-left:6px">无需认证</span></div>
+          <div class="tag-list">
+            <div class="tag selected" onclick="toggleTag(this)">📈 股票投资</div>
+            <div class="tag selected" onclick="toggleTag(this)">🏠 房产</div>
+            <div class="tag" onclick="toggleTag(this)">🚗 汽车</div>
+            <div class="tag" onclick="toggleTag(this)">🎮 游戏</div>
+            <div class="tag" onclick="toggleTag(this)">📷 摄影</div>
+            <div class="tag" onclick="toggleTag(this)">🏋️ 健身</div>
+            <div class="tag" onclick="toggleTag(this)">✈️ 旅行</div>
+            <div class="tag" onclick="toggleTag(this)">+ 自定义</div>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">🏠 资产信息 <span style="font-size:12px;font-weight:400;color:var(--text-muted)">可选，填写后解锁业主专属板块</span></div>
+        <div class="form-group">
+          <div class="form-label">名下房产</div>
+          <div class="tag-list">
+            <div class="tag" onclick="toggleTag(this)">无</div>
+            <div class="tag selected" onclick="toggleTag(this)">1 套</div>
+            <div class="tag" onclick="toggleTag(this)">2 套及以上</div>
+          </div>
+        </div>
+        <div class="form-group" style="margin-top:12px">
+          <div class="form-label">房产所在城市</div>
+          <div class="tag-list">
+            <div class="tag selected">上海</div>
+            <div class="tag" onclick="toggleTag(this)">北京</div>
+            <div class="tag" onclick="toggleTag(this)">+ 添加城市</div>
+          </div>
+        </div>
+        <div class="cert-section">
+          <div class="cert-section-title">🏅 认证等级（可选，影响能进入哪类门槛板块）</div>
+          <div class="cert-option" onclick="selCert(this)">
+            <div class="cert-radio"></div>
+            <div><div class="cert-opt-title"><span class="auth-badge auth-low">🔵 低级</span> 自填即可，立即生效</div>
+            <div class="cert-opt-desc">系统记录您填写的信息，无需证明；部分板块接受此级别</div></div>
+          </div>
+          <div class="cert-option selected" onclick="selCert(this)">
+            <div class="cert-radio"></div>
+            <div><div class="cert-opt-title"><span class="auth-badge auth-high">🔴 高级</span> 上传房产证，人工审核</div>
+            <div class="cert-opt-desc">上传房产证照片，人工复核（约 1–3 工作日），解锁高认证业主专区</div></div>
+          </div>
+        </div>
+      </div>
+      <div class="btn-group">
+        <button class="btn btn-primary">保存信息</button>
+        <button class="btn btn-outline">查看我的档案</button>
+      </div>
+    </div>
+    <div id="pcert" style="display:none">
+      <div class="card">
+        <div class="card-title">🏅 我的认证状态</div>
+        <table class="field-table">
+          <tr><th>信息类别</th><th>当前等级</th><th>状态</th><th>操作</th></tr>
+          <tr><td>性别</td><td><span class="auth-badge auth-low">🔵 低级</span></td><td style="color:var(--success)">✅ 已生效</td><td><button class="btn btn-outline btn-sm">无需提升</button></td></tr>
+          <tr><td>房产信息</td><td><span class="auth-badge auth-low">🔵 低级</span></td><td style="color:var(--warning)">⏳ 待认证</td><td><button class="btn btn-primary btn-sm">上传房产证</button></td></tr>
+          <tr><td>最高学历</td><td><span class="auth-badge auth-none">未填写</span></td><td style="color:var(--text-muted)">—</td><td><button class="btn btn-outline btn-sm">填写并认证</button></td></tr>
+          <tr><td>真实姓名</td><td><span class="auth-badge auth-none">未填写</span></td><td style="color:var(--text-muted)">—</td><td><button class="btn btn-outline btn-sm">去填写</button></td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== BUILDER ===== -->
+<div id="sec-builder" class="section">
+  <div class="section-header">
+    <h1>板块门槛设置器</h1>
+    <p>板块管理员设置访问门槛的交互界面原型，支持 AND/OR 逻辑组合多个条件。</p>
+  </div>
+  <div class="insight">
+    <div class="insight-title">★ Insight — 门槛设计要点</div>
+    <ul>
+      <li>两类权限独立设置：浏览门槛和操作门槛可以完全不同，操作门槛通常比浏览门槛更严格</li>
+      <li>组内 AND，组间 AND/OR：同组内条件全部须满足；多组之间可选「满足任一组」或「全部满足」</li>
+      <li>实时生成准入说明：设置完毕后自动生成用户侧的准入文本，板块主可直接预览用户会看到什么</li>
+    </ul>
+  </div>
+  <div class="card" style="padding:24px">
+    <div class="perm-tabs">
+      <button class="perm-tab active" onclick="swBuilder(this,'bview')">👁 浏览门槛</button>
+      <button class="perm-tab" onclick="swBuilder(this,'baction')">✏️ 操作门槛</button>
+    </div>
+
+    <!-- View threshold -->
+    <div id="bview">
+      <div class="rule-group" id="rg1">
+        <div class="rule-group-header">
+          <div class="logic-toggle">条件组一 · 内部逻辑
+            <button class="logic-btn active" onclick="togLogic(this)">AND 全满足</button>
+            <button class="logic-btn" onclick="togLogic(this)">OR 任一满足</button>
+          </div>
+          <button class="rule-delete" onclick="delGroup(this)">🗑 删除组</button>
+        </div>
+        <div class="rule-row">
+          <span class="rule-connector">条件</span>
+          <select class="rule-select"><option selected>性别</option><option>年龄</option><option>所在城市</option><option>国籍</option><option>学历</option><option>职业类别</option><option>房产数量</option><option>房产城市</option><option>兴趣爱好</option><option>婚姻状况</option><option>收入水平</option><option>注册时长</option></select>
+          <select class="rule-select" style="min-width:80px"><option>=</option><option>≠</option></select>
+          <select class="rule-select"><option>男性</option><option>女性</option><option>任意</option></select>
+          <button class="rule-delete" onclick="delRule(this)">✕</button>
+        </div>
+        <div class="rule-row">
+          <span class="rule-connector">且</span>
+          <select class="rule-select"><option>性别</option><option selected>年龄</option><option>所在城市</option><option>国籍</option><option>学历</option><option>职业类别</option><option>房产数量</option><option>房产城市</option><option>兴趣爱好</option><option>婚姻状况</option><option>注册时长</option></select>
+          <select class="rule-select" style="min-width:80px"><option selected>在范围</option><option>≥</option><option>≤</option></select>
+          <input class="rule-input" value="25" style="width:55px"/> <span style="font-size:13px;color:var(--text-muted)">至</span>
+          <input class="rule-input" value="45" style="width:55px"/> <span style="font-size:13px;color:var(--text-muted)">岁</span>
+          <button class="rule-delete" onclick="delRule(this)">✕</button>
+        </div>
+        <div class="rule-row">
+          <span class="rule-connector">且</span>
+          <select class="rule-select"><option>性别</option><option>年龄</option><option>所在城市</option><option>国籍</option><option>学历</option><option>职业类别</option><option>房产数量</option><option selected>房产城市</option><option>兴趣爱好</option><option>婚姻状况</option><option>注册时长</option></select>
+          <select class="rule-select" style="min-width:80px"><option selected>包含</option><option>不包含</option></select>
+          <input class="rule-input" value="上海, 北京" style="width:150px" placeholder="逗号分隔"/>
+          <span class="rule-cert-hint">需高级认证</span>
+          <button class="rule-delete" onclick="delRule(this)">✕</button>
+        </div>
+        <button class="add-rule-btn" onclick="addRule(this)">+ 在此组添加条件</button>
+      </div>
+
+      <div class="group-divider">— 组间关系：<button class="logic-btn active" id="grpLogicBtn" onclick="togGrpLogic(this)">OR 满足任一组即可进入</button></div>
+
+      <div class="rule-group" id="rg2">
+        <div class="rule-group-header">
+          <div class="logic-toggle">条件组二 · 内部逻辑
+            <button class="logic-btn active" onclick="togLogic(this)">AND 全满足</button>
+            <button class="logic-btn" onclick="togLogic(this)">OR 任一满足</button>
+          </div>
+          <button class="rule-delete" onclick="delGroup(this)">🗑 删除组</button>
+        </div>
+        <div class="rule-row">
+          <span class="rule-connector">条件</span>
+          <select class="rule-select"><option>性别</option><option>年龄</option><option>所在城市</option><option>国籍</option><option selected>学历</option><option>职业类别</option><option>房产数量</option><option>房产城市</option><option>兴趣爱好</option><option>婚姻状况</option><option>注册时长</option></select>
+          <select class="rule-select" style="min-width:80px"><option selected>≥</option></select>
+          <select class="rule-select"><option>高中/中专</option><option selected>本科</option><option>硕士</option><option>博士</option></select>
+          <span class="rule-cert-hint">需中级认证</span>
+          <button class="rule-delete" onclick="delRule(this)">✕</button>
+        </div>
+        <button class="add-rule-btn" onclick="addRule(this)">+ 在此组添加条件</button>
+      </div>
+
+      <button class="add-rule-btn" onclick="addGroup('bview')" style="border-color:var(--primary);color:var(--primary)">+ 添加条件组（OR 关系）</button>
+
+      <div class="preview-box">
+        <h4>📋 自动生成的准入说明（用户将看到）</h4>
+        <div class="preview-text">
+          满足以下<strong>任一条件组</strong>可进入板块：<br>
+          <strong>条件组一：</strong>性别为<span class="preview-tag">男性</span>，且年龄在<span class="preview-tag">25–45 岁</span>，且在<span class="preview-tag">上海 / 北京</span>有房产（需高级认证）<br>
+          <strong>条件组二：</strong>最高学历<span class="preview-tag">本科</span>及以上（需中级认证）
+        </div>
+      </div>
+    </div>
+
+    <!-- Action threshold -->
+    <div id="baction" style="display:none">
+      <div class="rule-group">
+        <div class="rule-group-header">
+          <div class="logic-toggle">操作权限条件（发帖 / 评论 / 投票）
+            <button class="logic-btn active">AND 全满足</button>
+          </div>
+        </div>
+        <div class="rule-row">
+          <span class="rule-connector">条件</span>
+          <select class="rule-select"><option selected>注册时长</option><option>年龄</option><option>学历</option></select>
+          <select class="rule-select" style="min-width:80px"><option>≥</option></select>
+          <input class="rule-input" value="30" style="width:60px"/>
+          <span style="font-size:13px;color:var(--text-muted)">天</span>
+          <button class="rule-delete" onclick="delRule(this)">✕</button>
+        </div>
+        <div class="rule-row">
+          <span class="rule-connector">且</span>
+          <select class="rule-select"><option>注册时长</option><option selected>学历</option><option>职业</option></select>
+          <select class="rule-select" style="min-width:80px"><option>≥</option></select>
+          <select class="rule-select"><option>高中</option><option selected>本科</option><option>硕士</option></select>
+          <button class="rule-delete" onclick="delRule(this)">✕</button>
+        </div>
+        <button class="add-rule-btn" onclick="addRule(this)">+ 添加操作条件</button>
+      </div>
+      <div class="preview-box">
+        <h4>📋 操作权限说明（用户将看到）</h4>
+        <div class="preview-text">
+          发帖、评论、投票须满足：注册超过<span class="preview-tag">30 天</span>，且最高学历<span class="preview-tag">本科</span>及以上
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== ACCESS UX ===== -->
+<div id="sec-access" class="section">
+  <div class="section-header">
+    <h1>用户进入板块的验证体验</h1>
+    <p>用户尝试访问有门槛的板块时，系统如何引导而不是粗暴拒绝。</p>
+  </div>
+  <div class="insight">
+    <div class="insight-title">★ Insight — 拒绝时的体验设计</div>
+    <ul>
+      <li>精确告知差距：「已满足 2/3 个条件，缺少：房产高级认证」而非「您不符合要求」</li>
+      <li>一键跳转补全：缺哪个字段 / 认证，就显示「去完善」按钮直达对应设置页</li>
+      <li>区分软拒绝和硬拒绝：软拒绝（信息未填 / 未认证）引导补全；硬拒绝（如年龄不符）才真正拦截</li>
+    </ul>
+  </div>
+  <div class="card" style="max-width:520px">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+      <div style="width:48px;height:48px;border-radius:10px;background:var(--primary-light);display:flex;align-items:center;justify-content:center;font-size:26px;flex-shrink:0">🏠</div>
+      <div><div style="font-size:16px;font-weight:700">上海业主交流圈</div><div style="font-size:12px;color:var(--text-muted)">1,842 成员 · 由 @PropertyMod 创建</div></div>
+    </div>
+    <div style="background:var(--warning-bg);border:1px solid rgba(217,119,6,.3);border-radius:8px;padding:14px 16px;margin-bottom:18px">
+      <div style="font-size:13px;font-weight:600;color:var(--warning);margin-bottom:8px">🔒 此板块有访问门槛</div>
+      <div style="font-size:12.5px;color:var(--text);line-height:1.9">
+        满足以下任一条件可进入：<br>
+        <strong>条件组一：</strong>男性 + 25–45 岁 + 上海/北京有房产（高级认证）<br>
+        <strong>条件组二：</strong>本科及以上学历（中级认证）
+      </div>
+    </div>
+    <div style="font-size:13px;font-weight:600;margin-bottom:10px">📊 您当前满足情况</div>
+    <div class="check-item check-pass"><span class="check-icon">✅</span><div class="check-info"><div class="check-title">性别：男性</div><div class="check-sub">自填，已记录</div></div></div>
+    <div class="check-item check-pass"><span class="check-icon">✅</span><div class="check-info"><div class="check-title">年龄：32 岁（符合 25–45 岁）</div><div class="check-sub">自填，已记录</div></div></div>
+    <div class="check-item check-warn" style="align-items:center">
+      <span class="check-icon">⚠️</span>
+      <div class="check-info"><div class="check-title">上海房产：已填写，认证等级不足</div><div class="check-sub">当前：低级（自填） · 需要：高级（上传房产证）</div></div>
+      <button class="btn btn-primary btn-sm" style="flex-shrink:0;margin-left:8px">去认证</button>
+    </div>
+    <div style="font-size:11.5px;color:var(--text-muted);text-align:center;margin:14px 0 10px">— 或满足另一条件直接进入 —</div>
+    <div class="check-item check-none" style="align-items:center">
+      <span class="check-icon">📋</span>
+      <div class="check-info"><div class="check-title">学历认证：未填写</div><div class="check-sub">填写学历并完成中级认证，也可直接进入</div></div>
+      <button class="btn btn-outline btn-sm" style="flex-shrink:0;margin-left:8px">填写学历</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== DATA MODEL ===== -->
+<div id="sec-datamodel" class="section">
+  <div class="section-header">
+    <h1>数据结构方案</h1>
+    <p>在现有代码基础上的最小改动方案，重点扩展 SubForum 的门槛字段和新增用户扩展档案表。</p>
+  </div>
+  <div class="insight">
+    <div class="insight-title">★ Insight — 改动最小化原则</div>
+    <ul>
+      <li>UserAuthentication 保持不变：继续复用 AuthType + AuthLevel 体系，无破坏性改动</li>
+      <li>新增 user_profiles 表：存储可选扩展字段，不影响现有 User 表结构</li>
+      <li>SubForum.access_rules 改为 JSON：从简单字符串升级为结构化规则，向后兼容</li>
+      <li>ForumAccessService 新增 checkAccess 方法：拒绝结果携带每条条件的满足状态供前端渲染</li>
+    </ul>
+  </div>
+  <div class="card">
+    <div class="card-title">📊 access_rules JSON 结构（替换现有 required_auth_types 字段）</div>
+    <div class="schema-block"><pre class="schema-code"><span class="sc">// sub_forums 表：access_rules LONGTEXT（JSON）</span>
+{
+  <span class="ss">"view"</span>: {
+    <span class="ss">"groupLogic"</span>: <span class="ss">"OR"</span>,         <span class="sc">// OR=满足任一组 | AND=全部满足</span>
+    <span class="ss">"groups"</span>: [
+      {
+        <span class="ss">"innerLogic"</span>: <span class="ss">"AND"</span>,       <span class="sc">// 组内条件全满足</span>
+        <span class="ss">"rules"</span>: [
+          { <span class="ss">"field"</span>: <span class="ss">"gender"</span>,        <span class="ss">"op"</span>: <span class="ss">"eq"</span>,         <span class="ss">"value"</span>: <span class="ss">"MALE"</span>,           <span class="ss">"minAuthLevel"</span>: <span class="ss">"LOW"</span>    },
+          { <span class="ss">"field"</span>: <span class="ss">"age"</span>,           <span class="ss">"op"</span>: <span class="ss">"between"</span>,    <span class="ss">"min"</span>: <span class="st">25</span>, <span class="ss">"max"</span>: <span class="st">45</span>                              },
+          { <span class="ss">"field"</span>: <span class="ss">"property_city"</span>, <span class="ss">"op"</span>: <span class="ss">"containsAny"</span>, <span class="ss">"value"</span>: [<span class="ss">"上海"</span>,<span class="ss">"北京"</span>], <span class="ss">"minAuthLevel"</span>: <span class="ss">"HIGH"</span>  }
+        ]
+      },
+      {
+        <span class="ss">"innerLogic"</span>: <span class="ss">"AND"</span>,
+        <span class="ss">"rules"</span>: [
+          { <span class="ss">"field"</span>: <span class="ss">"education"</span>,     <span class="ss">"op"</span>: <span class="ss">"gte"</span>,        <span class="ss">"value"</span>: <span class="ss">"BACHELOR"</span>,       <span class="ss">"minAuthLevel"</span>: <span class="ss">"MEDIUM"</span> }
+        ]
+      }
+    ]
+  },
+  <span class="ss">"action"</span>: {
+    <span class="ss">"groupLogic"</span>: <span class="ss">"AND"</span>,
+    <span class="ss">"groups"</span>: [
+      { <span class="ss">"innerLogic"</span>: <span class="ss">"AND"</span>, <span class="ss">"rules"</span>: [
+          { <span class="ss">"field"</span>: <span class="ss">"reg_days"</span>, <span class="ss">"op"</span>: <span class="ss">"gte"</span>, <span class="ss">"value"</span>: <span class="st">30</span> }
+        ]
+      }
+    ]
+  }
+}</pre></div>
+  </div>
+  <div class="card">
+    <div class="card-title">👤 新增表：user_profiles（扩展字段，不影响现有 User）</div>
+    <div class="schema-block"><pre class="schema-code"><span class="sk">CREATE TABLE</span> user_profiles (
+  id              <span class="st">BIGINT</span>       PRIMARY KEY AUTO_INCREMENT,
+  user_id         <span class="st">BIGINT</span>       NOT NULL UNIQUE,  <span class="sc">-- FK → users.id</span>
+
+  <span class="sc">-- 基本</span>
+  gender          <span class="st">VARCHAR(10)</span>,     <span class="sc">-- MALE / FEMALE / OTHER</span>
+  birth_year      <span class="st">SMALLINT</span>,        <span class="sc">-- 存年份，运行时计算年龄</span>
+  nationality     <span class="st">VARCHAR(80)</span>,
+  city            <span class="st">VARCHAR(80)</span>,
+
+  <span class="sc">-- 学历</span>
+  education       <span class="st">VARCHAR(20)</span>,     <span class="sc">-- HIGHSCHOOL / BACHELOR / MASTER / PHD</span>
+  school          <span class="st">VARCHAR(120)</span>,
+  major           <span class="st">VARCHAR(120)</span>,
+
+  <span class="sc">-- 职业</span>
+  occupation      <span class="st">VARCHAR(60)</span>,
+  industry        <span class="st">VARCHAR(60)</span>,
+  company         <span class="st">VARCHAR(120)</span>,
+  job_level       <span class="st">VARCHAR(60)</span>,
+
+  <span class="sc">-- 资产（认证等级另存于 user_authentications）</span>
+  property_count  <span class="st">TINYINT</span>,         <span class="sc">-- 0 / 1 / 2+</span>
+  property_cities <span class="st">TEXT</span>,            <span class="sc">-- JSON 数组，如 ["上海","北京"]</span>
+  has_vehicle     <span class="st">BOOLEAN</span>,
+  income_level    <span class="st">VARCHAR(20)</span>,     <span class="sc">-- LOW / MEDIUM / HIGH</span>
+
+  <span class="sc">-- 个人状况</span>
+  marital_status  <span class="st">VARCHAR(20)</span>,
+  interests       <span class="st">TEXT</span>,            <span class="sc">-- JSON 标签数组</span>
+
+  updated_at      <span class="st">DATETIME</span>         NOT NULL
+);</pre></div>
+  </div>
+  <div class="card">
+    <div class="card-title">⚙️ ForumAccessService 扩展逻辑（伪代码）</div>
+    <div class="schema-block"><pre class="schema-code"><span class="sk">public</span> AccessResult checkAccess(Long userId, Long forumId, String action) {
+  SubForum     forum    = subForumRepo.findById(forumId)...;
+  AccessRules  rules    = JsonSupport.parse(forum.getAccessRules());
+  RuleSet      ruleSet  = <span class="ss">"view"</span>.equals(action) ? rules.view() : rules.action();
+
+  <span class="sk">if</span> (ruleSet == null) <span class="sk">return</span> AccessResult.ALLOWED;  <span class="sc">// 无门槛</span>
+
+  UserProfile              profile    = profileRepo.findByUserId(userId)...;
+  Map&lt;ProfileField, AuthLevel&gt; levels = authRepo.getApprovedLevels(userId);
+
+  List&lt;GroupResult&gt; groups = ruleSet.groups().stream()
+      .map(g -> evaluateGroup(g, profile, levels)).toList();
+
+  boolean passed = ruleSet.groupLogic() == OR
+      ? groups.stream().anyMatch(GroupResult::passed)
+      : groups.stream().allMatch(GroupResult::passed);
+
+  <span class="sk">return</span> passed
+      ? AccessResult.ALLOWED
+      : AccessResult.denied(groups);  <span class="sc">// 携带每条条件的满足状态 → 前端精准引导</span>
+}</pre></div>
+  </div>
+</div>
+
+</main>
+</div>
+
+<script>
+function go(id) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  const sec = document.getElementById('sec-' + id);
+  if (sec) sec.classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(n => {
+    n.classList.toggle('active', n.getAttribute('onclick') === "go('" + id + "')");
+  });
+  document.querySelectorAll('.mobile-nav-item').forEach(n => {
+    n.classList.toggle('active', n.getAttribute('onclick') === "go('" + id + "')");
+  });
+  window.scrollTo(0, 0);
+}
+function toggleCat(hdr) {
+  const body = hdr.nextElementSibling;
+  const open = body.classList.toggle('open');
+  hdr.querySelector('.category-arrow').textContent = open ? '▼' : '▶';
+}
+function swTab(btn, id) {
+  btn.closest('.perm-tabs').querySelectorAll('.perm-tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('pbasic').style.display = id === 'pbasic' ? '' : 'none';
+  document.getElementById('pcert').style.display  = id === 'pcert'  ? '' : 'none';
+}
+function swBuilder(btn, id) {
+  btn.closest('.perm-tabs').querySelectorAll('.perm-tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('bview').style.display   = id === 'bview'   ? '' : 'none';
+  document.getElementById('baction').style.display = id === 'baction' ? '' : 'none';
+}
+function togLogic(btn) {
+  btn.closest('.logic-toggle').querySelectorAll('.logic-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+function togGrpLogic(btn) {
+  const isOR = btn.textContent.includes('OR');
+  btn.textContent = isOR ? 'AND 全部组须满足' : 'OR 满足任一组即可进入';
+  btn.classList.toggle('active', isOR);
+}
+function delRule(btn) { btn.closest('.rule-row').remove(); }
+function delGroup(btn) { btn.closest('.rule-group').remove(); }
+function addRule(btn) {
+  const row = document.createElement('div');
+  row.className = 'rule-row';
+  row.innerHTML = `<span class="rule-connector">且</span>
+    <select class="rule-select"><option selected>所在城市</option><option>年龄</option><option>学历</option><option>兴趣爱好</option></select>
+    <select class="rule-select" style="min-width:80px"><option>包含</option><option>不包含</option></select>
+    <input class="rule-input" placeholder="输入值…" style="width:150px"/>
+    <button class="rule-delete" onclick="delRule(this)">✕</button>`;
+  btn.before(row);
+}
+function addGroup(containerId) {
+  const wrap = document.getElementById(containerId);
+  const addBtn = wrap.querySelector('.add-rule-btn:last-of-type');
+  const grp = document.createElement('div');
+  grp.className = 'rule-group';
+  grp.innerHTML = `<div class="rule-group-header">
+      <div class="logic-toggle">新条件组 · 内部逻辑
+        <button class="logic-btn active" onclick="togLogic(this)">AND 全满足</button>
+        <button class="logic-btn" onclick="togLogic(this)">OR 任一满足</button>
+      </div>
+      <button class="rule-delete" onclick="delGroup(this)">🗑 删除组</button>
+    </div>
+    <div class="rule-row">
+      <span class="rule-connector">条件</span>
+      <select class="rule-select"><option selected>年龄</option><option>性别</option><option>学历</option><option>兴趣爱好</option></select>
+      <select class="rule-select" style="min-width:80px"><option>≥</option></select>
+      <input class="rule-input" placeholder="值…" style="width:100px"/>
+      <button class="rule-delete" onclick="delRule(this)">✕</button>
+    </div>
+    <button class="add-rule-btn" onclick="addRule(this)">+ 在此组添加条件</button>`;
+  addBtn.before(grp);
+}
+function toggleTag(el) { el.classList.toggle('selected'); }
+function selCert(opt) {
+  opt.closest('.cert-section').querySelectorAll('.cert-option').forEach(o => o.classList.remove('selected'));
+  opt.classList.add('selected');
+}
+</script>
