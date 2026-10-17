@@ -80,7 +80,7 @@
               :sub-title="result.reason || result.rejectionReason || ''"
             >
               <template #extra>
-                <el-button type="primary" @click="goCenter">返回认证中心</el-button>
+                <el-button type="primary" @click="goCenter">返回资料与认证</el-button>
               </template>
             </el-result>
           </template>
@@ -109,7 +109,7 @@
         >
           下一步
         </el-button>
-        <el-button v-else @click="goCenter">返回认证中心</el-button>
+        <el-button v-else @click="goCenter">返回资料与认证</el-button>
       </div>
     </template>
   </div>
@@ -235,11 +235,7 @@ async function submit() {
 }
 
 function goCenter() {
-  if (route.query.from === 'profile') {
-    router.push('/profile')
-    return
-  }
-  router.push({ name: 'authentication' })
+  router.push('/profile')
 }
 
 async function load() {

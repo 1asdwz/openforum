@@ -29,9 +29,7 @@ const routes: RouteRecordRaw[] = [
   },
   {
     path: '/authentication',
-    name: 'authentication',
-    component: () => import('@/views/AuthenticationCenter.vue'),
-    meta: { requiresAuth: true },
+    redirect: '/profile',
   },
   {
     path: '/authentication/:type/:level',

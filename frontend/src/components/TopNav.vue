@@ -82,8 +82,8 @@
           </span>
           <template #dropdown>
             <el-dropdown-menu>
-              <el-dropdown-item command="profile">个人资料</el-dropdown-item>
-              <el-dropdown-item command="auth">认证中心</el-dropdown-item>
+              <el-dropdown-item command="profile">我的主页</el-dropdown-item>
+              <el-dropdown-item command="info">资料与认证</el-dropdown-item>
               <el-dropdown-item command="myForums">我的社区</el-dropdown-item>
               <el-dropdown-item v-if="auth.isAdmin" command="admin" divided>
                 管理后台
@@ -142,8 +142,8 @@ function onCommand(command: string) {
     case 'profile':
       if (auth.user) router.push(`/u/${auth.user.id}`)
       break
-    case 'auth':
-      router.push('/authentication')
+    case 'info':
+      router.push('/profile')
       break
     case 'myForums':
       router.push({ path: '/', query: { view: 'mine' } })

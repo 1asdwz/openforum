@@ -81,7 +81,6 @@
 
     <div class="rail-card rail-footer">
       <router-link to="/search?tab=forums">查看全部社区</router-link>
-      <router-link to="/authentication">认证中心</router-link>
     </div>
   </aside>
 </template>

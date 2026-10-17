@@ -405,7 +405,6 @@ function goAuth(item: UserInfoItem) {
   router.push({
     name: 'auth-level-wizard',
     params: { type, level: next },
-    query: { from: 'profile' },
   })
 }
 
