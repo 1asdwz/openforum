@@ -5,7 +5,7 @@ use axum::Json;
 use chrono::{Duration, Local, NaiveDateTime};
 use serde::Deserialize;
 use serde_json::{json, Value};
-use sqlx::MySqlPool;
+use sqlx::{MySql, MySqlPool, QueryBuilder};
 
 use crate::error::{ApiError, ApiResult};
 use crate::gate;
@@ -297,6 +297,52 @@ fn visible_posts(rows: Vec<HomepagePostRow>, allowed: &HashSet<i64>) -> Vec<Valu
         .collect()
 }
 
+/// 把可见板块集合写入 `IN (...)` 占位符列表。
+fn push_forum_filter(qb: &mut QueryBuilder<'_, MySql>, ids: &[i64]) {
+    qb.push("(");
+    let mut separated = qb.separated(", ");
+    for id in ids {
+        separated.push_bind(*id);
+    }
+    separated.push_unseparated(")");
+}
+
+/// 统计只覆盖查看者有权浏览的板块，避免通过计数感知受限板块内容。
+async fn viewer_scoped_stats(
+    pool: &MySqlPool,
+    user_id: i64,
+    allowed: &HashSet<i64>,
+) -> Result<(i64, i64, i64), ApiError> {
+    if allowed.is_empty() {
+        return Ok((0, 0, 0));
+    }
+    let mut ids: Vec<i64> = allowed.iter().copied().collect();
+    ids.sort_unstable();
+
+    let mut qb = QueryBuilder::new(
+        "SELECT (SELECT COUNT(*) FROM posts p WHERE p.author_id = ",
+    );
+    qb.push_bind(user_id);
+    qb.push(" AND p.is_removed = 0 AND p.forum_id IN ");
+    push_forum_filter(&mut qb, &ids);
+    qb.push("), (SELECT COUNT(*) FROM comments c JOIN posts p ON p.id = c.post_id WHERE c.author_id = ");
+    qb.push_bind(user_id);
+    qb.push(" AND c.is_removed = 0 AND p.is_removed = 0 AND p.forum_id IN ");
+    push_forum_filter(&mut qb, &ids);
+    qb.push("), (SELECT CAST(COALESCE(SUM(p.upvotes), 0) AS SIGNED) FROM posts p WHERE p.author_id = ");
+    qb.push_bind(user_id);
+    qb.push(" AND p.is_removed = 0 AND p.forum_id IN ");
+    push_forum_filter(&mut qb, &ids);
+    qb.push(") + (SELECT CAST(COALESCE(SUM(c.upvotes), 0) AS SIGNED) FROM comments c JOIN posts p ON p.id = c.post_id WHERE c.author_id = ");
+    qb.push_bind(user_id);
+    qb.push(" AND c.is_removed = 0 AND p.is_removed = 0 AND p.forum_id IN ");
+    push_forum_filter(&mut qb, &ids);
+    qb.push(")");
+
+    let row: (i64, i64, i64) = qb.build_query_as().fetch_one(pool).await?;
+    Ok(row)
+}
+
 fn truncate_bio(raw: Option<&str>) -> Option<String> {
     let text = raw?.trim();
     if text.is_empty() {
@@ -313,7 +359,7 @@ fn truncate_bio(raw: Option<&str>) -> Option<String> {
 /// GET /users/{id}/homepage-data
 ///
 /// 自定义主页数据组件专用：只返回公开资料、公开统计与三个只读帖子列表。
-/// 不返回邮箱、认证信息、用户信息项；列表按查看者的板块浏览权限过滤。
+/// 不返回邮箱、认证信息、用户信息项；统计与列表都按查看者的板块浏览权限过滤。
 pub async fn homepage_data(
     State(state): State<AppState>,
     viewer: CurrentUser,
@@ -324,28 +370,14 @@ pub async fn homepage_data(
     let is_admin = viewer.0.as_ref().map(|u| u.is_admin()).unwrap_or(false);
     let allowed = gate::allowed_forum_ids(&state.pool, viewer_id, is_admin).await?;
 
-    let stats: (i64, i64, i64) = sqlx::query_as(
-        "SELECT \
-           (SELECT COUNT(*) FROM posts WHERE author_id = ? AND is_removed = 0), \
-           (SELECT COUNT(*) FROM comments WHERE author_id = ? AND is_removed = 0), \
-           (SELECT CAST(COALESCE(SUM(upvotes), 0) AS SIGNED) FROM posts \
-              WHERE author_id = ? AND is_removed = 0) \
-           + (SELECT CAST(COALESCE(SUM(upvotes), 0) AS SIGNED) FROM comments \
-              WHERE author_id = ? AND is_removed = 0)",
-    )
-    .bind(id)
-    .bind(id)
-    .bind(id)
-    .bind(id)
-    .fetch_one(&state.pool)
-    .await?;
+    let stats = viewer_scoped_stats(&state.pool, id, &allowed).await?;
 
     let authored: Vec<HomepagePostRow> = sqlx::query_as(
         "SELECT p.id, p.title, p.score, p.comment_count, p.created_at, p.forum_id, \
                 f.name AS forum_name, f.slug AS forum_slug \
          FROM posts p JOIN sub_forums f ON f.id = p.forum_id \
          WHERE p.author_id = ? AND p.is_removed = 0 \
-         ORDER BY p.created_at DESC",
+         ORDER BY p.created_at DESC, p.id DESC",
     )
     .bind(id)
     .fetch_all(&state.pool)
@@ -358,7 +390,7 @@ pub async fn homepage_data(
          JOIN posts p ON p.id = v.target_id \
          JOIN sub_forums f ON f.id = p.forum_id \
          WHERE v.user_id = ? AND v.target_type = 'POST' AND v.value = 1 AND p.is_removed = 0 \
-         ORDER BY v.updated_at DESC",
+         ORDER BY v.updated_at DESC, v.id DESC",
     )
     .bind(id)
     .fetch_all(&state.pool)
@@ -372,7 +404,7 @@ pub async fn homepage_data(
          JOIN sub_forums f ON f.id = p.forum_id \
          WHERE c.author_id = ? AND c.is_removed = 0 AND p.is_removed = 0 \
          GROUP BY p.id, p.title, p.score, p.comment_count, p.created_at, p.forum_id, f.name, f.slug \
-         ORDER BY last_comment_at DESC",
+         ORDER BY last_comment_at DESC, p.id DESC",
     )
     .bind(id)
     .fetch_all(&state.pool)

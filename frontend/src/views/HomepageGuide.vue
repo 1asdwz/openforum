@@ -173,7 +173,7 @@
         <ul class="guide-list">
           <li>组件内的文字是加载中占位，数据到达后会被替换。</li>
           <li>单页最多 20 个组件，所有组件共用一次数据请求。</li>
-          <li>列表只展示你有权浏览的板块内容，最多 10 条；超出部分请用 <code>limit</code> 截断。</li>
+          <li>列表与统计都只覆盖访客有权浏览的板块，最多 10 条；超出部分请用 <code>limit</code> 截断。</li>
           <li>点赞与评论列表是只读的，不能在主页内发起点赞或评论。</li>
           <li>数据加载失败时显示「内容加载失败，请刷新重试」，不会自动重试。</li>
           <li>主页被下架时，访客不会看到自定义内容与数据组件。</li>
@@ -216,6 +216,13 @@
           <p class="faq-a">
             请确认组件标签拼写正确、属性值合法。若网络异常，组件会显示「内容加载失败，请刷新重试」，
             刷新页面即可重试。
+          </p>
+        </div>
+        <div class="faq-item">
+          <p class="faq-q">type 写错或 limit 超出范围会怎样？</p>
+          <p class="faq-a">
+            非法的 <code>type</code> 与超出 1–10 的 <code>limit</code> 会被移除，组件不会报错，而是按默认值
+            <code>type="authored"</code>、<code>limit="5"</code> 展示。保存前请对照上表检查属性值。
           </p>
         </div>
         <div class="faq-item">
