@@ -36,6 +36,7 @@ pub fn router() -> Router<AppState> {
         .route("/users/me/homepage/reset", post(homepages::reset))
         .route("/users/:id/homepage", get(homepages::public_get))
         .route("/users/:id/homepage/report", post(homepages::report))
+        .route("/users/:id/homepage-data", get(homepages::homepage_data))
         // -------- 用户资料 --------
         .route("/info/fields", get(info::fields))
         .route("/info/me", get(info::me))

@@ -53,7 +53,8 @@
           <section class="content-card">
             <div class="editor-toolbar">
               <el-button size="small" @click="pickImage">插入图片</el-button>
-              <el-button size="small" @click="insertExample">插入示例模板</el-button>
+              <el-button size="small" @click="insertExample">插入完整示例</el-button>
+              <el-button size="small" @click="goGuide">组件文档</el-button>
               <el-button size="small" @click="html = ''">清空</el-button>
               <span class="byte-count" :class="{ over: byteCount > MAX_BYTES }">
                 {{ sizeText }} / 64 KB
@@ -79,12 +80,17 @@
               <li>仅支持站内图片，外链图片会被移除。</li>
               <li>仅支持 <code>style</code> 属性，不支持 <code>&lt;style&gt;</code> 标签。</li>
               <li>外部链接点击时会弹出安全风险提示。</li>
+              <li>
+                可用 <code>&lt;of-profile&gt;</code>、<code>&lt;of-stats&gt;</code>、<code>&lt;of-posts&gt;</code>
+                展示公开资料、统计与帖子列表，详见
+                <el-button link type="primary" size="small" @click="goGuide">组件文档</el-button>。
+              </li>
             </ul>
           </section>
 
           <section class="content-card">
             <h2 class="editor-section-title">实时预览</h2>
-            <SafeHomepageFrame :html="html" />
+            <SafeHomepageFrame :html="html" :user-id="auth.user?.id || 0" />
           </section>
         </template>
 
@@ -115,18 +121,11 @@ import { homepageApi, mediaApi } from '@/api'
 import { useAuthStore } from '@/stores/auth'
 import type { HomepageMode, MyHomepage } from '@/types'
 import { errorMessage } from '@/utils/format'
+import { HOMEPAGE_EXAMPLE_HTML } from '@/utils/homepageGuide'
 
 const MAX_BYTES = 65_536
 
-const EXAMPLE_HTML = `<section style="padding:32px;border-radius:16px;background:#f6f8ff">
-  <h1 style="margin:0 0 12px;font-size:28px">你好，我是……</h1>
-  <p style="margin:0 0 16px;line-height:1.8;color:#4b5563">
-    欢迎来到我的主页。这里可以写下自我介绍、兴趣方向与联系方式。
-  </p>
-  <p style="margin:0">
-    <a href="https://example.com" style="color:#2563eb">我的博客</a>
-  </p>
-</section>`
+const EXAMPLE_HTML = HOMEPAGE_EXAMPLE_HTML
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -273,6 +272,10 @@ function insertExample() {
 
 function goProfile() {
   if (auth.user) router.push(`/u/${auth.user.id}`)
+}
+
+function goGuide() {
+  router.push('/settings/homepage/guide')
 }
 
 onBeforeRouteLeave(async () => {

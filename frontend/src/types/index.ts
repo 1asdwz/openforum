@@ -259,6 +259,33 @@ export interface MyHomepage {
   updatedAt: string | null
 }
 
+/** 自定义主页数据组件中的帖子条目 */
+export interface HomepageDataPost {
+  id: number
+  title: string
+  forumName: string
+  forumSlug: string
+  score: number
+  commentCount: number
+  createdAt: string
+}
+
+/** 自定义主页数据组件所需的公开数据 */
+export interface HomepageData {
+  profile: {
+    id: number
+    username: string
+    avatar: string | null
+    bio: string | null
+    role: Role
+    createdAt: string
+  }
+  stats: { posts: number; comments: number; upvotes: number }
+  posts: HomepageDataPost[]
+  liked: HomepageDataPost[]
+  commented: HomepageDataPost[]
+}
+
 /** 管理后台个人主页条目 */
 export interface AdminHomepageItem {
   userId: number

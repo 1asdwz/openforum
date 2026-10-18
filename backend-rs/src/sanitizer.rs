@@ -29,8 +29,9 @@ pub fn sanitize_homepage(html: &str) -> String {
         "a", "abbr", "article", "aside", "b", "blockquote", "br", "caption", "code", "col",
         "colgroup", "dd", "del", "details", "div", "dl", "dt", "em", "figcaption", "figure",
         "footer", "h1", "h2", "h3", "h4", "h5", "h6", "header", "hr", "i", "img", "ins", "li",
-        "main", "mark", "nav", "ol", "p", "pre", "q", "s", "section", "small", "span", "strong",
-        "sub", "summary", "sup", "table", "tbody", "td", "tfoot", "th", "thead", "tr", "u", "ul",
+        "main", "mark", "nav", "of-posts", "of-profile", "of-stats", "ol", "p", "pre", "q", "s",
+        "section", "small", "span", "strong", "sub", "summary", "sup", "table", "tbody", "td",
+        "tfoot", "th", "thead", "tr", "u", "ul",
     ]);
 
     let mut clean_content_tags: HashSet<&'static str> = HashSet::new();
@@ -53,6 +54,9 @@ pub fn sanitize_homepage(html: &str) -> String {
     tag_attributes.insert("ol", HashSet::from(["start"]));
     tag_attributes.insert("li", HashSet::from(["value"]));
     tag_attributes.insert("details", HashSet::from(["open"]));
+    tag_attributes.insert("of-profile", HashSet::from(["heading"]));
+    tag_attributes.insert("of-stats", HashSet::from(["heading"]));
+    tag_attributes.insert("of-posts", HashSet::from(["type", "limit", "heading"]));
 
     let mut url_schemes: HashSet<&'static str> = HashSet::new();
     url_schemes.extend(["http", "https", "mailto"]);
@@ -75,6 +79,17 @@ pub fn sanitize_homepage(html: &str) -> String {
             }
             if element == "a" && attribute.eq_ignore_ascii_case("href") {
                 return is_safe_href(value).then_some(Cow::Borrowed(value));
+            }
+            if element.starts_with("of-") {
+                if attribute.eq_ignore_ascii_case("type") {
+                    return normalize_component_type(value).map(Cow::Owned);
+                }
+                if attribute.eq_ignore_ascii_case("limit") {
+                    return normalize_component_limit(value).map(Cow::Owned);
+                }
+                if attribute.eq_ignore_ascii_case("heading") {
+                    return normalize_component_heading(value).map(Cow::Owned);
+                }
             }
             if value.chars().any(char::is_control) {
                 return None;
@@ -107,6 +122,28 @@ fn is_safe_href(value: &str) -> bool {
     }
     let lower = value.to_ascii_lowercase();
     lower.starts_with("http://") || lower.starts_with("https://") || lower.starts_with("mailto:")
+}
+
+/// 数据组件的列表类型；非法值直接丢弃属性。
+fn normalize_component_type(value: &str) -> Option<String> {
+    let value = value.trim().to_ascii_lowercase();
+    matches!(value.as_str(), "authored" | "liked" | "commented").then_some(value)
+}
+
+/// 数据组件的条数：只接受 1–10 的十进制整数。
+fn normalize_component_limit(value: &str) -> Option<String> {
+    let value = value.trim();
+    let limit: u32 = value.parse().ok()?;
+    (1..=10).contains(&limit).then(|| limit.to_string())
+}
+
+/// 数据组件的标题：1–30 个字符，且不含控制字符。
+fn normalize_component_heading(value: &str) -> Option<String> {
+    let value = value.trim();
+    if value.is_empty() || value.chars().count() > 30 || value.chars().any(char::is_control) {
+        return None;
+    }
+    Some(value.to_string())
 }
 
 /// 内联 CSS 属性白名单。
@@ -425,6 +462,42 @@ mod tests {
         assert!(out.contains("position:fixed"));
         assert!(!out.contains("animation"));
         assert!(!out.contains("unknown"));
+    }
+
+    #[test]
+    fn keeps_component_tags_and_valid_attributes() {
+        let out = sanitize_homepage(
+            r#"<of-profile heading="关于我"></of-profile><of-stats heading="数据"></of-stats><of-posts type="liked" limit="10" heading="我点赞的帖子">加载中</of-posts>"#,
+        );
+        assert!(out.contains("<of-profile"), "{out}");
+        assert!(out.contains("<of-stats"), "{out}");
+        assert!(out.contains(r#"type="liked""#), "{out}");
+        assert!(out.contains(r#"limit="10""#), "{out}");
+        assert!(out.contains("我点赞的帖子"), "{out}");
+        assert!(out.contains("加载中"), "{out}");
+    }
+
+    #[test]
+    fn drops_invalid_component_attributes() {
+        let out = sanitize_homepage(
+            r#"<of-posts type="evil" limit="999" heading="这是一段超过三十个字符的标题这是一段超过三十个字符的标题这是一段超过三十个字符的标题" onclick="alert(1)">x</of-posts>"#,
+        );
+        assert!(!out.contains("type="), "{out}");
+        assert!(!out.contains("limit="), "{out}");
+        assert!(!out.contains("heading="), "{out}");
+        assert!(!out.contains("onclick"), "{out}");
+
+        for bad in [r#"<of-posts limit="0">x</of-posts>"#, r#"<of-posts limit="11">x</of-posts>"#, r#"<of-posts limit="abc">x</of-posts>"#] {
+            let out = sanitize_homepage(bad);
+            assert!(!out.contains("limit="), "{bad} -> {out}");
+        }
+    }
+
+    #[test]
+    fn unknown_of_tags_are_stripped() {
+        let out = sanitize_homepage("<of-foo>hello</of-foo>");
+        assert!(!out.contains("of-foo"), "{out}");
+        assert!(out.contains("hello"), "{out}");
     }
 
     #[test]

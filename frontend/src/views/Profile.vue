@@ -48,7 +48,7 @@
             style="margin-bottom: 12px"
           />
           <div class="content-card homepage-frame-card">
-            <SafeHomepageFrame :html="homepage?.html || ''" />
+            <SafeHomepageFrame :html="homepage?.html || ''" :user-id="profile?.id || 0" />
           </div>
           <div v-if="!isSelf" class="homepage-report-row">
             <el-button text type="info" size="small" @click="openReport">

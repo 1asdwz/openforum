@@ -1,11 +1,14 @@
+use std::collections::HashSet;
+
 use axum::extract::{Path, State};
 use axum::Json;
-use chrono::{Duration, Local};
+use chrono::{Duration, Local, NaiveDateTime};
 use serde::Deserialize;
 use serde_json::{json, Value};
 use sqlx::MySqlPool;
 
 use crate::error::{ApiError, ApiResult};
+use crate::gate;
 use crate::json as j;
 use crate::models::UserHomepage;
 use crate::repo;
@@ -254,4 +257,143 @@ pub async fn report(
     .await?;
 
     Ok(j::ok(json!({ "ok": true })))
+}
+
+/// 单个列表最多返回的条数。
+const HOMEPAGE_LIST_LIMIT: usize = 10;
+/// 简介最多展示的字符数。
+const HOMEPAGE_BIO_CHARS: usize = 200;
+
+#[derive(Debug, sqlx::FromRow)]
+struct HomepagePostRow {
+    id: i64,
+    title: String,
+    score: i32,
+    comment_count: i32,
+    created_at: NaiveDateTime,
+    forum_id: i64,
+    forum_name: String,
+    forum_slug: String,
+}
+
+fn post_row_json(row: &HomepagePostRow) -> Value {
+    json!({
+        "id": row.id,
+        "title": row.title,
+        "forumName": row.forum_name,
+        "forumSlug": row.forum_slug,
+        "score": row.score,
+        "commentCount": row.comment_count,
+        "createdAt": j::jts(row.created_at),
+    })
+}
+
+/// 先按查看者可见板块过滤，再截断，避免被隐藏内容占用条数。
+fn visible_posts(rows: Vec<HomepagePostRow>, allowed: &HashSet<i64>) -> Vec<Value> {
+    rows.into_iter()
+        .filter(|row| allowed.contains(&row.forum_id))
+        .take(HOMEPAGE_LIST_LIMIT)
+        .map(|row| post_row_json(&row))
+        .collect()
+}
+
+fn truncate_bio(raw: Option<&str>) -> Option<String> {
+    let text = raw?.trim();
+    if text.is_empty() {
+        return None;
+    }
+    if text.chars().count() <= HOMEPAGE_BIO_CHARS {
+        return Some(text.to_string());
+    }
+    let mut out: String = text.chars().take(HOMEPAGE_BIO_CHARS - 1).collect();
+    out.push('…');
+    Some(out)
+}
+
+/// GET /users/{id}/homepage-data
+///
+/// 自定义主页数据组件专用：只返回公开资料、公开统计与三个只读帖子列表。
+/// 不返回邮箱、认证信息、用户信息项；列表按查看者的板块浏览权限过滤。
+pub async fn homepage_data(
+    State(state): State<AppState>,
+    viewer: CurrentUser,
+    Path(id): Path<i64>,
+) -> ApiResult<Json<Value>> {
+    let user = repo::require_user(&state.pool, id).await?;
+    let viewer_id = viewer.0.as_ref().map(|u| u.id);
+    let is_admin = viewer.0.as_ref().map(|u| u.is_admin()).unwrap_or(false);
+    let allowed = gate::allowed_forum_ids(&state.pool, viewer_id, is_admin).await?;
+
+    let stats: (i64, i64, i64) = sqlx::query_as(
+        "SELECT \
+           (SELECT COUNT(*) FROM posts WHERE author_id = ? AND is_removed = 0), \
+           (SELECT COUNT(*) FROM comments WHERE author_id = ? AND is_removed = 0), \
+           (SELECT CAST(COALESCE(SUM(upvotes), 0) AS SIGNED) FROM posts \
+              WHERE author_id = ? AND is_removed = 0) \
+           + (SELECT CAST(COALESCE(SUM(upvotes), 0) AS SIGNED) FROM comments \
+              WHERE author_id = ? AND is_removed = 0)",
+    )
+    .bind(id)
+    .bind(id)
+    .bind(id)
+    .bind(id)
+    .fetch_one(&state.pool)
+    .await?;
+
+    let authored: Vec<HomepagePostRow> = sqlx::query_as(
+        "SELECT p.id, p.title, p.score, p.comment_count, p.created_at, p.forum_id, \
+                f.name AS forum_name, f.slug AS forum_slug \
+         FROM posts p JOIN sub_forums f ON f.id = p.forum_id \
+         WHERE p.author_id = ? AND p.is_removed = 0 \
+         ORDER BY p.created_at DESC",
+    )
+    .bind(id)
+    .fetch_all(&state.pool)
+    .await?;
+
+    let liked: Vec<HomepagePostRow> = sqlx::query_as(
+        "SELECT p.id, p.title, p.score, p.comment_count, p.created_at, p.forum_id, \
+                f.name AS forum_name, f.slug AS forum_slug \
+         FROM votes v \
+         JOIN posts p ON p.id = v.target_id \
+         JOIN sub_forums f ON f.id = p.forum_id \
+         WHERE v.user_id = ? AND v.target_type = 'POST' AND v.value = 1 AND p.is_removed = 0 \
+         ORDER BY v.updated_at DESC",
+    )
+    .bind(id)
+    .fetch_all(&state.pool)
+    .await?;
+
+    let commented: Vec<HomepagePostRow> = sqlx::query_as(
+        "SELECT p.id, p.title, p.score, p.comment_count, p.created_at, p.forum_id, \
+                f.name AS forum_name, f.slug AS forum_slug, MAX(c.created_at) AS last_comment_at \
+         FROM comments c \
+         JOIN posts p ON p.id = c.post_id \
+         JOIN sub_forums f ON f.id = p.forum_id \
+         WHERE c.author_id = ? AND c.is_removed = 0 AND p.is_removed = 0 \
+         GROUP BY p.id, p.title, p.score, p.comment_count, p.created_at, p.forum_id, f.name, f.slug \
+         ORDER BY last_comment_at DESC",
+    )
+    .bind(id)
+    .fetch_all(&state.pool)
+    .await?;
+
+    Ok(j::ok(json!({
+        "profile": {
+            "id": user.id,
+            "username": user.username,
+            "avatar": user.avatar,
+            "bio": truncate_bio(user.bio.as_deref()),
+            "role": user.role,
+            "createdAt": j::jts(user.created_at),
+        },
+        "stats": {
+            "posts": stats.0,
+            "comments": stats.1,
+            "upvotes": stats.2,
+        },
+        "posts": visible_posts(authored, &allowed),
+        "liked": visible_posts(liked, &allowed),
+        "commented": visible_posts(commented, &allowed),
+    })))
 }

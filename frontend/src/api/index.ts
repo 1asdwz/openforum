@@ -9,6 +9,7 @@ import type {
   CustomPageInfo,
   ForumMember,
   GateRule,
+  HomepageData,
   HomepageMode,
   InfoFieldGroup,
   MediaKind,
@@ -74,6 +75,9 @@ export const userApi = {
 export const homepageApi = {
   /** 公开读取某用户主页 */
   get: (id: number | string) => api.get<PublicHomepage>(`/users/${id}/homepage`),
+  /** 数据组件所需的公开资料、统计与只读列表 */
+  data: (id: number | string) =>
+    api.get<HomepageData>(`/users/${id}/homepage-data`, { skipAuthRedirect: true }),
   /** 读取自己的主页配置 */
   mine: () => api.get<MyHomepage>('/users/me/homepage'),
   /** 保存模式与自定义 HTML */
