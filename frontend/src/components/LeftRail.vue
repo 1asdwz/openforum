@@ -32,6 +32,15 @@
       </router-link>
       <router-link
         v-if="auth.user"
+        to="/settings/homepage"
+        class="rail-nav-item"
+        :class="{ active: route.name === 'homepage-settings' }"
+      >
+        <IconUser class="rail-ico" />
+        <span>主页装修</span>
+      </router-link>
+      <router-link
+        v-if="auth.user"
         to="/profile"
         class="rail-nav-item"
         :class="{ active: route.name === 'my-info' }"

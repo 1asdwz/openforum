@@ -1,7 +1,7 @@
 use axum::extract::{Path, Query, State};
 use axum::Json;
 use serde::Deserialize;
-use serde_json::Value;
+use serde_json::{json, Value};
 
 use crate::enums::AuthLevel;
 use crate::error::{ApiError, ApiResult};
@@ -9,7 +9,7 @@ use crate::json as j;
 use crate::models::UserAuthentication;
 use crate::repo;
 use crate::routes::authentications::auth_dto;
-use crate::routes::{forums, users};
+use crate::routes::{forums, homepages, users};
 use crate::security::CurrentUser;
 use crate::state::AppState;
 
@@ -188,4 +188,133 @@ pub async fn list_users(
 ) -> ApiResult<Json<Value>> {
     admin.require_admin()?;
     users::list_users_page(&state, qp.page, qp.size).await
+}
+
+#[derive(Debug, Deserialize)]
+pub struct HomepageListQuery {
+    #[serde(default = "default_all")]
+    pub status: String,
+    #[serde(default)]
+    pub page: i32,
+    #[serde(default = "default_size")]
+    pub size: i32,
+}
+
+fn default_all() -> String {
+    "ALL".to_string()
+}
+
+#[derive(Debug, sqlx::FromRow)]
+struct AdminHomepageRow {
+    user_id: i64,
+    username: String,
+    mode: String,
+    status: String,
+    size_bytes: i32,
+    block_reason: Option<String>,
+    updated_at: chrono::NaiveDateTime,
+    report_count: i64,
+}
+
+/// GET /admin/user-homepages
+pub async fn list_user_homepages(
+    State(state): State<AppState>,
+    admin: CurrentUser,
+    Query(qp): Query<HomepageListQuery>,
+) -> ApiResult<Json<Value>> {
+    admin.require_admin()?;
+    let status = qp.status.trim().to_ascii_uppercase();
+    if !matches!(status.as_str(), "ALL" | "ACTIVE" | "BLOCKED") {
+        return Err(ApiError::bad_request(format!("非法的状态: {}", qp.status)));
+    }
+
+    let mut rows: Vec<AdminHomepageRow> = sqlx::query_as(
+        "SELECT h.user_id, u.username, h.mode, h.status, h.size_bytes, h.block_reason, h.updated_at, \
+         (SELECT COUNT(*) FROM user_homepage_reports r WHERE r.user_id = h.user_id) AS report_count \
+         FROM user_homepages h JOIN users u ON u.id = h.user_id \
+         WHERE h.mode = 'CUSTOM' ORDER BY h.updated_at DESC",
+    )
+    .fetch_all(&state.pool)
+    .await?;
+    if status != "ALL" {
+        rows.retain(|r| r.status == status);
+    }
+
+    let total = rows.len() as i64;
+    let (slice, _) = j::slice_page(rows, qp.page, qp.size);
+    let content: Vec<Value> = slice
+        .iter()
+        .map(|r| {
+            json!({
+                "userId": r.user_id,
+                "username": r.username,
+                "mode": r.mode,
+                "status": r.status,
+                "sizeBytes": r.size_bytes,
+                "blockReason": r.block_reason,
+                "reportCount": r.report_count,
+                "updatedAt": j::jts(r.updated_at),
+            })
+        })
+        .collect();
+    Ok(j::ok(j::PageResponse::of(content, qp.page, qp.size, total)))
+}
+
+/// POST /admin/user-homepages/{userId}/block
+pub async fn block_user_homepage(
+    State(state): State<AppState>,
+    admin: CurrentUser,
+    Path(user_id): Path<i64>,
+    body: Option<Json<Value>>,
+) -> ApiResult<Json<Value>> {
+    let me = admin.require_admin()?;
+    let reason = body
+        .as_ref()
+        .and_then(|Json(v)| v.get("reason").and_then(|r| r.as_str()))
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .ok_or_else(|| ApiError::bad_request("请填写下架原因"))?;
+    let chars = reason.chars().count();
+    if !(2..=200).contains(&chars) {
+        return Err(ApiError::bad_request("下架原因需为 2-200 个字符"));
+    }
+
+    homepages::find_homepage(&state.pool, user_id)
+        .await?
+        .filter(|r| r.mode == "CUSTOM")
+        .ok_or_else(|| ApiError::not_found("该用户没有自定义主页"))?;
+
+    sqlx::query(
+        "UPDATE user_homepages SET status = 'BLOCKED', block_reason = ?, blocked_by = ?, \
+         blocked_at = ? WHERE user_id = ?",
+    )
+    .bind(&reason)
+    .bind(me.id)
+    .bind(chrono::Local::now().naive_local())
+    .bind(user_id)
+    .execute(&state.pool)
+    .await?;
+    Ok(j::ok(json!({ "ok": true })))
+}
+
+/// POST /admin/user-homepages/{userId}/unblock
+pub async fn unblock_user_homepage(
+    State(state): State<AppState>,
+    admin: CurrentUser,
+    Path(user_id): Path<i64>,
+) -> ApiResult<Json<Value>> {
+    admin.require_admin()?;
+    homepages::find_homepage(&state.pool, user_id)
+        .await?
+        .filter(|r| r.mode == "CUSTOM")
+        .ok_or_else(|| ApiError::not_found("该用户没有自定义主页"))?;
+
+    sqlx::query(
+        "UPDATE user_homepages SET status = 'ACTIVE', block_reason = NULL, blocked_by = NULL, \
+         blocked_at = NULL WHERE user_id = ?",
+    )
+    .bind(user_id)
+    .execute(&state.pool)
+    .await?;
+    Ok(j::ok(json!({ "ok": true })))
 }

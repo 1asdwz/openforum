@@ -237,6 +237,40 @@ export interface PageResult<T> {
   total: number
 }
 
+export type HomepageMode = 'NORMAL' | 'CUSTOM'
+export type HomepageStatus = 'ACTIVE' | 'BLOCKED'
+
+/** 公开主页视图：仅 CUSTOM 可见时返回 html；被下架时对他人只返回 NORMAL */
+export interface PublicHomepage {
+  mode: HomepageMode
+  html?: string
+  blocked?: boolean
+  blockReason?: string | null
+  updatedAt?: string | null
+}
+
+/** 本人主页配置 */
+export interface MyHomepage {
+  mode: HomepageMode
+  html: string | null
+  status: HomepageStatus
+  blockReason: string | null
+  sizeBytes: number
+  updatedAt: string | null
+}
+
+/** 管理后台个人主页条目 */
+export interface AdminHomepageItem {
+  userId: number
+  username: string
+  mode: HomepageMode
+  status: HomepageStatus
+  sizeBytes: number
+  blockReason?: string | null
+  reportCount: number
+  updatedAt?: string | null
+}
+
 /** 信息项目录 */
 export interface InfoField {
   fieldKey: string

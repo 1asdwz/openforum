@@ -111,6 +111,67 @@
           </div>
         </div>
       </el-tab-pane>
+
+      <el-tab-pane label="个人主页" name="homepages">
+        <div class="admin-filter">
+          <span>状态筛选：</span>
+          <el-select
+            v-model="homepageFilter"
+            size="small"
+            style="width: 140px"
+            @change="loadHomepages"
+          >
+            <el-option label="全部" value="ALL" />
+            <el-option label="已发布" value="ACTIVE" />
+            <el-option label="已下架" value="BLOCKED" />
+          </el-select>
+        </div>
+        <el-skeleton v-if="homepagesLoading" :rows="4" animated />
+        <div v-else-if="!homepageItems.length" class="state-box">暂无自定义个人主页</div>
+        <div v-else class="record-list">
+          <div v-for="item in homepageItems" :key="item.userId" class="record-item">
+            <div style="flex: 1">
+              <div style="font-weight: 600">
+                {{ item.username }}
+                <el-tag
+                  size="small"
+                  :type="item.status === 'BLOCKED' ? 'danger' : 'success'"
+                  effect="plain"
+                >
+                  {{ item.status === 'BLOCKED' ? '已下架' : '已发布' }}
+                </el-tag>
+              </div>
+              <div class="sidebar-item-meta">
+                大小 {{ sizeText(item.sizeBytes) }} · 举报 {{ item.reportCount }} · 更新于
+                {{ formatDate(item.updatedAt) || '-' }}
+              </div>
+              <div v-if="item.blockReason" class="sidebar-item-meta">
+                下架原因：{{ item.blockReason }}
+              </div>
+            </div>
+            <div style="display: flex; gap: 8px">
+              <el-button size="small" @click="openHomepage(item)">查看</el-button>
+              <el-button
+                v-if="item.status === 'BLOCKED'"
+                type="success"
+                size="small"
+                @click="unblockHomepage(item)"
+              >
+                恢复
+              </el-button>
+              <el-button
+                v-else
+                type="danger"
+                size="small"
+                plain
+                @click="blockHomepage(item)"
+              >
+                下架
+              </el-button>
+            </div>
+          </div>
+        </div>
+      </el-tab-pane>
     </el-tabs>
 
     <el-dialog v-model="previewVisible" title="自定义页面预览" width="720px">
@@ -134,6 +195,7 @@ import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { adminApi, authenticationApi } from '@/api'
 import { useAuthStore } from '@/stores/auth'
+import type { AdminHomepageItem } from '@/types'
 import {
   authLevelLabel,
   authTypeLabel,
@@ -201,6 +263,77 @@ const LEVEL_OPTIONS = [
 const mediaUrls = ref<Record<number, string>>({})
 const mediaVisible = ref(false)
 const mediaPreviewUrl = ref('')
+
+const homepageItems = ref<AdminHomepageItem[]>([])
+const homepagesLoading = ref(false)
+const homepageFilter = ref('ALL')
+
+function sizeText(bytes: number): string {
+  if (!bytes) return '0 B'
+  return bytes >= 1024 ? `${(bytes / 1024).toFixed(1)} KB` : `${bytes} B`
+}
+
+async function loadHomepages() {
+  homepagesLoading.value = true
+  try {
+    const payload = await adminApi.userHomepages({
+      status: homepageFilter.value,
+      page: 1,
+      size: 50,
+    })
+    homepageItems.value = normalizePage<AdminHomepageItem>(payload).items
+  } catch (e) {
+    ElMessage.error(errorMessage(e, '个人主页加载失败'))
+  } finally {
+    homepagesLoading.value = false
+  }
+}
+
+function openHomepage(item: AdminHomepageItem) {
+  window.open(`${import.meta.env.BASE_URL}u/${item.userId}`, '_blank', 'noopener,noreferrer')
+}
+
+async function blockHomepage(item: AdminHomepageItem) {
+  try {
+    const { value } = await ElMessageBox.prompt(
+      `下架 ${item.username} 的自定义主页，请填写原因`,
+      '下架个人主页',
+      {
+        inputPlaceholder: '下架原因（2-200 字）',
+        confirmButtonText: '确认下架',
+        cancelButtonText: '取消',
+        inputValidator: (v: string) => {
+          const len = (v || '').trim().length
+          return len >= 2 && len <= 200 ? true : '原因需为 2-200 个字符'
+        },
+      }
+    )
+    await adminApi.blockUserHomepage(item.userId, value.trim())
+    ElMessage.success('已下架')
+    loadHomepages()
+  } catch {
+    /* 取消或失败 */
+  }
+}
+
+async function unblockHomepage(item: AdminHomepageItem) {
+  try {
+    await ElMessageBox.confirm(
+      `恢复 ${item.username} 的自定义主页？恢复后立即重新公开。`,
+      '恢复个人主页',
+      { confirmButtonText: '确认恢复', cancelButtonText: '取消', type: 'warning' }
+    )
+  } catch {
+    return
+  }
+  try {
+    await adminApi.unblockUserHomepage(item.userId)
+    ElMessage.success('已恢复')
+    loadHomepages()
+  } catch (e) {
+    ElMessage.error(errorMessage(e, '恢复失败'))
+  }
+}
 
 function livenessText(item: AdminAuthItem): string {
   const l = item.liveness
@@ -345,6 +478,7 @@ onMounted(async () => {
   }
   loadAuth()
   loadPages()
+  loadHomepages()
 })
 
 onBeforeUnmount(() => {

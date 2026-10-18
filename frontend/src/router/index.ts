@@ -49,6 +49,12 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/views/Profile.vue'),
   },
   {
+    path: '/settings/homepage',
+    name: 'homepage-settings',
+    component: () => import('@/views/HomepageEditor.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
     path: '/f/:slug/settings',
     name: 'forum-settings',
     component: () => import('@/views/ForumSettings.vue'),

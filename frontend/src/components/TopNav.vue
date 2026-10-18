@@ -83,6 +83,7 @@
           <template #dropdown>
             <el-dropdown-menu>
               <el-dropdown-item command="profile">我的主页</el-dropdown-item>
+              <el-dropdown-item command="homepage">主页装修</el-dropdown-item>
               <el-dropdown-item command="info">资料与认证</el-dropdown-item>
               <el-dropdown-item command="myForums">我的社区</el-dropdown-item>
               <el-dropdown-item v-if="auth.isAdmin" command="admin" divided>
@@ -144,6 +145,9 @@ function onCommand(command: string) {
       break
     case 'info':
       router.push('/profile')
+      break
+    case 'homepage':
+      router.push('/settings/homepage')
       break
     case 'myForums':
       router.push({ path: '/', query: { view: 'mine' } })

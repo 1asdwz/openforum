@@ -3,6 +3,7 @@ pub mod auth;
 pub mod authentications;
 pub mod comments;
 pub mod forums;
+pub mod homepages;
 pub mod info;
 pub mod media;
 pub mod plugins;
@@ -27,6 +28,14 @@ pub fn router() -> Router<AppState> {
         .route("/users/:id", get(users::profile))
         .route("/users/:id/posts", get(users::user_posts))
         .route("/users/:id/comments", get(users::user_comments))
+        // -------- 个人主页 --------
+        .route(
+            "/users/me/homepage",
+            get(homepages::my_get).put(homepages::save),
+        )
+        .route("/users/me/homepage/reset", post(homepages::reset))
+        .route("/users/:id/homepage", get(homepages::public_get))
+        .route("/users/:id/homepage/report", post(homepages::report))
         // -------- 用户资料 --------
         .route("/info/fields", get(info::fields))
         .route("/info/me", get(info::me))
@@ -101,7 +110,28 @@ pub fn router() -> Router<AppState> {
             post(admin::reject_custom_page),
         )
         .route("/admin/users", get(admin::list_users))
+        .route("/admin/user-homepages", get(admin::list_user_homepages))
+        .route(
+            "/admin/user-homepages/:userId/block",
+            post(admin::block_user_homepage),
+        )
+        .route(
+            "/admin/user-homepages/:userId/unblock",
+            post(admin::unblock_user_homepage),
+        )
         // -------- 插件 --------
         .route("/plugins", get(plugins::list))
         .route("/plugins/:key/enabled", put(plugins::set_enabled))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// 路由表存在静态段与参数段混用（如 `/users/me/homepage` 与 `/users/:id/homepage`），
+    /// 构建时若冲突 axum 会 panic，这里做一次兜底校验。
+    #[test]
+    fn router_builds_without_conflicts() {
+        let _ = router();
+    }
 }

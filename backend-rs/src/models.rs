@@ -109,6 +109,17 @@ pub struct AuthMedia {
     pub size_bytes: Option<i64>,
 }
 
+/// 用户个人主页配置；无记录等价于「普通主页 + 无自定义内容」。
+#[derive(Debug, Clone, FromRow)]
+pub struct UserHomepage {
+    pub mode: String,
+    pub html: Option<String>,
+    pub status: String,
+    pub block_reason: Option<String>,
+    pub size_bytes: i32,
+    pub updated_at: NaiveDateTime,
+}
+
 /// 作者精简信息（对应 Java `AuthorDTO`）。
 #[derive(Debug, Clone, Serialize)]
 pub struct AuthorDto {

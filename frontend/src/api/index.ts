@@ -9,10 +9,13 @@ import type {
   CustomPageInfo,
   ForumMember,
   GateRule,
+  HomepageMode,
   InfoFieldGroup,
   MediaKind,
   MediaUploadResult,
+  MyHomepage,
   Post,
+  PublicHomepage,
   SubForum,
   User,
   UserInfoResponse,
@@ -66,6 +69,21 @@ export const userApi = {
     api.get<unknown>(`/users/${id}/comments`, { params: shiftPage(params) }),
   updateMe: (payload: { avatar?: string; bio?: string }) =>
     api.put<User>('/users/me', payload),
+}
+
+export const homepageApi = {
+  /** 公开读取某用户主页 */
+  get: (id: number | string) => api.get<PublicHomepage>(`/users/${id}/homepage`),
+  /** 读取自己的主页配置 */
+  mine: () => api.get<MyHomepage>('/users/me/homepage'),
+  /** 保存模式与自定义 HTML */
+  save: (payload: { mode: HomepageMode; html?: string }) =>
+    api.put<MyHomepage>('/users/me/homepage', payload),
+  /** 重置为普通主页并清除举报记录 */
+  reset: () => api.post<MyHomepage>('/users/me/homepage/reset'),
+  /** 举报他人的自定义主页 */
+  report: (id: number | string, reason: string) =>
+    api.post<{ ok: boolean }>(`/users/${id}/homepage/report`, { reason }),
 }
 
 export const infoApi = {
@@ -193,4 +211,10 @@ export const adminApi = {
   rejectCustomPage: (id: number | string, reason?: string) =>
     api.post<unknown>(`/admin/custom-pages/${id}/reject`, { reason }),
   users: () => api.get<unknown>('/admin/users'),
+  userHomepages: (params: { status?: string; page?: number; size?: number } = {}) =>
+    api.get<unknown>('/admin/user-homepages', { params: shiftPage(params) }),
+  blockUserHomepage: (userId: number | string, reason: string) =>
+    api.post<{ ok: boolean }>(`/admin/user-homepages/${userId}/block`, { reason }),
+  unblockUserHomepage: (userId: number | string) =>
+    api.post<{ ok: boolean }>(`/admin/user-homepages/${userId}/unblock`),
 }

@@ -35,13 +35,39 @@ CREATE TABLE IF NOT EXISTS user_info (\
   KEY idx_field_key (field_key)\
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
 
+const CREATE_USER_HOMEPAGES: &str = "\
+CREATE TABLE IF NOT EXISTS user_homepages (\
+  user_id BIGINT NOT NULL PRIMARY KEY,\
+  mode VARCHAR(10) NOT NULL DEFAULT 'NORMAL',\
+  html MEDIUMTEXT NULL,\
+  status VARCHAR(10) NOT NULL DEFAULT 'ACTIVE',\
+  block_reason VARCHAR(255) NULL,\
+  blocked_by BIGINT NULL,\
+  blocked_at DATETIME NULL,\
+  size_bytes INT NOT NULL DEFAULT 0,\
+  created_at DATETIME NOT NULL,\
+  updated_at DATETIME NOT NULL\
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
+
+const CREATE_USER_HOMEPAGE_REPORTS: &str = "\
+CREATE TABLE IF NOT EXISTS user_homepage_reports (\
+  id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,\
+  user_id BIGINT NOT NULL,\
+  reporter_id BIGINT NOT NULL,\
+  reason VARCHAR(500) NOT NULL,\
+  created_at DATETIME NOT NULL,\
+  KEY idx_target_time (user_id, created_at)\
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
+
 /// 启动时幂等执行的迁移：建表、补列、种子字段、旧规则转换、旧认证回填。
 pub async fn run(state: &AppState) -> Result<(), ApiError> {
     let pool = &state.pool;
 
     sqlx::query(CREATE_INFO_FIELDS).execute(pool).await?;
     sqlx::query(CREATE_USER_INFO).execute(pool).await?;
-    tracing::info!("迁移植：info_fields / user_info 就绪");
+    sqlx::query(CREATE_USER_HOMEPAGES).execute(pool).await?;
+    sqlx::query(CREATE_USER_HOMEPAGE_REPORTS).execute(pool).await?;
+    tracing::info!("迁移植：info_fields / user_info / user_homepages 就绪");
 
     ensure_column(pool, "browse_rule", "TEXT NULL").await?;
     ensure_column(pool, "operate_rule", "TEXT NULL").await?;

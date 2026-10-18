@@ -28,17 +28,36 @@
               </div>
               <p v-if="profile.bio" class="profile-bio">{{ profile.bio }}</p>
             </div>
-            <el-button
-              v-if="isSelf"
-              class="profile-edit"
-              round
-              @click="editVisible = true"
-            >
-              编辑资料
-            </el-button>
+            <div v-if="isSelf" style="display: flex; gap: 8px">
+              <el-button class="profile-edit" round @click="goEditor">装修主页</el-button>
+              <el-button class="profile-edit" round @click="editVisible = true">
+                编辑资料
+              </el-button>
+            </div>
           </div>
         </div>
 
+        <template v-if="customMode">
+          <el-alert
+            v-if="homepage?.blocked"
+            type="error"
+            :closable="false"
+            show-icon
+            title="你的自定义主页已被管理员下架"
+            :description="`原因：${homepage.blockReason || '未填写'}。修改后需管理员复核恢复。`"
+            style="margin-bottom: 12px"
+          />
+          <div class="content-card homepage-frame-card">
+            <SafeHomepageFrame :html="homepage?.html || ''" />
+          </div>
+          <div v-if="!isSelf" class="homepage-report-row">
+            <el-button text type="info" size="small" @click="openReport">
+              举报此主页
+            </el-button>
+          </div>
+        </template>
+
+        <template v-else>
         <div class="feed-toolbar profile-toolbar">
           <SortChips v-model="activeTab" :options="tabs" />
         </div>
@@ -113,6 +132,7 @@
             <span class="v">{{ formatDate(profile.createdAt) }}</span>
           </div>
         </div>
+        </template>
       </template>
     </div>
   </div>
@@ -131,6 +151,32 @@
       <el-button type="primary" :loading="saving" @click="save">保存</el-button>
     </template>
   </el-dialog>
+
+  <el-dialog v-model="reportVisible" title="举报此主页" width="480px">
+    <p class="report-hint">请选择或填写举报原因，管理员会尽快处理。</p>
+    <div class="report-quick">
+      <el-check-tag
+        v-for="option in REPORT_OPTIONS"
+        :key="option"
+        :checked="reportReason === option"
+        @change="reportReason = option"
+      >
+        {{ option }}
+      </el-check-tag>
+    </div>
+    <el-input
+      v-model="reportReason"
+      type="textarea"
+      :rows="4"
+      maxlength="500"
+      show-word-limit
+      placeholder="请描述具体问题（5-500 字）"
+    />
+    <template #footer>
+      <el-button @click="reportVisible = false">取消</el-button>
+      <el-button type="danger" :loading="reporting" @click="submitReport">提交举报</el-button>
+    </template>
+  </el-dialog>
 </template>
 
 <script setup lang="ts">
@@ -139,10 +185,11 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import LeftRail from '@/components/LeftRail.vue'
 import PostCard from '@/components/PostCard.vue'
+import SafeHomepageFrame from '@/components/SafeHomepageFrame.vue'
 import SortChips, { type SortOption } from '@/components/SortChips.vue'
-import { postApi, userApi } from '@/api'
+import { homepageApi, postApi, userApi } from '@/api'
 import { useAuthStore } from '@/stores/auth'
-import type { Post, User, UserComment } from '@/types'
+import type { Post, PublicHomepage, User, UserComment } from '@/types'
 import {
   avatarText,
   errorMessage,
@@ -187,6 +234,21 @@ const editVisible = ref(false)
 const saving = ref(false)
 const editForm = reactive({ avatar: '', bio: '' })
 
+const homepage = ref<PublicHomepage | null>(null)
+const customMode = computed(
+  () => homepage.value?.mode === 'CUSTOM' && !!homepage.value.html
+)
+
+const REPORT_OPTIONS = [
+  '冒充官方或他人',
+  '包含诈骗或诱导信息',
+  '包含色情或暴力内容',
+  '页面内容令人不适',
+]
+const reportVisible = ref(false)
+const reportReason = ref('')
+const reporting = ref(false)
+
 const isSelf = computed(
   () => !!auth.user && !!profile.value && auth.user.id === profile.value.id
 )
@@ -194,12 +256,23 @@ const isSelf = computed(
 async function load() {
   loading.value = true
   error.value = ''
+  homepage.value = null
   try {
-    const data = await userApi.get(String(route.params.id))
+    const id = String(route.params.id)
+    const [profileRes, homepageRes] = await Promise.allSettled([
+      userApi.get(id),
+      homepageApi.get(id),
+    ])
+    if (profileRes.status === 'rejected') {
+      throw profileRes.reason
+    }
+    const data = profileRes.value
     profile.value = data
     editForm.avatar = data.avatar || ''
     editForm.bio = data.bio || ''
-    ensureTab()
+    // 主页接口失败时回退普通主页，不阻断资料页渲染。
+    homepage.value = homepageRes.status === 'fulfilled' ? homepageRes.value : { mode: 'NORMAL' }
+    if (!customMode.value) ensureTab()
   } catch (e) {
     error.value = errorMessage(e, '用户资料加载失败')
   } finally {
@@ -317,6 +390,38 @@ async function save() {
   }
 }
 
+function goEditor() {
+  router.push('/settings/homepage')
+}
+
+function openReport() {
+  if (!auth.isAuthenticated) {
+    ElMessage.warning('请先登录后举报')
+    router.push({ name: 'login', query: { redirect: route.fullPath } })
+    return
+  }
+  reportReason.value = ''
+  reportVisible.value = true
+}
+
+async function submitReport() {
+  const reason = reportReason.value.trim()
+  if (reason.length < 5 || reason.length > 500) {
+    ElMessage.warning('举报原因需为 5-500 个字符')
+    return
+  }
+  reporting.value = true
+  try {
+    await homepageApi.report(String(route.params.id), reason)
+    reportVisible.value = false
+    ElMessage.success('举报已提交，管理员会尽快处理')
+  } catch (e) {
+    ElMessage.error(errorMessage(e, '举报失败'))
+  } finally {
+    reporting.value = false
+  }
+}
+
 watch(activeTab, ensureTab)
 
 watch(
@@ -335,3 +440,26 @@ watch(
 
 onMounted(load)
 </script>
+
+<style scoped>
+.homepage-frame-card {
+  padding: 0;
+  overflow: hidden;
+}
+.homepage-report-row {
+  display: flex;
+  justify-content: center;
+  margin: 8px 0 24px;
+}
+.report-hint {
+  margin: 0 0 12px;
+  color: var(--of-text-muted);
+  font-size: 13px;
+}
+.report-quick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+</style>
