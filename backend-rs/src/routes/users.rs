@@ -48,7 +48,7 @@ pub async fn profile(
     Path(id): Path<i64>,
 ) -> ApiResult<Json<Value>> {
     let user = repo::require_user(&state.pool, id).await?;
-    // 隐私：公开资料不返回认证徽章与具体信息项。
+    // Privacy: public profiles do not return authentication badges or specific info fields.
     Ok(j::ok(dto::user_dto(&user, Vec::new(), false)))
 }
 
@@ -104,7 +104,7 @@ pub async fn update_me(
     Ok(j::ok(dto::user_dto(&u, auths, true)))
 }
 
-/// 供 admin 列表复用：分页返回用户（email 置 null）。
+/// Reused by the admin list: returns users paginated (email set to null).
 pub async fn list_users_page(
     state: &AppState,
     page: i32,

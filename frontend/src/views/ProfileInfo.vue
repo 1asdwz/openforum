@@ -5,9 +5,9 @@
     <div class="feed-column">
       <div class="content-card info-head">
         <div>
-          <h1 class="page-title" style="margin: 0">资料与认证</h1>
+          <h1 class="page-title" style="margin: 0">Profile &amp; Verification</h1>
           <p class="info-desc">
-            资料仅自己可见；填写后可按需提升认证等级，以满足不同板块的浏览与互动门槛。
+            Your profile is visible only to you. After filling it in, you can raise your verification level as needed to meet the viewing and interaction thresholds of different forums.
           </p>
         </div>
         <div class="info-progress">
@@ -17,7 +17,7 @@
             :width="72"
           />
           <span class="muted">
-            已填写 {{ info?.completeness.filled ?? 0 }}/{{ info?.completeness.total ?? 0 }} 项
+            Completed {{ info?.completeness.filled ?? 0 }}/{{ info?.completeness.total ?? 0 }} fields
           </span>
         </div>
       </div>
@@ -26,7 +26,7 @@
       <div v-else-if="error" class="state-box error">
         {{ error }}
         <div style="margin-top: 12px">
-          <el-button size="small" @click="load">重试</el-button>
+          <el-button size="small" @click="load">Retry</el-button>
         </div>
       </div>
 
@@ -43,7 +43,7 @@
                   type="warning"
                   effect="light"
                 >
-                  审核中
+                  Under review
                 </el-tag>
                 <el-tag
                   v-else-if="item.authLevel && rankOf(item.authLevel) > 0"
@@ -51,16 +51,16 @@
                   type="success"
                   effect="plain"
                 >
-                  认证 {{ authLevelLabel(item.authLevel) }}
+                  Verified {{ authLevelLabel(item.authLevel) }}
                 </el-tag>
               </div>
               <div class="info-item-value" :class="{ empty: !item.valueText }">
-                {{ item.valueText || '未填写' }}
+                {{ item.valueText || 'Not provided' }}
               </div>
             </div>
             <div class="info-item-actions">
               <el-button size="small" text type="primary" @click="openEdit(item)">
-                {{ item.valueText ? '修改' : '填写' }}
+                {{ item.valueText ? 'Edit' : 'Add' }}
               </el-button>
               <el-button
                 v-if="authTypeOf(item.fieldKey)"
@@ -69,7 +69,7 @@
                 :disabled="item.authStatus === 'PENDING'"
                 @click="goAuth(item)"
               >
-                {{ item.authStatus === 'PENDING' ? '审核中' : item.valueText ? '去认证 / 升级' : '去认证' }}
+                {{ item.authStatus === 'PENDING' ? 'Under review' : item.valueText ? 'Verify / Upgrade' : 'Verify' }}
               </el-button>
             </div>
           </div>
@@ -78,37 +78,37 @@
     </div>
   </div>
 
-  <el-dialog v-model="editVisible" :title="`填写${editField?.label || ''}`" width="520px">
+  <el-dialog v-model="editVisible" :title="`Edit ${editField?.label || ''}`" width="520px">
     <el-form v-if="editField" label-position="top">
       <template v-if="editField.fieldKey === 'REAL_NAME'">
-        <el-form-item label="真实姓名" required>
+        <el-form-item label="Full name" required>
           <el-input v-model="editData.fullName" maxlength="50" />
         </el-form-item>
       </template>
 
       <template v-else-if="editField.fieldKey === 'GENDER'">
-        <el-form-item label="性别" required>
+        <el-form-item label="Gender" required>
           <el-select v-model="editData.gender" style="width: 100%">
-            <el-option label="男" value="MALE" />
-            <el-option label="女" value="FEMALE" />
+            <el-option label="Male" value="MALE" />
+            <el-option label="Female" value="FEMALE" />
           </el-select>
         </el-form-item>
       </template>
 
       <template v-else-if="editField.fieldKey === 'AGE'">
-        <el-form-item label="出生日期" required>
+        <el-form-item label="Date of birth" required>
           <el-date-picker
             v-model="editData.birthDate"
             type="date"
             value-format="YYYY-MM-DD"
-            placeholder="选择出生日期"
+            placeholder="Select date of birth"
             style="width: 100%"
           />
         </el-form-item>
       </template>
 
       <template v-else-if="editField.fieldKey === 'COUNTRY'">
-        <el-form-item label="国家/地区" required>
+        <el-form-item label="Country/Region" required>
           <el-select v-model="editData.country" filterable style="width: 100%">
             <el-option
               v-for="o in optionsOf('COUNTRY')"
@@ -121,7 +121,7 @@
       </template>
 
       <template v-else-if="editField.fieldKey === 'CITY'">
-        <el-form-item label="国家/地区">
+        <el-form-item label="Country/Region">
           <el-select v-model="editData.country" filterable style="width: 100%">
             <el-option
               v-for="o in optionsOf('COUNTRY')"
@@ -131,13 +131,13 @@
             />
           </el-select>
         </el-form-item>
-        <el-form-item label="城市" required>
-          <el-input v-model="editData.city" maxlength="40" placeholder="例如：上海" />
+        <el-form-item label="City" required>
+          <el-input v-model="editData.city" maxlength="40" placeholder="e.g. Shanghai" />
         </el-form-item>
       </template>
 
       <template v-else-if="editField.fieldKey === 'OCCUPATION'">
-        <el-form-item label="职业分类" required>
+        <el-form-item label="Occupation category" required>
           <el-select v-model="editData.category" style="width: 100%">
             <el-option
               v-for="o in optionsOf('OCCUPATION')"
@@ -147,13 +147,13 @@
             />
           </el-select>
         </el-form-item>
-        <el-form-item label="职位名称（可选）">
+        <el-form-item label="Job title (optional)">
           <el-input v-model="editData.title" maxlength="50" />
         </el-form-item>
       </template>
 
       <template v-else-if="editField.fieldKey === 'EDUCATION'">
-        <el-form-item label="学历" required>
+        <el-form-item label="Education" required>
           <el-select v-model="editData.education" style="width: 100%">
             <el-option
               v-for="o in optionsOf('EDUCATION')"
@@ -166,45 +166,45 @@
       </template>
 
       <template v-else-if="editField.fieldKey === 'PROPERTY_AREA'">
-        <el-form-item label="房产所在城市">
+        <el-form-item label="Property city">
           <el-select
             v-model="editData.cities"
             multiple
             filterable
             allow-create
             default-first-option
-            placeholder="输入城市后回车，可添加多个"
+            placeholder="Type a city and press Enter; you can add multiple"
             style="width: 100%"
           />
         </el-form-item>
-        <el-form-item label="房产所在区县">
+        <el-form-item label="Property district">
           <el-select
             v-model="editData.districts"
             multiple
             filterable
             allow-create
             default-first-option
-            placeholder="输入区县后回车，可添加多个"
+            placeholder="Type a district and press Enter; you can add multiple"
             style="width: 100%"
           />
         </el-form-item>
       </template>
 
       <template v-else-if="editField.fieldKey === 'PROPERTY_COUNT'">
-        <el-form-item label="房产数量" required>
+        <el-form-item label="Number of properties" required>
           <el-input-number v-model="editData.count" :min="0" :max="100" />
         </el-form-item>
       </template>
 
       <template v-else-if="editField.fieldKey === 'INTERESTS'">
-        <el-form-item label="兴趣标签">
+        <el-form-item label="Interest tags">
           <el-select
             v-model="editData.tags"
             multiple
             filterable
             allow-create
             default-first-option
-            placeholder="选择或输入兴趣"
+            placeholder="Select or enter interests"
             style="width: 100%"
           >
             <el-option
@@ -222,13 +222,13 @@
         type="info"
         :closable="false"
         show-icon
-        title="修改已认证的信息后，原认证等级会失效，需要重新认证。"
+        title="Editing verified information will invalidate the current verification level and require re-verification."
         style="margin-top: 6px"
       />
     </el-form>
     <template #footer>
-      <el-button @click="editVisible = false">取消</el-button>
-      <el-button type="primary" :loading="saving" @click="save">保存</el-button>
+      <el-button @click="editVisible = false">Cancel</el-button>
+      <el-button type="primary" :loading="saving" @click="save">Save</el-button>
     </template>
   </el-dialog>
 </template>
@@ -381,17 +381,17 @@ async function save() {
   if (!editField.value) return
   const payload = payloadOf(editField.value.fieldKey)
   if (!payload) {
-    ElMessage.warning('请填写完整信息')
+    ElMessage.warning('Please fill in all required information')
     return
   }
   saving.value = true
   try {
     await infoApi.update(editField.value.fieldKey, payload)
-    ElMessage.success('已保存')
+    ElMessage.success('Saved')
     editVisible.value = false
     await load()
   } catch (e) {
-    ElMessage.error(e instanceof Error ? e.message : '保存失败')
+    ElMessage.error(e instanceof Error ? e.message : 'Failed to save')
   } finally {
     saving.value = false
   }
@@ -416,7 +416,7 @@ async function load() {
     fields.value = fieldGroups || []
     info.value = mine
   } catch (e) {
-    error.value = e instanceof Error ? e.message : '资料加载失败'
+    error.value = e instanceof Error ? e.message : 'Failed to load information'
   } finally {
     loading.value = false
   }

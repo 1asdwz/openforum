@@ -8,7 +8,7 @@
       <div v-else-if="error" class="state-box error">
         {{ error }}
         <div style="margin-top: 12px">
-          <el-button size="small" @click="load">重试</el-button>
+          <el-button size="small" @click="load">Retry</el-button>
         </div>
       </div>
 
@@ -24,14 +24,14 @@
               <div class="profile-sub">
                 <span>u/{{ profile.username }}</span>
                 <span class="dot">·</span>
-                <span>加入于 {{ formatDate(profile.createdAt) }}</span>
+                <span>Joined {{ formatDate(profile.createdAt) }}</span>
               </div>
               <p v-if="profile.bio" class="profile-bio">{{ profile.bio }}</p>
             </div>
             <div v-if="isSelf" style="display: flex; gap: 8px">
-              <el-button class="profile-edit" round @click="goEditor">装修主页</el-button>
+              <el-button class="profile-edit" round @click="goEditor">Customize Page</el-button>
               <el-button class="profile-edit" round @click="editVisible = true">
-                编辑资料
+                Edit Profile
               </el-button>
             </div>
           </div>
@@ -43,16 +43,16 @@
             type="error"
             :closable="false"
             show-icon
-            title="你的自定义主页已被管理员下架"
-            :description="`原因：${homepage.blockReason || '未填写'}。修改后需管理员复核恢复。`"
+            title="Your custom page was blocked by a moderator"
+            :description="`Reason: ${homepage.blockReason || 'Not provided'}. After editing, a moderator must review it before restoration.`"
             style="margin-bottom: 12px"
           />
           <div class="content-card homepage-frame-card">
-            <SafeHomepageFrame :html="homepage?.html || ''" :user-id="profile?.id || 0" />
+            <SafeHomepageFrame :html="homepage?.html || ''" :load-data="loadHomepageData" />
           </div>
           <div v-if="!isSelf" class="homepage-report-row">
             <el-button text type="info" size="small" @click="openReport">
-              举报此主页
+              Report this page
             </el-button>
           </div>
         </template>
@@ -65,7 +65,7 @@
         <template v-if="activeTab === 'posts'">
           <el-skeleton v-if="listLoading" :rows="4" animated />
           <div v-else-if="!userPosts.length" class="state-box">
-            该用户还没有公开的帖子
+            This user has no public posts yet
           </div>
           <template v-else>
             <div class="post-list">
@@ -78,7 +78,7 @@
             </div>
             <div v-if="userPosts.length < postsTotal" class="load-more">
               <el-button round :loading="loadingMore" @click="loadPostsMore">
-                加载更多
+                Load more
               </el-button>
             </div>
           </template>
@@ -87,7 +87,7 @@
         <template v-else-if="activeTab === 'comments'">
           <el-skeleton v-if="listLoading" :rows="4" animated />
           <div v-else-if="!userComments.length" class="state-box">
-            该用户还没有公开的评论
+            This user has no public comments yet
           </div>
           <template v-else>
             <div class="post-list">
@@ -97,22 +97,22 @@
                 class="content-card profile-comment"
               >
                 <div class="profile-comment-meta">
-                  <span class="muted">评论于</span>
+                  <span class="muted">Commented on</span>
                   <router-link class="profile-comment-link" :to="`/post/${c.postId}`">
-                    {{ c.postTitle || `帖子 #${c.postId}` }}
+                    {{ c.postTitle || `Post #${c.postId}` }}
                   </router-link>
                   <span class="dot">·</span>
                   <span>{{ formatTime(c.createdAt) }}</span>
                 </div>
                 <p class="profile-comment-body">{{ c.content }}</p>
                 <div class="profile-comment-foot">
-                  <span class="profile-comment-score">{{ c.score }} 分</span>
+                  <span class="profile-comment-score">{{ c.score }} points</span>
                 </div>
               </article>
             </div>
             <div v-if="userComments.length < commentsTotal" class="load-more">
               <el-button round :loading="loadingMore" @click="loadCommentsMore">
-                加载更多
+                Load more
               </el-button>
             </div>
           </template>
@@ -120,15 +120,15 @@
 
         <div v-else class="content-card profile-about">
           <div class="about-row">
-            <span class="k">用户名</span>
+            <span class="k">Username</span>
             <span class="v">u/{{ profile.username }}</span>
           </div>
           <div class="about-row">
-            <span class="k">角色</span>
-            <span class="v">{{ profile.role === 'ADMIN' ? '管理员' : '用户' }}</span>
+            <span class="k">Role</span>
+            <span class="v">{{ profile.role === 'ADMIN' ? 'Admin' : 'User' }}</span>
           </div>
           <div class="about-row">
-            <span class="k">加入时间</span>
+            <span class="k">Joined</span>
             <span class="v">{{ formatDate(profile.createdAt) }}</span>
           </div>
         </div>
@@ -137,23 +137,23 @@
     </div>
   </div>
 
-  <el-dialog v-model="editVisible" title="编辑资料" width="480px">
+  <el-dialog v-model="editVisible" title="Edit Profile" width="480px">
     <el-form label-position="top">
-      <el-form-item label="头像地址">
+      <el-form-item label="Avatar URL">
         <el-input v-model="editForm.avatar" placeholder="https://…" />
       </el-form-item>
-      <el-form-item label="个人简介">
+      <el-form-item label="Bio">
         <el-input v-model="editForm.bio" type="textarea" :rows="4" maxlength="200" show-word-limit />
       </el-form-item>
     </el-form>
     <template #footer>
-      <el-button @click="editVisible = false">取消</el-button>
-      <el-button type="primary" :loading="saving" @click="save">保存</el-button>
+      <el-button @click="editVisible = false">Cancel</el-button>
+      <el-button type="primary" :loading="saving" @click="save">Save</el-button>
     </template>
   </el-dialog>
 
-  <el-dialog v-model="reportVisible" title="举报此主页" width="480px">
-    <p class="report-hint">请选择或填写举报原因，管理员会尽快处理。</p>
+  <el-dialog v-model="reportVisible" title="Report this page" width="480px">
+    <p class="report-hint">Choose or enter a report reason. A moderator will review it as soon as possible.</p>
     <div class="report-quick">
       <el-check-tag
         v-for="option in REPORT_OPTIONS"
@@ -170,11 +170,11 @@
       :rows="4"
       maxlength="500"
       show-word-limit
-      placeholder="请描述具体问题（5-500 字）"
+      placeholder="Describe the issue (5-500 characters)"
     />
     <template #footer>
-      <el-button @click="reportVisible = false">取消</el-button>
-      <el-button type="danger" :loading="reporting" @click="submitReport">提交举报</el-button>
+      <el-button @click="reportVisible = false">Cancel</el-button>
+      <el-button type="danger" :loading="reporting" @click="submitReport">Submit Report</el-button>
     </template>
   </el-dialog>
 </template>
@@ -212,9 +212,9 @@ const error = ref('')
 
 const activeTab = ref<ProfileTab>('posts')
 const tabs: SortOption<ProfileTab>[] = [
-  { label: '帖子', value: 'posts' },
-  { label: '评论', value: 'comments' },
-  { label: '关于', value: 'about' },
+  { label: 'Posts', value: 'posts' },
+  { label: 'Comments', value: 'comments' },
+  { label: 'About', value: 'about' },
 ]
 
 const userPosts = ref<Post[]>([])
@@ -240,10 +240,10 @@ const customMode = computed(
 )
 
 const REPORT_OPTIONS = [
-  '冒充官方或他人',
-  '包含诈骗或诱导信息',
-  '包含色情或暴力内容',
-  '页面内容令人不适',
+  'Impersonating officials or others',
+  'Contains fraud or misleading information',
+  'Contains sexual or violent content',
+  'Page content is disturbing',
 ]
 const reportVisible = ref(false)
 const reportReason = ref('')
@@ -252,6 +252,10 @@ const reporting = ref(false)
 const isSelf = computed(
   () => !!auth.user && !!profile.value && auth.user.id === profile.value.id
 )
+
+function loadHomepageData() {
+  return homepageApi.data(String(route.params.id))
+}
 
 async function load() {
   loading.value = true
@@ -270,17 +274,17 @@ async function load() {
     profile.value = data
     editForm.avatar = data.avatar || ''
     editForm.bio = data.bio || ''
-    // 主页接口失败时回退普通主页，不阻断资料页渲染。
+    // Fall back to the normal page if the homepage API fails; do not block profile rendering.
     homepage.value = homepageRes.status === 'fulfilled' ? homepageRes.value : { mode: 'NORMAL' }
     if (!customMode.value) ensureTab()
   } catch (e) {
-    error.value = errorMessage(e, '用户资料加载失败')
+    error.value = errorMessage(e, 'Failed to load user profile')
   } finally {
     loading.value = false
   }
 }
 
-/** 首次切换到某个 tab 时才加载对应列表 */
+/** Load the corresponding list only on the first switch to a tab */
 function ensureTab() {
   const tab = activeTab.value
   if (tab === 'about' || loadedTabs[tab]) return
@@ -307,7 +311,7 @@ async function loadPosts(reset = true) {
     userPosts.value = reset ? mapped : [...userPosts.value, ...mapped]
     postsTotal.value = total
   } catch (e) {
-    ElMessage.error(errorMessage(e, '帖子加载失败'))
+    ElMessage.error(errorMessage(e, 'Failed to load posts'))
   } finally {
     listLoading.value = false
     loadingMore.value = false
@@ -330,7 +334,7 @@ async function loadComments(reset = true) {
     userComments.value = reset ? items : [...userComments.value, ...items]
     commentsTotal.value = total
   } catch (e) {
-    ElMessage.error(errorMessage(e, '评论加载失败'))
+    ElMessage.error(errorMessage(e, 'Failed to load comments'))
   } finally {
     listLoading.value = false
     loadingMore.value = false
@@ -350,12 +354,12 @@ function loadCommentsMore() {
 async function onVote(payload: { post: Post; value: number }) {
   const { post, value } = payload
   if (!auth.isAuthenticated) {
-    ElMessage.warning('请先登录后投票')
+    ElMessage.warning('Please log in to vote')
     router.push({ name: 'login', query: { redirect: route.fullPath } })
     return
   }
   if (post.canVote === false) {
-    ElMessage.warning('你暂时没有投票权限')
+    ElMessage.warning('You do not have permission to vote yet')
     return
   }
   try {
@@ -382,9 +386,9 @@ async function save() {
     profile.value = updated
     auth.setUser(updated)
     editVisible.value = false
-    ElMessage.success('资料已更新')
+    ElMessage.success('Profile updated')
   } catch (e) {
-    ElMessage.error(errorMessage(e, '保存失败'))
+    ElMessage.error(errorMessage(e, 'Failed to save'))
   } finally {
     saving.value = false
   }
@@ -396,7 +400,7 @@ function goEditor() {
 
 function openReport() {
   if (!auth.isAuthenticated) {
-    ElMessage.warning('请先登录后举报')
+    ElMessage.warning('Please log in to report')
     router.push({ name: 'login', query: { redirect: route.fullPath } })
     return
   }
@@ -407,16 +411,16 @@ function openReport() {
 async function submitReport() {
   const reason = reportReason.value.trim()
   if (reason.length < 5 || reason.length > 500) {
-    ElMessage.warning('举报原因需为 5-500 个字符')
+    ElMessage.warning('Report reason must be 5-500 characters')
     return
   }
   reporting.value = true
   try {
     await homepageApi.report(String(route.params.id), reason)
     reportVisible.value = false
-    ElMessage.success('举报已提交，管理员会尽快处理')
+    ElMessage.success('Report submitted. A moderator will review it as soon as possible')
   } catch (e) {
-    ElMessage.error(errorMessage(e, '举报失败'))
+    ElMessage.error(errorMessage(e, 'Failed to submit report'))
   } finally {
     reporting.value = false
   }

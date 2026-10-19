@@ -1,13 +1,13 @@
 <template>
   <div class="auth-wizard">
-    <h1 class="page-title">认证向导</h1>
+    <h1 class="page-title">Verification Wizard</h1>
 
     <div v-if="loadError" class="state-box">{{ loadError }}</div>
     <el-skeleton v-else-if="!meta" :rows="6" animated />
 
     <template v-else>
       <p class="wizard-subtitle">
-        {{ meta.label }} · <strong>{{ authLevelLabel(level) }}等级</strong>
+        {{ meta.label }} · <strong>{{ authLevelLabel(level) }} level</strong>
       </p>
 
       <el-steps :active="activeIndex" align-center finish-status="success" class="wizard-steps">
@@ -15,22 +15,22 @@
       </el-steps>
 
       <div class="wizard-body">
-        <!-- 说明与注意事项 -->
+        <!-- Overview and tips -->
         <section v-if="currentKey === 'intro'">
-          <h3 class="section-title">{{ authLevelLabel(level) }}等级认证说明</h3>
-          <p v-if="levelMeta?.requirements?.length" class="wizard-lead">本等级需要：</p>
+          <h3 class="section-title">{{ authLevelLabel(level) }} Level Verification</h3>
+          <p v-if="levelMeta?.requirements?.length" class="wizard-lead">This level requires:</p>
           <ul class="wizard-list">
             <li v-for="(r, i) in levelMeta?.requirements || []" :key="i">{{ r }}</li>
           </ul>
 
-          <h3 class="section-title">拍摄 / 操作注意事项</h3>
+          <h3 class="section-title">Photo / Action Tips</h3>
           <ul class="wizard-list">
             <li v-for="(t, i) in tips" :key="i">{{ t }}</li>
           </ul>
 
           <el-alert
             v-if="isExtreme"
-            title="极高等级需要在「高」等级基础上，使用 OpenForum 移动 App 完成防伪录制，网页端暂不支持提交。"
+            title="The Extreme level builds on the High level and requires anti-spoofing recording in the OpenForum mobile app. Web submissions are not supported yet."
             type="warning"
             :closable="false"
             show-icon
@@ -38,9 +38,9 @@
           />
         </section>
 
-        <!-- 信息填写 -->
+        <!-- Information -->
         <section v-else-if="currentKey === 'info'">
-          <h3 class="section-title">填写认证信息</h3>
+          <h3 class="section-title">Enter Verification Information</h3>
           <AuthTypeForm
             ref="formRef"
             :meta="meta"
@@ -49,24 +49,24 @@
           />
         </section>
 
-        <!-- 证件上传 -->
+        <!-- Document upload -->
         <section v-else-if="currentKey === 'docs'">
-          <h3 class="section-title">上传证件材料</h3>
+          <h3 class="section-title">Upload Documents</h3>
           <DocumentUpload :min-count="1" :max-count="5" @change="documentIds = $event" />
         </section>
 
-        <!-- 视频认证 -->
+        <!-- Video verification -->
         <section v-else-if="currentKey === 'video'">
-          <h3 class="section-title">视频认证（活体检测）</h3>
+          <h3 class="section-title">Video Verification (Liveness Detection)</h3>
           <VideoCapture @done="videoResult = $event" />
         </section>
 
-        <!-- 提交 -->
+        <!-- Submit -->
         <section v-else>
           <template v-if="isExtreme">
             <el-alert
-              title="极高等级需通过 OpenForum 移动 App 完成防伪录制"
-              description="请在 App 中完成人脸活体 + 证件 + App 防伪录制后，由 App 自动提交。网页端不提供极高等级的提交入口。"
+              title="The Extreme level requires anti-spoofing recording in the OpenForum mobile app"
+              description="Complete face liveness + documents + in-app anti-spoofing recording in the app, and the app will submit automatically. The web version does not offer a submission path for the Extreme level."
               type="warning"
               :closable="false"
               show-icon
@@ -80,36 +80,36 @@
               :sub-title="result.reason || result.rejectionReason || ''"
             >
               <template #extra>
-                <el-button type="primary" @click="goCenter">返回资料与认证</el-button>
+                <el-button type="primary" @click="goCenter">Back to Profile &amp; Verification</el-button>
               </template>
             </el-result>
           </template>
 
           <template v-else>
-            <h3 class="section-title">确认并提交</h3>
+            <h3 class="section-title">Review and Submit</h3>
             <ul class="wizard-summary">
-              <li>认证类型：{{ meta.label }}</li>
-              <li>认证等级：{{ authLevelLabel(level) }}</li>
-              <li v-if="showDocs">证件材料：{{ documentIds.length }} 张</li>
-              <li v-if="showVideo">视频认证：{{ videoResult ? (videoResult.liveness.degraded ? '已录制（降级转人工）' : '已完成活体检测') : '未完成' }}</li>
+              <li>Verification type: {{ meta.label }}</li>
+              <li>Verification level: {{ authLevelLabel(level) }}</li>
+              <li v-if="showDocs">Documents: {{ documentIds.length }} files</li>
+              <li v-if="showVideo">Video verification: {{ videoResult ? (videoResult.liveness.degraded ? 'Recorded (degraded to manual review)' : 'Liveness check complete') : 'Not completed' }}</li>
             </ul>
             <div class="wizard-actions">
-              <el-button type="primary" :loading="submitting" @click="submit">提交认证</el-button>
+              <el-button type="primary" :loading="submitting" @click="submit">Submit Verification</el-button>
             </div>
           </template>
         </section>
       </div>
 
       <div class="wizard-nav">
-        <el-button :disabled="activeIndex === 0" @click="prev">上一步</el-button>
+        <el-button :disabled="activeIndex === 0" @click="prev">Back</el-button>
         <el-button
           v-if="activeIndex < steps.length - 1"
           type="primary"
           @click="next"
         >
-          下一步
+          Next
         </el-button>
-        <el-button v-else @click="goCenter">返回资料与认证</el-button>
+        <el-button v-else @click="goCenter">Back to Profile &amp; Verification</el-button>
       </div>
     </template>
   </div>
@@ -163,27 +163,27 @@ const levelMeta = computed<AuthLevelMeta | null>(
 )
 
 const DEFAULT_TIPS = [
-  '光线充足、均匀，避免逆光或过曝',
-  '面部无遮挡，不戴帽子、墨镜、口罩',
-  '正对镜头，保持面部完整入镜',
-  '按屏幕提示依次完成随机动作',
+  'Use bright, even lighting; avoid backlight or overexposure',
+  'Keep your face unobstructed; remove hats, sunglasses, and masks',
+  'Face the camera directly and keep your whole face in frame',
+  'Follow the on-screen prompts to complete the random actions in order',
 ]
 
 const tips = computed(() => levelMeta.value?.tips?.length ? levelMeta.value.tips : DEFAULT_TIPS)
 
 type StepKey = 'intro' | 'info' | 'docs' | 'video' | 'submit'
 const steps = computed<{ key: StepKey; title: string }[]>(() => {
-  const s: { key: StepKey; title: string }[] = [{ key: 'intro', title: '说明' }]
-  if (!isExtreme.value) s.push({ key: 'info', title: '信息填写' })
-  if (showDocs.value) s.push({ key: 'docs', title: '证件上传' })
-  if (showVideo.value) s.push({ key: 'video', title: '视频认证' })
-  s.push({ key: 'submit', title: isExtreme.value ? '需移动 App' : '提交' })
+  const s: { key: StepKey; title: string }[] = [{ key: 'intro', title: 'Overview' }]
+  if (!isExtreme.value) s.push({ key: 'info', title: 'Information' })
+  if (showDocs.value) s.push({ key: 'docs', title: 'Documents' })
+  if (showVideo.value) s.push({ key: 'video', title: 'Video' })
+  s.push({ key: 'submit', title: isExtreme.value ? 'Mobile App Required' : 'Submit' })
   return s
 })
 const currentKey = computed<StepKey>(() => steps.value[activeIndex.value]?.key ?? 'intro')
 
 function statusText(status: AuthStatus): string {
-  return status === 'APPROVED' ? '认证已通过' : status === 'PENDING' ? '提交成功，等待审核' : '认证未通过'
+  return status === 'APPROVED' ? 'Verification approved' : status === 'PENDING' ? 'Submitted, pending review' : 'Verification rejected'
 }
 
 function next() {
@@ -197,11 +197,11 @@ function next() {
     infoData.value = formRef.value?.getData() || {}
   }
   if (key === 'docs' && documentIds.value.length < 1) {
-    ElMessage.warning('请至少上传 1 张证件照片')
+    ElMessage.warning('Please upload at least 1 document image')
     return
   }
   if (key === 'video' && !videoResult.value) {
-    ElMessage.warning('请先完成视频认证')
+    ElMessage.warning('Please complete video verification first')
     return
   }
   if (activeIndex.value < steps.value.length - 1) activeIndex.value += 1
@@ -226,9 +226,9 @@ async function submit() {
       payload.liveness = videoResult.value.liveness as unknown as Record<string, unknown>
     }
     result.value = await authenticationApi.submit(payload)
-    ElMessage.success('认证已提交')
+    ElMessage.success('Verification submitted')
   } catch (e) {
-    ElMessage.error(errorMessage(e, '提交失败'))
+    ElMessage.error(errorMessage(e, 'Submission failed'))
   } finally {
     submitting.value = false
   }
@@ -240,15 +240,15 @@ function goCenter() {
 
 async function load() {
   if (!type.value || !VALID_LEVELS.includes(level.value)) {
-    loadError.value = '认证类型或等级参数无效'
+    loadError.value = 'Invalid verification type or level'
     return
   }
   try {
     const list = await authenticationApi.types()
     meta.value = (list || []).find((m) => m.type === type.value) || null
-    if (!meta.value) loadError.value = '未找到该认证类型'
+    if (!meta.value) loadError.value = 'Verification type not found'
   } catch (e) {
-    loadError.value = errorMessage(e, '认证类型加载失败')
+    loadError.value = errorMessage(e, 'Failed to load verification types')
   }
 }
 

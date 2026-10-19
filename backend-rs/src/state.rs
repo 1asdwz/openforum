@@ -6,7 +6,7 @@ use crate::config::Config;
 use crate::plugins::PluginRegistry;
 use crate::storage::Storage;
 
-/// 应用共享状态。`Clone` 成本极低（全部为 `Arc` 包裹）。
+/// Shared application state. `Clone` is very cheap (everything is wrapped in `Arc`).
 #[derive(Clone)]
 pub struct AppState {
     pub cfg: Arc<Config>,

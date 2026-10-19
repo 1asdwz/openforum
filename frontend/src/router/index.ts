@@ -61,9 +61,21 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true },
   },
   {
+    path: '/settings/forum-homepage/guide',
+    name: 'forum-homepage-guide',
+    component: () => import('@/views/ForumHomepageGuide.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
     path: '/f/:slug/settings',
     name: 'forum-settings',
     component: () => import('@/views/ForumSettings.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/f/:slug/mod',
+    name: 'forum-moderation',
+    component: () => import('@/views/ForumModeration.vue'),
     meta: { requiresAuth: true },
   },
   {
@@ -89,7 +101,7 @@ const routes: RouteRecordRaw[] = [
 ]
 
 const router = createRouter({
-  history: createWebHistory('/forum/'),
+  history: createWebHistory(import.meta.env.BASE_URL),
   routes,
   scrollBehavior() {
     return { top: 0 }

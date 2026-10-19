@@ -1,5 +1,5 @@
 <template>
-  <el-config-provider :locale="zhCn">
+  <el-config-provider :locale="en">
     <div class="app-shell">
       <TopNav />
       <main class="app-main">
@@ -10,6 +10,6 @@
 </template>
 
 <script setup lang="ts">
-import zhCn from 'element-plus/es/locale/lang/zh-cn'
+import en from 'element-plus/es/locale/lang/en'
 import TopNav from '@/components/TopNav.vue'
 </script>

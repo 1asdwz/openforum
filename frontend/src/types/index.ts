@@ -17,9 +17,8 @@ export interface AuthResult {
 }
 
 export type TemplateType = 'DEFAULT' | 'CUSTOM'
-export type CustomPageStatus = 'DRAFT' | 'PENDING' | 'APPROVED' | 'REJECTED'
 
-/** 门槛条件（与后端 GateCondition 对齐） */
+/** Gate conditions (aligned with backend GateCondition) */
 export interface GateCondition {
   field: string
   op?: string
@@ -43,16 +42,26 @@ export interface GateMissingItem {
   required: string
 }
 
-/** 403 门槛拦截附带的数据 */
+/** Data attached to a 403 gate rejection */
 export interface GateDeniedData {
   gate: 'BROWSE' | 'OPERATE' | string
   forumId?: number
   forumName?: string
   loginRequired?: boolean
   missing: GateMissingItem[]
-  /** 前端补充的错误文案 */
+  /** Error message added by the frontend */
   message?: string
 }
+
+/** Moderation permissions, matching Reddit's moderator permissions dialog */
+export type ForumPermission =
+  | 'EVERYTHING'
+  | 'USERS'
+  | 'CONFIG'
+  | 'FLAIR'
+  | 'MAIL'
+  | 'POSTS_COMMENTS'
+  | 'WIKI'
 
 export interface SubForum {
   id: number
@@ -62,23 +71,36 @@ export interface SubForum {
   icon?: string | null
   themeColor?: string | null
   rules?: string | null
-  /** 旧版认证门槛（仅兼容展示） */
+  /** Legacy auth gate (display compatibility only) */
   requiredAuthTypes?: string | string[] | null
   legacyRequiredAuthTypes?: string | null
   browseRule?: GateRule | null
   operateRule?: GateRule | null
   templateType: TemplateType
   templateConfig?: string | TemplateConfig | null
-  customPageHtml?: string | null
-  customPageStatus?: CustomPageStatus
-  customPageReviewNote?: string | null
   memberCount: number
   postCount: number
   isMember?: boolean
   canPost?: boolean
   canOperate?: boolean
+  canManage?: boolean
+  myPermissions?: ForumPermission[]
+  isCreator?: boolean
   creatorId?: number
+  creatorName?: string | null
   createdAt?: string
+}
+
+/** Forum moderators and permission details */
+export interface ForumModerator {
+  userId: number
+  username: string
+  avatar?: string | null
+  role: 'OWNER' | 'MODERATOR' | string
+  isCreator: boolean
+  permissions: ForumPermission[]
+  joinedAt?: string
+  promotedAt?: string | null
 }
 
 
@@ -132,7 +154,7 @@ export interface Comment {
   canVote?: boolean
 }
 
-/** 用户主页「评论」列表：扁平评论 + 所属帖子标题 */
+/** User profile "comments" list: flat comments plus their post titles */
 export interface UserComment {
   id: number
   postId: number
@@ -225,13 +247,6 @@ export interface AuthRecord {
   reviewedAt?: string
 }
 
-export interface CustomPageInfo {
-  html?: string | null
-  status?: CustomPageStatus
-  reviewNote?: string | null
-  customPageReviewNote?: string | null
-}
-
 export interface PageResult<T> {
   items: T[]
   total: number
@@ -240,7 +255,7 @@ export interface PageResult<T> {
 export type HomepageMode = 'NORMAL' | 'CUSTOM'
 export type HomepageStatus = 'ACTIVE' | 'BLOCKED'
 
-/** 公开主页视图：仅 CUSTOM 可见时返回 html；被下架时对他人只返回 NORMAL */
+/** Public homepage view: html is returned only when mode is CUSTOM; when blocked, others receive NORMAL only */
 export interface PublicHomepage {
   mode: HomepageMode
   html?: string
@@ -249,7 +264,7 @@ export interface PublicHomepage {
   updatedAt?: string | null
 }
 
-/** 本人主页配置 */
+/** Own homepage configuration */
 export interface MyHomepage {
   mode: HomepageMode
   html: string | null
@@ -259,7 +274,7 @@ export interface MyHomepage {
   updatedAt: string | null
 }
 
-/** 自定义主页数据组件中的帖子条目 */
+/** Post entry used by custom homepage data components */
 export interface HomepageDataPost {
   id: number
   title: string
@@ -270,7 +285,7 @@ export interface HomepageDataPost {
   createdAt: string
 }
 
-/** 自定义主页数据组件所需的公开数据 */
+/** Public data required by custom homepage data components */
 export interface HomepageData {
   profile: {
     id: number
@@ -286,7 +301,7 @@ export interface HomepageData {
   commented: HomepageDataPost[]
 }
 
-/** 管理后台个人主页条目 */
+/** User homepage entry in the admin console */
 export interface AdminHomepageItem {
   userId: number
   username: string
@@ -298,7 +313,77 @@ export interface AdminHomepageItem {
   updatedAt?: string | null
 }
 
-/** 信息项目录 */
+export type ForumHomepageMode = 'NORMAL' | 'CUSTOM'
+
+/** Public forum homepage view: visitors receive NORMAL only when blocked */
+export interface PublicForumHomepage {
+  mode: ForumHomepageMode
+  html?: string
+  blocked?: boolean
+  blockReason?: string | null
+  updatedAt?: string | null
+}
+
+/** Full forum homepage configuration read by managers */
+export interface MyForumHomepage {
+  mode: ForumHomepageMode
+  html: string | null
+  status: HomepageStatus
+  blockReason: string | null
+  sizeBytes: number
+  updatedAt: string | null
+}
+
+/** Post entry used by custom forum homepage components */
+export interface ForumHomepagePost {
+  id: number
+  title: string
+  score: number
+  commentCount: number
+  authorName: string | null
+  createdAt: string
+}
+
+/** Member entry used by custom forum homepage components */
+export interface ForumMemberSummary {
+  id: number
+  username: string
+  avatar: string | null
+  role: string
+  joinedAt: string
+}
+
+/** Public data required by forum homepage data components */
+export interface ForumHomepageData {
+  forum: {
+    id: number
+    slug: string
+    name: string
+    description: string | null
+    icon: string | null
+    themeColor: string | null
+    createdAt: string
+  }
+  stats: { members: number; posts: number; comments: number }
+  posts: ForumHomepagePost[]
+  hotPosts: ForumHomepagePost[]
+  members: ForumMemberSummary[]
+}
+
+/** Forum homepage entry in the admin console */
+export interface AdminForumHomepageItem {
+  forumId: number
+  forumName: string
+  forumSlug: string
+  creatorName: string
+  status: HomepageStatus
+  sizeBytes: number
+  blockReason?: string | null
+  reportCount: number
+  updatedAt?: string | null
+}
+
+/** Info field catalog */
 export interface InfoField {
   fieldKey: string
   label: string
@@ -315,7 +400,7 @@ export interface InfoFieldGroup {
   fields: InfoField[]
 }
 
-/** 我的资料项 */
+/** My profile item */
 export interface UserInfoItem {
   fieldKey: string
   label: string

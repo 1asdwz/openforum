@@ -1,6 +1,6 @@
 use crate::error::ApiError;
 
-/// 认证等级，对应 Java `AuthLevel`（rank + 中文标签）。
+/// Auth level, mirrors Java `AuthLevel` (rank + label).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum AuthLevel {
     Low,
@@ -28,14 +28,14 @@ impl AuthLevel {
         }
     }
 
-    /// 未知等级 → 400（对应 Java `AuthLevel.parse`）。
+    /// Unknown level → 400 (mirrors Java `AuthLevel.parse`).
     pub fn parse(raw: &str) -> Result<AuthLevel, ApiError> {
         match raw.trim().to_ascii_uppercase().as_str() {
             "LOW" => Ok(AuthLevel::Low),
             "MEDIUM" => Ok(AuthLevel::Medium),
             "HIGH" => Ok(AuthLevel::High),
             "EXTREME" => Ok(AuthLevel::Extreme),
-            _ => Err(ApiError::bad_request(format!("未知认证等级: {raw}"))),
+            _ => Err(ApiError::bad_request(format!("Unknown auth level: {raw}"))),
         }
     }
 
@@ -50,21 +50,21 @@ impl AuthLevel {
     }
 }
 
-/// 认证类型取值，对应 Java `AuthType`。
+/// Auth type values, mirrors Java `AuthType`.
 pub const AUTH_TYPES: [(&str, &str); 13] = [
-    ("REAL_NAME", "实名认证"),
-    ("ID_CARD", "身份证认证"),
-    ("GENDER", "性别认证"),
-    ("AGE", "年龄认证"),
-    ("NATIONALITY", "国籍认证"),
-    ("CITY", "城市认证"),
-    ("OCCUPATION", "职业认证"),
-    ("EDUCATION", "学历认证"),
-    ("DRIVER_LICENSE", "驾照认证"),
-    ("MARRIAGE_CERT", "婚姻认证"),
-    ("PROPERTY_CERT", "房产认证"),
-    ("ASSETS", "资产认证"),
-    ("CUSTOM", "自定义认证"),
+    ("REAL_NAME", "Real-name verification"),
+    ("ID_CARD", "ID card verification"),
+    ("GENDER", "Gender verification"),
+    ("AGE", "Age verification"),
+    ("NATIONALITY", "Nationality verification"),
+    ("CITY", "City verification"),
+    ("OCCUPATION", "Occupation verification"),
+    ("EDUCATION", "Education verification"),
+    ("DRIVER_LICENSE", "Driver's license verification"),
+    ("MARRIAGE_CERT", "Marriage verification"),
+    ("PROPERTY_CERT", "Property verification"),
+    ("ASSETS", "Assets verification"),
+    ("CUSTOM", "Custom verification"),
 ];
 
 pub fn auth_type_label(t: &str) -> Option<&'static str> {
@@ -75,5 +75,5 @@ pub fn is_known_auth_type(t: &str) -> bool {
     AUTH_TYPES.iter().any(|(k, _)| *k == t)
 }
 
-/// 动作池，对应 Java `AuthChallengeService`。
+/// Action pool, mirrors Java `AuthChallengeService`.
 pub const CHALLENGE_ACTIONS: [&str; 5] = ["BLINK", "OPEN_MOUTH", "TURN_LEFT", "TURN_RIGHT", "NOD"];

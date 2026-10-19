@@ -9,25 +9,25 @@
       style="margin-bottom: 12px"
     />
 
-    <!-- 待开始 -->
+    <!-- Not started -->
     <div v-if="phase === 'idle' || phase === 'error'">
       <p class="video-tip">
-        视频认证将随机生成 {{ 3 }} 个动作，请在光线充足、面部无遮挡的环境下正对镜头完成。
+        Video verification randomly generates {{ 3 }} actions. Please face the camera in a well-lit environment with your face unobstructed.
       </p>
       <div class="video-actions">
         <el-button type="primary" :disabled="disabled" @click="start">
-          开始视频认证
+          Start video verification
         </el-button>
         <el-button v-if="degradedAvailable" :disabled="disabled" @click="startDegraded">
-          仅录制视频，转人工审核
+          Record video only for manual review
         </el-button>
       </div>
     </div>
 
-    <!-- 进行中 -->
+    <!-- In progress -->
     <div v-else-if="phase === 'initializing'" class="video-loading">
       <span class="video-spinner" />
-      正在初始化摄像头与活体模型…
+      Initializing camera and liveness model…
     </div>
 
     <div v-else class="video-stage">
@@ -37,7 +37,7 @@
       </div>
 
       <div class="video-guide">
-        <p class="video-hint">{{ progress?.hint || '请正对镜头' }}</p>
+        <p class="video-hint">{{ progress?.hint || 'Please face the camera' }}</p>
         <ul class="video-action-list">
           <li
             v-for="(action, index) in actions"
@@ -52,7 +52,7 @@
           </li>
         </ul>
         <p v-if="isDegraded" class="video-degraded-note">
-          降级录制中：请正对镜头并缓慢转头，录制约 6 秒后将提交人工审核。
+          Degraded recording in progress: face the camera and turn your head slowly. The recording will be submitted for manual review after about 6 seconds.
         </p>
 
         <div class="video-actions">
@@ -61,19 +61,19 @@
             :disabled="isDegraded"
             @click="cancel"
           >
-            取消
+            Cancel
           </el-button>
-          <el-button v-else type="primary" :loading="true">上传中…</el-button>
+          <el-button v-else type="primary" :loading="true">Uploading…</el-button>
         </div>
       </div>
     </div>
 
-    <!-- 完成 -->
+    <!-- Completed -->
     <div v-if="phase === 'done'" class="video-done">
-      <el-alert title="视频已上传" type="success" :closable="false" show-icon />
+      <el-alert title="Video uploaded" type="success" :closable="false" show-icon />
       <video v-if="previewUrl" :src="previewUrl" class="video-preview" controls />
       <div class="video-actions">
-        <el-button @click="reset">重新录制</el-button>
+        <el-button @click="reset">Record again</el-button>
       </div>
     </div>
   </div>
@@ -118,7 +118,7 @@ const actions = computed<LivenessAction[]>(
   () => (challenge.value?.actions as LivenessAction[]) || []
 )
 
-/** 供父组件读取已完成的结果 */
+/** Expose the completed result to the parent component */
 function getResult(): VideoAuthResult | null {
   return result.value
 }
@@ -136,7 +136,7 @@ function reset() {
 async function start() {
   if (props.disabled) return
   if (!isLivenessSupported()) {
-    errorMsg.value = '当前浏览器不支持摄像头活体检测，可尝试降级录制。'
+    errorMsg.value = 'This browser does not support camera liveness detection. Try degraded recording instead.'
     degradedAvailable.value = true
     phase.value = 'error'
     return
@@ -227,12 +227,12 @@ function handleError(e: unknown) {
     }
     errorMsg.value = e.message
   } else {
-    errorMsg.value = errorMessage(e, '视频认证失败，请重试')
+    errorMsg.value = errorMessage(e, 'Video verification failed. Please try again.')
   }
   phase.value = 'error'
 }
 
-/** 降级：仅录制视频（仍叠加 nonce 水印），不做活体判定 */
+/** Degraded mode: record video only (still overlays the nonce watermark), with no liveness check */
 async function recordPlainVideo(): Promise<{ blob: Blob; startedAt: string; endedAt: string }> {
   const video = videoEl.value!
   const canvas = canvasEl.value!
@@ -248,7 +248,7 @@ async function recordPlainVideo(): Promise<{ blob: Blob; startedAt: string; ende
   const mime = pickRecorderMime()
   if (!mime) {
     stream.getTracks().forEach((t) => t.stop())
-    throw new LivenessError('UNSUPPORTED', '当前浏览器不支持视频录制')
+    throw new LivenessError('UNSUPPORTED', 'This browser does not support video recording')
   }
   const recorder = new MediaRecorder(canvas.captureStream(25), { mimeType: mime })
   const chunks: BlobPart[] = []
@@ -284,7 +284,7 @@ async function recordPlainVideo(): Promise<{ blob: Blob; startedAt: string; ende
         ctx.fillStyle = 'rgba(0,0,0,0.45)'
         ctx.fillRect(0, h - Math.round(h / 12), w, Math.round(h / 12))
         ctx.fillStyle = '#fff'
-        ctx.fillText(`${nonce}  剩余 ${remain}s`, 12, h - 10)
+        ctx.fillText(`${nonce}  ${remain}s left`, 12, h - 10)
         ctx.restore()
       }
       if (elapsed >= duration) {
@@ -304,7 +304,7 @@ async function recordPlainVideo(): Promise<{ blob: Blob; startedAt: string; ende
   video.srcObject = null
   const endedAt = new Date().toISOString()
   const blob = new Blob(chunks, { type: mime })
-  if (!blob.size) throw new LivenessError('UNSUPPORTED', '视频录制失败，请重试')
+  if (!blob.size) throw new LivenessError('UNSUPPORTED', 'Video recording failed. Please try again.')
   return { blob, startedAt, endedAt }
 }
 

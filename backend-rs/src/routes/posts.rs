@@ -137,7 +137,7 @@ async fn require_post(pool: &MySqlPool, id: i64) -> Result<Post, ApiError> {
         .bind(id)
         .fetch_optional(pool)
         .await?
-        .ok_or_else(|| ApiError::not_found("帖子不存在"))
+        .ok_or_else(|| ApiError::not_found("Post not found"))
 }
 
 async fn assert_can_edit(
@@ -149,11 +149,20 @@ async fn assert_can_edit(
         return Ok(());
     }
     if let Some(forum) = crate::routes::forums::find_by_id(pool, post.forum_id).await? {
-        if access::can_manage(pool, &forum, Some(user_id)).await? {
+        if access::has_permission(
+            pool,
+            &forum,
+            Some(user_id),
+            access::PERM_POSTS_COMMENTS,
+        )
+        .await?
+        {
             return Ok(());
         }
     }
-    Err(ApiError::forbidden("只有作者或坛主可以操作"))
+    Err(ApiError::forbidden(
+        "Only the author or a moderator with the Posts & Comments permission can perform this action",
+    ))
 }
 
 async fn recount_posts(conn: &mut sqlx::MySqlConnection, forum_id: i64) -> Result<(), ApiError> {
@@ -270,25 +279,25 @@ pub async fn create(
     let me = user.require()?;
     let forum_id = req
         .forum_id
-        .ok_or_else(|| ApiError::bad_request("forumId forumId 不能为空"))?;
+        .ok_or_else(|| ApiError::bad_request("forumId must not be empty"))?;
     if req.title.as_deref().map(|s| s.trim().is_empty()).unwrap_or(true) {
-        return Err(ApiError::bad_request("title 标题不能为空"));
+        return Err(ApiError::bad_request("title must not be empty"));
     }
     let title = req.title.as_deref().unwrap().trim().to_string();
     if title.chars().count() > 300 {
-        return Err(ApiError::bad_request("title 长度不能超过 300"));
+        return Err(ApiError::bad_request("title must not exceed 300 characters"));
     }
     if req.content.as_deref().map(|s| s.trim().is_empty()).unwrap_or(true) {
-        return Err(ApiError::bad_request("content 内容不能为空"));
+        return Err(ApiError::bad_request("content must not be empty"));
     }
     let content = req.content.as_deref().unwrap().to_string();
 
     let forum = crate::routes::forums::find_by_id(&state.pool, forum_id)
         .await?
-        .ok_or_else(|| ApiError::not_found("子论坛不存在"))?;
+        .ok_or_else(|| ApiError::not_found("Forum not found"))?;
     gate::ensure(&state.pool, Some(me.id), me.is_admin(), &forum, GateKind::Operate).await?;
 
-    // 帖子插入与论坛帖子数重算需原子完成（对齐 Java `PostService.create` 的 @Transactional）。
+    // Post insert and forum post count recount must be atomic (matches @Transactional in Java `PostService.create`).
     let mut tx = state.pool.begin().await?;
     let result = sqlx::query(
         "INSERT INTO posts (forum_id, author_id, title, content, upvotes, downvotes, score, comment_count, \
@@ -345,7 +354,7 @@ pub async fn delete(
     let me = user.require()?;
     let post = require_post(&state.pool, id).await?;
     assert_can_edit(&state.pool, &post, me.id).await?;
-    // 软删除、清票与帖子数重算需原子完成（对齐 Java `PostService.delete`）。
+    // Soft delete, vote cleanup, and post count recount must be atomic (matches Java `PostService.delete`).
     let mut tx = state.pool.begin().await?;
     sqlx::query("UPDATE posts SET is_removed = 1, updated_at = NOW() WHERE id = ?")
         .bind(post.id)
@@ -368,13 +377,13 @@ pub async fn post_vote(
     let post = require_post(&state.pool, id).await?;
     let forum = crate::routes::forums::find_by_id(&state.pool, post.forum_id)
         .await?
-        .ok_or_else(|| ApiError::not_found("子论坛不存在"))?;
+        .ok_or_else(|| ApiError::not_found("Forum not found"))?;
     gate::ensure(&state.pool, Some(me.id), me.is_admin(), &forum, GateKind::Operate).await?;
     let value = req.value.unwrap_or(0);
     if !(-1..=1).contains(&value) {
-        return Err(ApiError::bad_request("投票值只能是 1、-1 或 0"));
+        return Err(ApiError::bad_request("Vote value must be 1, -1, or 0"));
     }
-    // 票记录变更与帖子计数写回需原子完成（对齐 Java `PostService.vote` 的 @Transactional）。
+    // Vote record changes and post count write-back must be atomic (matches @Transactional in Java `PostService.vote`).
     let mut tx = state.pool.begin().await?;
     let outcome = vote::apply(
         &mut tx,
@@ -408,10 +417,14 @@ pub async fn pin(
     let post = require_post(&state.pool, id).await?;
     let forum = crate::routes::forums::find_by_id(&state.pool, post.forum_id)
         .await?
-        .ok_or_else(|| ApiError::not_found("子论坛不存在"))?;
-    if !access::can_manage(&state.pool, &forum, Some(me.id)).await? {
-        return Err(ApiError::forbidden("需要坛主或管理员权限"));
-    }
+        .ok_or_else(|| ApiError::not_found("Forum not found"))?;
+    access::require_permission(
+        &state.pool,
+        &forum,
+        Some(me.id),
+        access::PERM_POSTS_COMMENTS,
+    )
+    .await?;
     sqlx::query("UPDATE posts SET is_pinned = ? WHERE id = ?")
         .bind(!post.pinned)
         .bind(post.id)
@@ -421,7 +434,7 @@ pub async fn pin(
     Ok(j::ok(to_detail(&state, &post, Some(me.id), me.is_admin()).await?))
 }
 
-/// 供 users 模块复用：GET /users/{id}/posts
+/// Reused by the users module: GET /users/{id}/posts
 pub async fn list_by_author(
     state: &AppState,
     author_id: i64,
@@ -448,7 +461,7 @@ pub async fn list_by_author(
     Ok(j::ok(j::PageResponse::of(content, page, size, total)))
 }
 
-/// 供评论模块复用：重算帖子的评论数（需在调用方事务内执行）。
+/// Reused by the comments module: recount a post's comments (must run inside the caller's transaction).
 pub async fn recount_comments(conn: &mut sqlx::MySqlConnection, post_id: i64) -> Result<(), ApiError> {
     let (count,): (i64,) =
         sqlx::query_as("SELECT COUNT(*) FROM comments WHERE post_id = ? AND is_removed = 0")
@@ -463,7 +476,7 @@ pub async fn recount_comments(conn: &mut sqlx::MySqlConnection, post_id: i64) ->
     Ok(())
 }
 
-/// 保留：帖子存在性检查（供其它模块使用）。
+/// Retained: post existence check (used by other modules).
 #[allow(dead_code)]
 pub async fn post_exists(pool: &MySqlPool, id: i64) -> Result<bool, ApiError> {
     let row: Option<(i64,)> =

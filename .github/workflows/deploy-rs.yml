@@ -84,7 +84,12 @@ jobs:
               --memory 256m --memory-swap 384m \
               --env-file /root/openforum-build-rs/openforum-rs.env \
               openforum-rs:latest
-            sleep 5
+            sleep 8
+            if ! docker ps --filter name=openforum-rs --filter status=running --format '{{.Names}}' | grep -qx openforum-rs; then
+              echo "ERROR: openforum-rs exited after start; recent logs:" >&2
+              docker logs --tail 60 openforum-rs >&2 || true
+              exit 1
+            fi
             docker ps --filter name=openforum-rs --format '{{.Names}} {{.Status}} {{.Ports}}'
             docker logs --tail 30 openforum-rs || true
             docker image prune -f >/dev/null 2>&1 || true

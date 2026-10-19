@@ -24,12 +24,12 @@ pub fn extension_for(content_type: &str) -> &'static str {
     }
 }
 
-/// 读取 multipart 中的 `file` 字段，返回 (bytes, content_type)。
+/// Reads the `file` field from a multipart request and returns (bytes, content_type).
 pub async fn read_file_field(multipart: &mut Multipart) -> Result<(Vec<u8>, String), ApiError> {
     while let Some(field) = multipart
         .next_field()
         .await
-        .map_err(|_| ApiError::bad_request("读取上传文件失败"))?
+        .map_err(|_| ApiError::bad_request("Failed to read the uploaded file"))?
     {
         if field.name() == Some("file") {
             let content_type = field
@@ -39,11 +39,11 @@ pub async fn read_file_field(multipart: &mut Multipart) -> Result<(Vec<u8>, Stri
             let bytes = field
                 .bytes()
                 .await
-                .map_err(|_| ApiError::bad_request("读取上传文件失败"))?;
+                .map_err(|_| ApiError::bad_request("Failed to read the uploaded file"))?;
             return Ok((bytes.to_vec(), content_type));
         }
     }
-    Err(ApiError::bad_request("上传文件不能为空"))
+    Err(ApiError::bad_request("Uploaded file must not be empty"))
 }
 
 /// POST /media
@@ -55,25 +55,25 @@ pub async fn upload(
     let me = user.require()?;
     let (bytes, content_type) = read_file_field(&mut multipart).await?;
     if bytes.is_empty() {
-        return Err(ApiError::bad_request("上传文件不能为空"));
+        return Err(ApiError::bad_request("Uploaded file must not be empty"));
     }
     if !state.storage.is_enabled() {
-        return Err(ApiError::bad_request("文件存储未启用，无法上传媒体"));
+        return Err(ApiError::bad_request("File storage is not enabled; cannot upload media"));
     }
     let lower = content_type.to_lowercase();
     let is_video = VIDEO_TYPES.contains(&lower.as_str());
     let is_image = IMAGE_TYPES.contains(&lower.as_str());
     if !is_video && !is_image {
         return Err(ApiError::bad_request(
-            "文件格式不支持，图片仅允许 jpeg/png/webp/gif，视频仅允许 mp4/webm",
+            "Unsupported file format; images must be jpeg/png/webp/gif and videos must be mp4/webm",
         ));
     }
     let size = bytes.len() as i64;
     if is_video && size > state.cfg.auth_max_video_bytes {
-        return Err(ApiError::bad_request("视频过大，上限 50MB"));
+        return Err(ApiError::bad_request("Video is too large; the limit is 50MB"));
     }
     if is_image && size > state.cfg.auth_max_image_bytes {
-        return Err(ApiError::bad_request("图片过大，上限 10MB"));
+        return Err(ApiError::bad_request("Image is too large; the limit is 10MB"));
     }
 
     let ext = extension_for(&lower);
@@ -110,9 +110,9 @@ pub async fn get(
             .fetch_optional(&state.pool)
             .await?;
     let (object_key, content_type, size) =
-        row.ok_or_else(|| ApiError::not_found("媒体文件不存在"))?;
+        row.ok_or_else(|| ApiError::not_found("Media file not found"))?;
     if !state.storage.is_enabled() {
-        return Err(ApiError::bad_request("文件存储未启用"));
+        return Err(ApiError::bad_request("File storage is not enabled"));
     }
     let bytes = state.storage.get(&object_key).await?;
     let ct = content_type.unwrap_or_else(|| "application/octet-stream".to_string());

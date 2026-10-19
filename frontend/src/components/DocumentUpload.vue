@@ -10,10 +10,10 @@
         @change="onPick"
       />
       <el-button :disabled="disabled || full" @click="fileInput?.click()">
-        选择 / 拍摄证件照片
+        Select / capture document photos
       </el-button>
       <span class="doc-upload-count">
-        已上传 {{ items.length }} / {{ maxCount }} 张
+        Uploaded {{ items.length }} / {{ maxCount }}
       </span>
     </div>
 
@@ -31,13 +31,13 @@
         <img :src="item.url" :alt="item.name" />
         <div class="doc-upload-item-mask">
           <el-button size="small" type="danger" @click="remove(item.mediaId)">
-            删除
+            Delete
           </el-button>
         </div>
         <div class="doc-upload-item-name" :title="item.name">{{ item.name }}</div>
       </div>
     </div>
-    <div v-else class="doc-upload-empty">尚未上传证件照片</div>
+    <div v-else class="doc-upload-empty">No document photos uploaded yet</div>
   </div>
 </template>
 
@@ -74,9 +74,9 @@ const full = computed(() => items.value.length >= props.maxCount)
 const hint = computed(() => {
   if (props.disabled) return ''
   if (items.value.length < props.minCount) {
-    return `请上传至少 ${props.minCount} 张清晰证件照片（支持 JPEG/PNG/WEBP，单张不超过 10MB）`
+    return `Upload at least ${props.minCount} clear document photo(s) (JPEG/PNG/WEBP, max 10MB each)`
   }
-  return '照片需完整、清晰、无反光、无遮挡，四角完整入镜'
+  return 'Photos must be complete and clear, with no glare or obstruction and all four corners in frame'
 })
 
 function onPick(e: Event) {
@@ -91,18 +91,18 @@ async function upload(files: File[]) {
   if (props.disabled) return
   const remain = props.maxCount - items.value.length
   if (remain <= 0) {
-    ElMessage.warning(`最多上传 ${props.maxCount} 张`)
+    ElMessage.warning(`You can upload at most ${props.maxCount} photos`)
     return
   }
   uploading.value = true
   try {
     for (const file of files.slice(0, remain)) {
       if (!/^image\/(jpeg|png|webp)$/i.test(file.type)) {
-        ElMessage.warning(`「${file.name}」格式不支持，请上传 JPEG/PNG/WEBP`)
+        ElMessage.warning(`"${file.name}" has an unsupported format; please upload JPEG/PNG/WEBP`)
         continue
       }
       if (file.size > 10 * 1024 * 1024) {
-        ElMessage.warning(`「${file.name}」超过 10MB`)
+        ElMessage.warning(`"${file.name}" exceeds 10MB`)
         continue
       }
       try {
@@ -115,7 +115,7 @@ async function upload(files: File[]) {
         })
         emit('change', items.value.map((i) => i.mediaId))
       } catch (err) {
-        ElMessage.error(errorMessage(err, `「${file.name}」上传失败`))
+        ElMessage.error(errorMessage(err, `Failed to upload "${file.name}"`))
       }
     }
   } finally {
@@ -131,7 +131,7 @@ function remove(mediaId: number) {
   emit('change', items.value.map((i) => i.mediaId))
 }
 
-/** 供父组件读取当前已上传的媒体 id */
+/** Expose the currently uploaded media IDs to the parent component */
 function getMediaIds(): number[] {
   return items.value.map((i) => i.mediaId)
 }

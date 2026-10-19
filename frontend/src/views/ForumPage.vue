@@ -3,12 +3,12 @@
     <el-skeleton v-if="loading" :rows="8" animated />
 
     <div v-else-if="blocked" class="content-card gate-blocked">
-      <h1 class="page-title" style="margin-top: 0">无法浏览该板块</h1>
+      <h1 class="page-title" style="margin-top: 0">Unable to view this forum</h1>
       <p class="gate-blocked-desc">
         {{ blocked.message }}
       </p>
       <div v-if="blocked.missing.length" class="gate-missing">
-        <div class="gate-missing-title">还需要满足：</div>
+        <div class="gate-missing-title">Still required:</div>
         <div v-for="item in blocked.missing" :key="item.fieldKey" class="gate-missing-row">
           <span class="gate-missing-label">{{ item.label }}</span>
           <span class="gate-missing-required">{{ item.required }}</span>
@@ -23,23 +23,42 @@
           type="primary"
           @click="router.push({ name: 'login', query: { redirect: route.fullPath } })"
         >
-          登录后重试
+          Log in and retry
         </el-button>
-        <el-button type="primary" @click="router.push('/profile')">完善资料与认证</el-button>
-        <el-button @click="router.push('/search')">返回探索</el-button>
+        <el-button type="primary" @click="router.push('/profile')">Complete profile & verification</el-button>
+        <el-button @click="router.push('/search')">Back to explore</el-button>
       </div>
     </div>
 
     <div v-else-if="error" class="state-box error">
       {{ error }}
       <div style="margin-top: 12px">
-        <el-button size="small" @click="loadForum">重试</el-button>
+        <el-button size="small" @click="loadForum">Retry</el-button>
       </div>
     </div>
 
     <template v-else-if="forum">
       <div class="forum-layout">
         <div class="forum-main">
+          <template v-if="customHomeActive">
+            <el-alert
+              v-if="homepageBlocked"
+              type="warning"
+              show-icon
+              :closable="false"
+              title="This custom homepage has been taken down; visitors currently see the default homepage"
+              style="margin-bottom: 12px"
+            >
+              <template #default>Reason: {{ homepageBlockReason || 'Not provided' }}</template>
+            </el-alert>
+            <SafeHomepageFrame
+              :html="homepageHtml"
+              :load-data="loadForumHomepageData"
+              title="Community custom homepage"
+            />
+          </template>
+
+          <template v-else>
           <section class="forum-hero">
             <div
               class="forum-hero-banner"
@@ -57,7 +76,7 @@
                   }}<template v-if="forum.description"> · {{ forum.description }}</template>
                 </p>
                 <p class="forum-hero-stats">
-                  {{ forum.memberCount }} 成员 · {{ forum.postCount }} 帖子
+                  {{ forum.memberCount }} members · {{ forum.postCount }} posts
                 </p>
                 <div v-if="browseTags.length" class="required-tags">
                   <el-tag
@@ -67,7 +86,7 @@
                     type="warning"
                     effect="plain"
                   >
-                    浏览：{{ t }}
+                    Browse: {{ t }}
                   </el-tag>
                 </div>
                 <div v-if="operateTags.length" class="required-tags">
@@ -78,7 +97,7 @@
                     type="info"
                     effect="plain"
                   >
-                    互动：{{ t }}
+                    Interact: {{ t }}
                   </el-tag>
                 </div>
               </div>
@@ -89,21 +108,13 @@
                   round
                   @click="toggleMembership(true)"
                 >
-                  加入
+                  Join
                 </el-button>
-                <el-button v-else round @click="toggleMembership(false)">已加入</el-button>
+                <el-button v-else round @click="toggleMembership(false)">Joined</el-button>
 
                 <el-button type="primary" plain round @click="openCreatePost">
                   <IconPlus />
-                  <span>发帖</span>
-                </el-button>
-
-                <el-button
-                  v-if="isOwner"
-                  text
-                  @click="router.push(`/f/${forum.slug}/settings`)"
-                >
-                  坛主设置
+                  <span>Post</span>
                 </el-button>
               </div>
             </div>
@@ -114,61 +125,54 @@
             type="warning"
             show-icon
             :closable="false"
-            title="你还未满足本社区的互动门槛，请先完善资料或提升认证等级"
+            title="You have not met this community's interaction threshold. Complete your profile or raise your verification level."
           >
             <template #default>
               <el-button size="small" text type="primary" @click="router.push('/profile')">
-                去完善资料
+                Complete profile
               </el-button>
             </template>
           </el-alert>
 
-          <!-- 已审核通过的自定义页面 -->
-          <template v-if="forum.customPageStatus === 'APPROVED'">
-            <CustomPageRenderer :html="customHtml" />
-          </template>
-
-          <!-- 默认模板 -->
-          <template v-else>
-            <div v-if="template.announcement" class="template-section">
-              <h3>公告</h3>
-              <div class="section-content">{{ template.announcement }}</div>
+          <!-- Default template -->
+          <div v-if="template.announcement" class="template-section">
+            <h3>Announcement</h3>
+            <div class="section-content">{{ template.announcement }}</div>
+          </div>
+          <div
+            v-for="(section, i) in template.sections || []"
+            :key="i"
+            class="template-section"
+          >
+            <h3>{{ section.title }}</h3>
+            <div class="section-content">{{ section.content }}</div>
+          </div>
+          <div v-if="template.links && template.links.length" class="template-section">
+            <h3>Related links</h3>
+            <div class="template-links">
+              <el-button
+                v-for="(link, i) in template.links"
+                :key="i"
+                tag="a"
+                :href="link.url"
+                target="_blank"
+                rel="noopener"
+                round
+              >
+                {{ link.label }}
+              </el-button>
             </div>
-            <div
-              v-for="(section, i) in template.sections || []"
-              :key="i"
-              class="template-section"
-            >
-              <h3>{{ section.title }}</h3>
-              <div class="section-content">{{ section.content }}</div>
-            </div>
-            <div v-if="template.links && template.links.length" class="template-section">
-              <h3>相关链接</h3>
-              <div class="template-links">
-                <el-button
-                  v-for="(link, i) in template.links"
-                  :key="i"
-                  tag="a"
-                  :href="link.url"
-                  target="_blank"
-                  rel="noopener"
-                  round
-                >
-                  {{ link.label }}
-                </el-button>
-              </div>
-            </div>
-          </template>
+          </div>
 
           <div class="feed-toolbar">
             <SortChips v-model="sort" :options="sorts" />
-            <el-button size="small" text @click="loadPosts(true)">刷新</el-button>
+            <el-button size="small" text @click="loadPosts(true)">Refresh</el-button>
           </div>
 
           <el-skeleton v-if="postsLoading" :rows="4" animated />
           <div v-else-if="postsError" class="state-box error">{{ postsError }}</div>
           <div v-else-if="!posts.length" class="state-box">
-            这个社区还没有帖子，来发布第一条吧
+            This community has no posts yet. Be the first to post!
           </div>
           <template v-else>
             <div class="post-list">
@@ -181,9 +185,10 @@
             </div>
             <div v-if="posts.length < postsTotal" class="load-more">
               <el-button round :loading="postsLoadingMore" @click="loadMorePosts">
-                加载更多
+                Load more
               </el-button>
             </div>
+          </template>
           </template>
         </div>
 
@@ -194,21 +199,21 @@
               :style="{ background: forum.themeColor || 'var(--of-brand)' }"
             ></div>
             <div class="about-body">
-              <h3 class="about-title">关于社区</h3>
+              <h3 class="about-title">About community</h3>
               <p class="about-desc">
-                {{ forum.description || '这个社区还没有简介' }}
+                {{ forum.description || 'This community has no description yet' }}
               </p>
               <div class="about-stats">
                 <div class="about-row">
-                  <span class="k">成员</span>
+                  <span class="k">Members</span>
                   <span class="v">{{ forum.memberCount }}</span>
                 </div>
                 <div class="about-row">
-                  <span class="k">帖子</span>
+                  <span class="k">Posts</span>
                   <span class="v">{{ forum.postCount }}</span>
                 </div>
                 <div class="about-row">
-                  <span class="k">社区代号</span>
+                  <span class="k">Community slug</span>
                   <span class="v">f/{{ forum.slug }}</span>
                 </div>
               </div>
@@ -218,13 +223,32 @@
                 round
                 @click="toggleMembership(!forum.isMember)"
               >
-                {{ forum.isMember ? '已加入社区' : '加入社区' }}
+                {{ forum.isMember ? 'Joined community' : 'Join community' }}
               </el-button>
+              <div class="rail-actions">
+                <el-button
+                  v-if="canManage"
+                  size="small"
+                  text
+                  type="primary"
+                  @click="router.push(`/f/${forum.slug}/mod`)"
+                >
+                  Moderation
+                </el-button>
+                <el-button
+                  v-if="customHomeActive && auth.isAuthenticated && !canManage"
+                  size="small"
+                  text
+                  @click="openReport"
+                >
+                  Report this homepage
+                </el-button>
+              </div>
             </div>
           </section>
 
           <section v-if="ruleList.length" class="rail-card">
-            <div class="rail-heading">社区规则</div>
+            <div class="rail-heading">Community rules</div>
             <div v-for="(rule, i) in ruleList" :key="i" class="rule-item">
               <span class="rule-index">{{ i + 1 }}</span>
               <span>{{ rule }}</span>
@@ -234,24 +258,53 @@
       </div>
     </template>
 
-    <!-- 发帖弹窗 -->
-    <el-dialog v-model="createVisible" title="发布帖子" width="560px">
+    <!-- Create post dialog -->
+    <el-dialog v-model="createVisible" title="Create post" width="560px">
       <el-form label-position="top">
-        <el-form-item label="标题">
+        <el-form-item label="Title">
           <el-input v-model="createForm.title" maxlength="120" show-word-limit />
         </el-form-item>
-        <el-form-item label="内容">
+        <el-form-item label="Content">
           <RichTextEditor
             v-model="createForm.content"
-            placeholder="分享你的想法…"
+            placeholder="Share your thoughts…"
             :min-height="200"
           />
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="createVisible = false">取消</el-button>
+        <el-button @click="createVisible = false">Cancel</el-button>
         <el-button type="primary" :loading="creating" @click="submitPost">
-          发布
+          Publish
+        </el-button>
+      </template>
+    </el-dialog>
+
+    <!-- Report custom homepage -->
+    <el-dialog v-model="reportVisible" title="Report this homepage" width="480px">
+      <p class="report-hint">Choose or enter a reason for the report; an administrator will review it as soon as possible.</p>
+      <div class="report-quick">
+        <el-check-tag
+          v-for="option in REPORT_OPTIONS"
+          :key="option"
+          :checked="reportReason === option"
+          @change="reportReason = option"
+        >
+          {{ option }}
+        </el-check-tag>
+      </div>
+      <el-input
+        v-model="reportReason"
+        type="textarea"
+        :rows="4"
+        maxlength="500"
+        show-word-limit
+        placeholder="Describe the issue (5-500 characters)"
+      />
+      <template #footer>
+        <el-button @click="reportVisible = false">Cancel</el-button>
+        <el-button type="danger" :loading="reporting" @click="submitReport">
+          Submit report
         </el-button>
       </template>
     </el-dialog>
@@ -265,11 +318,11 @@ import { ElMessage } from 'element-plus'
 import PostCard from '@/components/PostCard.vue'
 import SortChips, { type SortOption } from '@/components/SortChips.vue'
 import IconPlus from '@/components/icons/IconPlus.vue'
-import CustomPageRenderer from '@/components/CustomPageRenderer.vue'
+import SafeHomepageFrame from '@/components/SafeHomepageFrame.vue'
 import { forumApi, postApi } from '@/api'
 import { ApiError } from '@/api/client'
 import { useAuthStore } from '@/stores/auth'
-import type { GateDeniedData, Post, SubForum, TemplateConfig } from '@/types'
+import type { ForumHomepageMode, GateDeniedData, Post, SubForum, TemplateConfig } from '@/types'
 import {
   authTypeLabel,
   avatarText,
@@ -293,16 +346,19 @@ const auth = useAuthStore()
 type Sort = 'hot' | 'new' | 'top'
 
 const sorts: SortOption<Sort>[] = [
-  { label: '热门', value: 'hot' },
-  { label: '最新', value: 'new' },
-  { label: '最高分', value: 'top' },
+  { label: 'Hot', value: 'hot' },
+  { label: 'New', value: 'new' },
+  { label: 'Top', value: 'top' },
 ]
 
 const forum = ref<SubForum | null>(null)
 const loading = ref(true)
 const error = ref('')
 const blocked = ref<GateDeniedData | null>(null)
-const customHtml = ref('')
+const homepageMode = ref<ForumHomepageMode>('NORMAL')
+const homepageHtml = ref('')
+const homepageBlocked = ref(false)
+const homepageBlockReason = ref('')
 const sort = ref<Sort>('hot')
 
 const posts = ref<Post[]>([])
@@ -326,15 +382,25 @@ const requiredAuthTypes = computed(() =>
 const browseTags = computed(() => {
   const modern = gateSummary(forum.value?.browseRule)
   if (modern.length) return modern
-  return requiredAuthTypes.value.map((t) => `需 ${authTypeLabel(t)}`)
+  return requiredAuthTypes.value.map((t) => `${authTypeLabel(t)} required`)
 })
 const operateTags = computed(() => gateSummary(forum.value?.operateRule))
 const canOperate = computed(() =>
   typeof forum.value?.canOperate === 'boolean' ? forum.value.canOperate : forum.value?.canPost
 )
-const isOwner = computed(
-  () => !!forum.value && !!auth.user && forum.value.creatorId === auth.user.id
+const canManage = computed(() => !!forum.value?.canManage)
+const customHomeActive = computed(
+  () => homepageMode.value === 'CUSTOM' && !!homepageHtml.value.trim()
 )
+const REPORT_OPTIONS = [
+  'Impersonating officials or others',
+  'Contains scams or misleading information',
+  'Contains sexual or violent content',
+  'Offensive page content',
+]
+const reportVisible = ref(false)
+const reportReason = ref('')
+const reporting = ref(false)
 const ruleList = computed(() =>
   (forum.value?.rules || '')
     .split('\n')
@@ -346,46 +412,93 @@ async function loadForum() {
   loading.value = true
   error.value = ''
   blocked.value = null
+  homepageMode.value = 'NORMAL'
+  homepageHtml.value = ''
+  homepageBlocked.value = false
+  homepageBlockReason.value = ''
   try {
     const slug = String(route.params.slug)
     const data = await forumApi.get(slug)
     forum.value = data
-    customHtml.value = data.customPageHtml || ''
-    if (data.customPageStatus === 'APPROVED' && !customHtml.value && data.id) {
-      try {
-        const info = await forumApi.getCustomPage(data.id)
-        customHtml.value = info?.html || ''
-      } catch {
-        // 无权限获取时忽略
+    // If homepage settings fail to load, fall back to the default homepage without blocking
+    // forum page rendering.
+    try {
+      const hp = await forumApi.homepage(data.id)
+      if (hp.mode === 'CUSTOM' && (hp.html || '').trim()) {
+        homepageMode.value = 'CUSTOM'
+        homepageHtml.value = hp.html || ''
+        homepageBlocked.value = !!hp.blocked
+        homepageBlockReason.value = hp.blockReason || ''
       }
+    } catch {
+      // Ignore and treat as the default homepage
     }
-    await loadPosts(true)
+    if (customHomeActive.value) {
+      posts.value = []
+      postsTotal.value = 0
+    } else {
+      await loadPosts(true)
+    }
   } catch (e) {
     if (e instanceof ApiError && e.status === 403) {
       const data = e.data as GateDeniedData | null
       if (data?.gate === 'BROWSE') {
         blocked.value = { ...data, message: e.message }
       } else {
-        error.value = errorMessage(e, '社区加载失败')
+        error.value = errorMessage(e, 'Failed to load community')
       }
     } else {
-      error.value = errorMessage(e, '社区加载失败')
+      error.value = errorMessage(e, 'Failed to load community')
     }
   } finally {
     loading.value = false
   }
 }
 
+function loadForumHomepageData() {
+  if (!forum.value) return Promise.reject(new Error('Community not loaded'))
+  return forumApi.homepageData(forum.value.id)
+}
+
+function openReport() {
+  if (!auth.isAuthenticated) {
+    ElMessage.warning('Please log in')
+    router.push({ name: 'login', query: { redirect: route.fullPath } })
+    return
+  }
+  reportReason.value = ''
+  reportVisible.value = true
+}
+
+async function submitReport() {
+  if (!forum.value) return
+  const reason = reportReason.value.trim()
+  if (reason.length < 5 || reason.length > 500) {
+    ElMessage.warning('The report reason must be 5-500 characters')
+    return
+  }
+  reporting.value = true
+  try {
+    await forumApi.reportHomepage(forum.value.id, reason)
+    reportVisible.value = false
+    ElMessage.success('Report submitted')
+  } catch (e) {
+    ElMessage.error(errorMessage(e, 'Failed to submit report'))
+  } finally {
+    reporting.value = false
+  }
+}
+
 function missingReasonLabel(reason: string): string {
   switch (reason) {
     case 'NOT_FILLED':
-      return '未填写'
+      return 'Not provided'
     case 'VALUE_MISMATCH':
-      return '不符合'
+      return 'Does not match'
     case 'AUTH_PENDING':
-      return '认证审核中'
+      return 'Verification pending'
     case 'AUTH_LEVEL_LOW':
-      return '认证等级不足'
+      return 'Verification level too low'
     default:
       return reason
   }
@@ -429,14 +542,14 @@ function loadMorePosts() {
 async function toggleMembership(join: boolean) {
   if (!forum.value) return
   if (!auth.isAuthenticated) {
-    ElMessage.warning('请先登录')
+    ElMessage.warning('Please log in')
     router.push({ name: 'login', query: { redirect: route.fullPath } })
     return
   }
   try {
     if (join) await forumApi.join(forum.value.id)
     else await forumApi.leave(forum.value.id)
-    ElMessage.success(join ? '已加入社区' : '已退出社区')
+    ElMessage.success(join ? 'Joined community' : 'Left community')
     await loadForum()
   } catch (e) {
     ElMessage.error(errorMessage(e))
@@ -445,12 +558,12 @@ async function toggleMembership(join: boolean) {
 
 function openCreatePost() {
   if (!auth.isAuthenticated) {
-    ElMessage.warning('请先登录')
+    ElMessage.warning('Please log in')
     router.push({ name: 'login', query: { redirect: route.fullPath } })
     return
   }
   if (canOperate.value === false) {
-    ElMessage.warning('你还未满足本社区的互动门槛')
+    ElMessage.warning('You have not met the interaction threshold for this community')
     return
   }
   createForm.title = ''
@@ -461,7 +574,7 @@ function openCreatePost() {
 async function submitPost() {
   if (!forum.value) return
   if (!createForm.title.trim() || !createForm.content.trim()) {
-    ElMessage.warning('请填写标题和内容')
+    ElMessage.warning('Please fill in the title and content')
     return
   }
   creating.value = true
@@ -471,11 +584,11 @@ async function submitPost() {
       title: createForm.title.trim(),
       content: createForm.content.trim(),
     })
-    ElMessage.success('发布成功')
+    ElMessage.success('Post published')
     createVisible.value = false
     await loadPosts(true)
   } catch (e) {
-    ElMessage.error(errorMessage(e, '发布失败'))
+    ElMessage.error(errorMessage(e, 'Failed to publish'))
   } finally {
     creating.value = false
   }
@@ -484,12 +597,12 @@ async function submitPost() {
 async function onVote(payload: { post: Post; value: number }) {
   const { post, value } = payload
   if (!auth.isAuthenticated) {
-    ElMessage.warning('请先登录后投票')
+    ElMessage.warning('Please log in to vote')
     router.push({ name: 'login', query: { redirect: route.fullPath } })
     return
   }
   if (post.canVote === false) {
-    ElMessage.warning('你暂时没有投票权限')
+    ElMessage.warning('You do not have voting permission yet')
     return
   }
   try {
@@ -549,5 +662,23 @@ onMounted(loadForum)
 .gate-missing-required {
   color: var(--of-text-muted);
   flex: 1;
+}
+.rail-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  margin-top: 8px;
+}
+.report-hint {
+  margin: 0 0 12px;
+  color: var(--of-text-muted);
+  font-size: 13px;
+}
+.report-quick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
 }
 </style>

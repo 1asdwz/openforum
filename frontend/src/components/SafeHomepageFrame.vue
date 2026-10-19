@@ -1,7 +1,7 @@
 <template>
   <div class="safe-homepage">
     <div v-if="!envOk" class="safe-homepage-error">
-      当前环境不支持安全预览（缺少有效的站点来源），请通过 https 访问本站。
+      Secure preview is not supported in this environment (missing a valid site origin). Please access this site over HTTPS.
     </div>
     <iframe
       v-else
@@ -12,7 +12,7 @@
       scrolling="no"
       :srcdoc="documentHtml"
       :style="{ height: `${height}px` }"
-      title="用户自定义主页"
+      :title="title || 'User-customized homepage'"
     />
   </div>
 </template>
@@ -21,10 +21,12 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessageBox } from 'element-plus'
-import { homepageApi } from '@/api'
-import type { HomepageData } from '@/types'
 
-const props = defineProps<{ html: string; userId: number }>()
+const props = defineProps<{
+  html: string
+  loadData?: () => Promise<unknown>
+  title?: string
+}>()
 
 interface HomepageMessage {
   __openforum_homepage?: number
@@ -34,7 +36,7 @@ interface HomepageMessage {
   url?: string
   nonce?: string
   ok?: boolean
-  data?: HomepageData
+  data?: unknown
 }
 
 const MIN_HEIGHT = 480
@@ -44,7 +46,7 @@ const router = useRouter()
 const frameRef = ref<HTMLIFrameElement | null>(null)
 const height = ref(MIN_HEIGHT)
 
-/** 只接受 http(s) 来源；file:// 等环境直接拒绝加载。 */
+/** Only http(s) origins are accepted; environments such as file:// are rejected outright. */
 const nonce = ref(randomNonce())
 const origin = computed(() => {
   const o = window.location.origin
@@ -66,12 +68,19 @@ function randomNonce(): string {
   }
 }
 
-/** 受信任 shim：拦截导航、上报高度、请求并渲染数据组件。用户 HTML 无法影响它。 */
+/** Trusted shim: intercepts navigation, reports height, and requests and renders data components. User HTML cannot affect it. */
 function shimScript(originValue: string, nonceValue: string): string {
   return `(function () {
   var PARENT_ORIGIN = ${JSON.stringify(originValue)};
   var NONCE = ${JSON.stringify(nonceValue)};
-  var EMPTY_TEXT = { authored: '暂无帖子', liked: '暂无点赞', commented: '暂无评论' };
+  var EMPTY_TEXT = {
+    authored: 'No posts yet',
+    liked: 'No liked posts yet',
+    commented: 'No comments yet',
+    latest: 'No posts yet',
+    hot: 'No posts yet',
+    members: 'No members yet'
+  };
   function post(payload) {
     payload.__openforum_homepage = 1;
     parent.postMessage(payload, PARENT_ORIGIN);
@@ -110,7 +119,9 @@ function shimScript(originValue: string, nonceValue: string): string {
   var comps = null;
   function components() {
     if (comps) return comps;
-    var nodes = document.querySelectorAll('of-profile, of-stats, of-posts');
+    var nodes = document.querySelectorAll(
+      'of-profile, of-stats, of-posts, of-forum, of-forum-stats, of-forum-posts, of-members'
+    );
     comps = Array.prototype.slice.call(nodes, 0, 20);
     return comps;
   }
@@ -130,6 +141,9 @@ function shimScript(originValue: string, nonceValue: string): string {
   function validAvatar(value) {
     return typeof value === 'string' && /^\\/forum\\/api\\/media\\/[0-9]+$/.test(value);
   }
+  function validThemeColor(value) {
+    return typeof value === 'string' && /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(value);
+  }
   function dateText(value) {
     if (!value) return '';
     var d = new Date(value);
@@ -139,41 +153,49 @@ function shimScript(originValue: string, nonceValue: string): string {
     return d.getFullYear() + '-' + (m < 10 ? '0' + m : m) + '-' + (day < 10 ? '0' + day : day);
   }
   function roleText(role) {
-    return role === 'ADMIN' ? '管理员' : '用户';
+    return role === 'ADMIN' ? 'Admin' : 'User';
+  }
+  function forumRoleText(role) {
+    if (role === 'OWNER') return 'Owner';
+    if (role === 'MODERATOR') return 'Moderator';
+    if (role === 'MEMBER') return 'Member';
+    return 'Member';
+  }
+  function avatarNode(value, name, cls) {
+    if (validAvatar(value)) {
+      var img = document.createElement('img');
+      img.className = cls;
+      img.alt = name ? String(name) : '';
+      img.src = value;
+      return img;
+    }
+    return element('div', cls + ' of-avatar-fallback', name ? String(name).slice(0, 1) : '?');
   }
   function renderProfile(comp, data) {
     comp.textContent = '';
     var p = data && data.profile;
-    if (!p) { comp.textContent = '内容加载失败，请刷新重试'; return; }
+    if (!p) { comp.textContent = 'Failed to load content. Please refresh and try again.'; return; }
     var h = headingOf(comp);
     if (h) comp.appendChild(h);
     var card = element('div', 'of-profile-card');
-    if (validAvatar(p.avatar)) {
-      var img = document.createElement('img');
-      img.className = 'of-avatar';
-      img.alt = p.username ? String(p.username) : '';
-      img.src = p.avatar;
-      card.appendChild(img);
-    } else {
-      card.appendChild(element('div', 'of-avatar of-avatar-fallback', p.username ? String(p.username).slice(0, 1) : '?'));
-    }
+    card.appendChild(avatarNode(p.avatar, p.username, 'of-avatar'));
     var main = element('div', 'of-profile-main');
     main.appendChild(element('div', 'of-name', p.username || ''));
     main.appendChild(element('div', 'of-meta', roleText(p.role)));
     if (p.bio) main.appendChild(element('div', 'of-bio', p.bio));
     var joined = dateText(p.createdAt);
-    if (joined) main.appendChild(element('div', 'of-meta', '加入于 ' + joined));
+    if (joined) main.appendChild(element('div', 'of-meta', 'Joined ' + joined));
     card.appendChild(main);
     comp.appendChild(card);
   }
   function renderStats(comp, data) {
     comp.textContent = '';
     var s = data && data.stats;
-    if (!s) { comp.textContent = '内容加载失败，请刷新重试'; return; }
+    if (!s) { comp.textContent = 'Failed to load content. Please refresh and try again.'; return; }
     var h = headingOf(comp);
     if (h) comp.appendChild(h);
     var grid = element('div', 'of-stats-grid');
-    var items = [['帖子', s.posts], ['评论', s.comments], ['获赞', s.upvotes]];
+    var items = [['Posts', s.posts], ['Comments', s.comments], ['Upvotes', s.upvotes]];
     for (var i = 0; i < items.length; i++) {
       var box = element('div', 'of-stat');
       var value = Number(items[i][1]);
@@ -187,49 +209,133 @@ function shimScript(originValue: string, nonceValue: string): string {
     var raw = (comp.getAttribute('type') || 'authored').toLowerCase().replace(/^\\s+|\\s+$/g, '');
     return raw === 'liked' || raw === 'commented' ? raw : 'authored';
   }
-  function componentLimit(comp) {
-    var raw = (comp.getAttribute('limit') || '').replace(/^\\s+|\\s+$/g, '');
-    if (!/^[0-9]+$/.test(raw)) return 5;
-    var n = parseInt(raw, 10);
-    return n >= 1 && n <= 10 ? n : 5;
+  function forumPostType(comp) {
+    var raw = (comp.getAttribute('type') || 'latest').toLowerCase().replace(/^\\s+|\\s+$/g, '');
+    return raw === 'hot' ? 'hot' : 'latest';
   }
-  function postItem(item) {
+  function componentLimit(comp, fallback) {
+    var raw = (comp.getAttribute('limit') || '').replace(/^\\s+|\\s+$/g, '');
+    if (!/^[0-9]+$/.test(raw)) return fallback;
+    var n = parseInt(raw, 10);
+    return n >= 1 && n <= 10 ? n : fallback;
+  }
+  function postItem(item, withForum) {
     var id = Number(item && item.id);
     if (!isFinite(id) || id <= 0) return null;
     var a = document.createElement('a');
     a.className = 'of-post';
-    a.href = '/forum/post/' + Math.floor(id);
-    a.appendChild(element('span', 'of-post-title', item.title ? String(item.title) : '（无标题）'));
+    a.href = '/post/' + Math.floor(id);
+    a.appendChild(element('span', 'of-post-title', item.title ? String(item.title) : '(Untitled)'));
     var meta = [];
-    if (item.forumName) meta.push(String(item.forumName));
+    if (withForum && item.forumName) meta.push(String(item.forumName));
+    if (item.authorName) meta.push(String(item.authorName));
     var score = Number(item.score);
-    if (isFinite(score)) meta.push(score + ' 赞');
+    if (isFinite(score)) meta.push(score + ' upvotes');
     var comments = Number(item.commentCount);
-    if (isFinite(comments)) meta.push(comments + ' 评论');
+    if (isFinite(comments)) meta.push(comments + ' comments');
     var created = dateText(item.createdAt);
     if (created) meta.push(created);
     a.appendChild(element('span', 'of-post-meta', meta.join(' · ')));
     return a;
   }
-  function renderPosts(comp, data) {
-    comp.textContent = '';
-    var type = componentType(comp);
-    var list = data ? (type === 'authored' ? data.posts : data[type]) : null;
-    if (!Array.isArray(list)) { comp.textContent = '内容加载失败，请刷新重试'; return; }
+  function appendPostList(comp, list, withForum, emptyText, fallbackLimit) {
     var h = headingOf(comp);
     if (h) comp.appendChild(h);
-    var limit = componentLimit(comp);
+    var limit = componentLimit(comp, fallbackLimit);
     if (list.length === 0) {
-      comp.appendChild(element('div', 'of-empty', EMPTY_TEXT[type]));
+      comp.appendChild(element('div', 'of-empty', emptyText));
       return;
     }
     var wrap = element('div', 'of-post-list');
     var count = 0;
     for (var i = 0; i < list.length && count < limit; i++) {
-      var node = postItem(list[i]);
+      var node = postItem(list[i], withForum);
       if (node) { wrap.appendChild(node); count++; }
     }
-    if (count === 0) wrap.appendChild(element('div', 'of-empty', EMPTY_TEXT[type]));
+    if (count === 0) wrap.appendChild(element('div', 'of-empty', emptyText));
+    comp.appendChild(wrap);
+  }
+  function renderPosts(comp, data) {
+    comp.textContent = '';
+    var type = componentType(comp);
+    var list = data ? (type === 'authored' ? data.posts : data[type]) : null;
+    if (!Array.isArray(list)) { comp.textContent = 'Failed to load content. Please refresh and try again.'; return; }
+    appendPostList(comp, list, true, EMPTY_TEXT[type], 5);
+  }
+  function renderForum(comp, data) {
+    comp.textContent = '';
+    var f = data && data.forum;
+    if (!f) { comp.textContent = 'Failed to load content. Please refresh and try again.'; return; }
+    var h = headingOf(comp);
+    if (h) comp.appendChild(h);
+    var card = element('div', 'of-forum-card');
+    var icon = avatarNode(f.icon, f.name, 'of-forum-icon');
+    if (validThemeColor(f.themeColor)) icon.style.background = f.themeColor;
+    card.appendChild(icon);
+    var main = element('div', 'of-forum-main');
+    main.appendChild(element('div', 'of-name', f.name || ''));
+    if (f.slug) main.appendChild(element('div', 'of-meta', 'f/' + f.slug));
+    if (f.description) main.appendChild(element('div', 'of-bio', f.description));
+    var created = dateText(f.createdAt);
+    if (created) main.appendChild(element('div', 'of-meta', 'Created ' + created));
+    card.appendChild(main);
+    comp.appendChild(card);
+  }
+  function renderForumStats(comp, data) {
+    comp.textContent = '';
+    var s = data && data.stats;
+    if (!s) { comp.textContent = 'Failed to load content. Please refresh and try again.'; return; }
+    var h = headingOf(comp);
+    if (h) comp.appendChild(h);
+    var grid = element('div', 'of-stats-grid');
+    var items = [['Members', s.members], ['Posts', s.posts], ['Comments', s.comments]];
+    for (var i = 0; i < items.length; i++) {
+      var box = element('div', 'of-stat');
+      var value = Number(items[i][1]);
+      box.appendChild(element('div', 'of-stat-value', isFinite(value) ? String(value) : '0'));
+      box.appendChild(element('div', 'of-stat-label', items[i][0]));
+      grid.appendChild(box);
+    }
+    comp.appendChild(grid);
+  }
+  function renderForumPosts(comp, data) {
+    comp.textContent = '';
+    var type = forumPostType(comp);
+    var list = data ? (type === 'hot' ? data.hotPosts : data.posts) : null;
+    if (!Array.isArray(list)) { comp.textContent = 'Failed to load content. Please refresh and try again.'; return; }
+    appendPostList(comp, list, false, EMPTY_TEXT[type], 5);
+  }
+  function renderMembers(comp, data) {
+    comp.textContent = '';
+    var list = data && data.members;
+    if (!Array.isArray(list)) { comp.textContent = 'Failed to load content. Please refresh and try again.'; return; }
+    var h = headingOf(comp);
+    if (h) comp.appendChild(h);
+    var limit = componentLimit(comp, 5);
+    if (list.length === 0) {
+      comp.appendChild(element('div', 'of-empty', EMPTY_TEXT.members));
+      return;
+    }
+    var wrap = element('div', 'of-member-list');
+    var count = 0;
+    for (var i = 0; i < list.length && count < limit; i++) {
+      var m = list[i];
+      var id = Number(m && m.id);
+      if (!isFinite(id) || id <= 0) continue;
+      var row = document.createElement('a');
+      row.className = 'of-member';
+      row.href = '/u/' + Math.floor(id);
+      row.appendChild(avatarNode(m.avatar, m.username, 'of-member-avatar'));
+      var main = element('div', 'of-member-main');
+      main.appendChild(element('div', 'of-member-name', m.username || ''));
+      main.appendChild(element('div', 'of-meta', forumRoleText(m.role)));
+      row.appendChild(main);
+      var joined = dateText(m.joinedAt);
+      if (joined) row.appendChild(element('span', 'of-member-joined', 'Joined ' + joined));
+      wrap.appendChild(row);
+      count++;
+    }
+    if (count === 0) wrap.appendChild(element('div', 'of-empty', EMPTY_TEXT.members));
     comp.appendChild(wrap);
   }
   function renderAll(data) {
@@ -239,14 +345,18 @@ function shimScript(originValue: string, nonceValue: string): string {
       var tag = comp.tagName.toLowerCase();
       if (tag === 'of-profile') renderProfile(comp, data);
       else if (tag === 'of-stats') renderStats(comp, data);
-      else renderPosts(comp, data);
+      else if (tag === 'of-posts') renderPosts(comp, data);
+      else if (tag === 'of-forum') renderForum(comp, data);
+      else if (tag === 'of-forum-stats') renderForumStats(comp, data);
+      else if (tag === 'of-forum-posts') renderForumPosts(comp, data);
+      else if (tag === 'of-members') renderMembers(comp, data);
     }
     reportHeight();
     setTimeout(reportHeight, 50);
   }
   function failAll() {
     var list = components();
-    for (var i = 0; i < list.length; i++) list[i].textContent = '内容加载失败，请刷新重试';
+    for (var i = 0; i < list.length; i++) list[i].textContent = 'Failed to load content. Please refresh and try again.';
     reportHeight();
   }
   var responded = false;
@@ -277,7 +387,7 @@ function shimScript(originValue: string, nonceValue: string): string {
   try {
     if (components().length > 0) post({ type: 'data-request', nonce: NONCE });
   } catch (e) {
-    /* 保持占位文案 */
+    /* Keep the placeholder text */
   }
 })();`
 }
@@ -313,12 +423,13 @@ const documentHtml = computed(() => {
     overflow-wrap: anywhere;
   }
   img { max-width: 100%; height: auto; }
-  of-profile, of-stats, of-posts { display: block; }
+  of-profile, of-stats, of-posts, of-forum, of-forum-stats, of-forum-posts, of-members { display: block; }
   .of-heading { margin: 18px 0 10px; font-size: 16px; font-weight: 600; }
-  .of-profile-card { display: flex; gap: 14px; align-items: flex-start; padding: 16px; border: 1px solid #e5e7eb; border-radius: 12px; }
-  .of-avatar { width: 64px; height: 64px; border-radius: 50%; object-fit: cover; flex: none; }
+  .of-profile-card, .of-forum-card { display: flex; gap: 14px; align-items: flex-start; padding: 16px; border: 1px solid #e5e7eb; border-radius: 12px; }
+  .of-avatar, .of-forum-icon { width: 64px; height: 64px; border-radius: 50%; object-fit: cover; flex: none; }
+  .of-forum-icon { border-radius: 14px; }
   .of-avatar-fallback { display: flex; align-items: center; justify-content: center; background: #eef2ff; color: #4f46e5; font-size: 24px; font-weight: 600; }
-  .of-profile-main { min-width: 0; }
+  .of-profile-main, .of-forum-main { min-width: 0; }
   .of-name { font-size: 18px; font-weight: 600; }
   .of-meta { margin-top: 4px; font-size: 12px; color: #6b7280; }
   .of-bio { margin-top: 6px; font-size: 13px; line-height: 1.7; color: #374151; white-space: pre-wrap; }
@@ -331,6 +442,13 @@ const documentHtml = computed(() => {
   .of-post:hover { border-color: #c7d2fe; background: #f8faff; }
   .of-post-title { display: block; font-size: 14px; font-weight: 600; }
   .of-post-meta { display: block; margin-top: 4px; font-size: 12px; color: #6b7280; }
+  .of-member-list { display: flex; flex-direction: column; gap: 8px; }
+  .of-member { display: flex; gap: 12px; align-items: center; padding: 10px 14px; border: 1px solid #e5e7eb; border-radius: 10px; color: inherit; text-decoration: none; }
+  .of-member:hover { border-color: #c7d2fe; background: #f8faff; }
+  .of-member-avatar { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; flex: none; }
+  .of-member-main { min-width: 0; flex: 1; }
+  .of-member-name { font-size: 14px; font-weight: 600; }
+  .of-member-joined { font-size: 12px; color: #6b7280; }
   .of-empty { padding: 14px; font-size: 13px; color: #9ca3af; text-align: center; border: 1px dashed #e5e7eb; border-radius: 10px; }
   @media (max-width: 560px) {
     .of-stats-grid { flex-direction: column; }
@@ -348,7 +466,7 @@ function respond(
   frame: HTMLIFrameElement | null,
   requestNonce: string,
   ok: boolean,
-  data?: HomepageData
+  data?: unknown
 ) {
   const payload: Record<string, unknown> = {
     __openforum_homepage: 1,
@@ -362,13 +480,12 @@ function respond(
 
 async function provideData(requestNonce: string) {
   const frame = frameRef.value
-  const userId = Number(props.userId)
-  if (!frame?.contentWindow || !Number.isInteger(userId) || userId <= 0) {
+  if (!frame?.contentWindow || !props.loadData) {
     respond(frame, requestNonce, false)
     return
   }
   try {
-    const data = await homepageApi.data(userId)
+    const data = await props.loadData()
     if (unmounted || requestNonce !== nonce.value) return
     respond(frame, requestNonce, true, data)
   } catch {
@@ -414,11 +531,11 @@ function onMessage(event: MessageEvent) {
       return
     }
     ElMessageBox.confirm(
-      `即将离开本站，前往外部网站：${host}\n外部网站可能收集你的信息，请注意账号与财产安全。`,
-      '安全风险提示',
+      `You are about to leave this site and visit an external website: ${host}\nExternal websites may collect your information. Please protect your account and property.`,
+      'Security risk warning',
       {
-        confirmButtonText: '继续访问',
-        cancelButtonText: '留在本站',
+        confirmButtonText: 'Continue',
+        cancelButtonText: 'Stay on this site',
         type: 'warning',
       }
     )
@@ -426,7 +543,7 @@ function onMessage(event: MessageEvent) {
         window.open(url, '_blank', 'noopener,noreferrer')
       })
       .catch(() => {
-        /* 用户取消 */
+        /* User cancelled */
       })
   }
 }

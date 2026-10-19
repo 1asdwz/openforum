@@ -3,15 +3,15 @@ use chrono::{Duration, NaiveDateTime};
 use serde::Serialize;
 use serde_json::{Map, Value};
 
-/// 将「数据库读出的」时间戳转换为与 Java 完全一致的 JSON 字符串，两层处理：
+/// Convert a timestamp "read from the database" into a JSON string exactly matching Java, in two steps:
 ///
-/// 1) `-8h` 偏移：Java 端 `DB_URL` 设置了 `serverTimezone=Asia/Shanghai`，而 MySQL 容器实际运行在 UTC；
-///    Connector/J 因此把 DATETIME 按 +08:00 解释后再以 UTC 输出，读出的时间比库中存储值少 8 小时。
-///    为保证两个后端返回完全一致的 JSON，Rust 在序列化「数据库读出的」时间戳时同样减 8 小时。
-///    注意：仅适用于来自数据库的时间戳；由代码即时计算（未经过 DB）的时间戳不偏移。
-/// 2) 字符串格式：对齐 Java `LocalDateTime.toString()` —— `yyyy-MM-ddTHH:mm:ss`，
-///    外加可选的小数秒（最多 9 位、去掉末尾的 0）。chrono 默认固定输出 6/9 位小数，
-///    会产生 `...48.942590`（Rust）与 `...48.94259`（Java）的差异。
+/// 1) `-8h` offset: the Java side's `DB_URL` sets `serverTimezone=Asia/Shanghai`, while the MySQL container actually runs in UTC;
+///    Connector/J therefore interprets DATETIME as +08:00 and then outputs it in UTC, making the read time 8 hours less than the value stored in the DB.
+///    To ensure both backends return identical JSON, Rust likewise subtracts 8 hours when serializing timestamps "read from the database".
+///    Note: this applies only to timestamps originating from the database; timestamps computed at runtime (not via the DB) are not offset.
+/// 2) String format: mirrors Java `LocalDateTime.toString()` — `yyyy-MM-ddTHH:mm:ss`,
+///    plus optional fractional seconds (up to 9 digits, trailing zeros removed). chrono outputs a fixed 6/9 digits by default,
+///    which would produce differences like `...48.942590` (Rust) vs `...48.94259` (Java).
 pub const JAVA_TS_OFFSET_HOURS: i64 = 8;
 
 pub fn jts(dt: NaiveDateTime) -> String {
@@ -22,7 +22,7 @@ pub fn jts_opt(dt: Option<NaiveDateTime>) -> Option<String> {
     dt.map(jts)
 }
 
-/// 按 Java `LocalDateTime.toString()` 的规则格式化：小数秒去掉末尾 0，全为 0 时不输出小数点。
+/// Format per Java `LocalDateTime.toString()`: strip trailing zeros from fractional seconds; omit the decimal point when all zeros.
 fn fmt_like_java(dt: NaiveDateTime) -> String {
     use chrono::Timelike;
     let base = dt.format("%Y-%m-%dT%H:%M:%S").to_string();
@@ -37,7 +37,7 @@ fn fmt_like_java(dt: NaiveDateTime) -> String {
     format!("{base}.{frac}")
 }
 
-/// 统一响应体，与 Java `ApiResponse` 对齐。
+/// Unified response body, mirrors Java `ApiResponse`.
 pub fn ok<T: Serialize>(data: T) -> Json<Value> {
     Json(serde_json::json!({ "code": 200, "message": "ok", "data": data }))
 }
@@ -46,7 +46,7 @@ pub fn ok_empty() -> Json<Value> {
     Json(serde_json::json!({ "code": 200, "message": "ok", "data": null }))
 }
 
-/// 与 Java `PageResponse` 对齐：content/page/size/totalElements/totalPages。
+/// Mirrors Java `PageResponse`: content/page/size/totalElements/totalPages.
 #[derive(Debug, Clone, Serialize)]
 pub struct PageResponse<T> {
     pub content: Vec<T>,
@@ -59,7 +59,7 @@ pub struct PageResponse<T> {
 }
 
 impl<T> PageResponse<T> {
-    /// 与 Java `PageResponse.of(List, page, size, totalElements)` 一致：totalPages = ceil(total/size)。
+    /// Matches Java `PageResponse.of(List, page, size, totalElements)`: totalPages = ceil(total/size).
     pub fn of(content: Vec<T>, page: i32, size: i32, total_elements: i64) -> Self {
         let total_pages = if size <= 0 {
             0
@@ -70,7 +70,7 @@ impl<T> PageResponse<T> {
     }
 }
 
-/// 内存分页切片，复刻 Java `PostService#toPage` 的 from/to 计算。
+/// In-memory pagination slice, replicating the from/to computation in Java `PostService#toPage`.
 pub fn slice_page<T>(items: Vec<T>, page: i32, size: i32) -> (Vec<T>, i64) {
     let total = items.len() as i64;
     if size <= 0 {
@@ -82,7 +82,7 @@ pub fn slice_page<T>(items: Vec<T>, page: i32, size: i32) -> (Vec<T>, i64) {
     (content, total)
 }
 
-/// 与 Java `JsonSupport` 对齐：把 DB 中的 JSON 字符串解析为对象；空 → 空对象。
+/// Mirrors Java `JsonSupport`: parse a JSON string from the DB into an object; empty → empty object.
 pub fn json_to_map(raw: Option<&str>) -> Map<String, Value> {
     match raw {
         Some(s) if !s.trim().is_empty() => match serde_json::from_str::<Value>(s) {
@@ -93,7 +93,7 @@ pub fn json_to_map(raw: Option<&str>) -> Map<String, Value> {
     }
 }
 
-/// 解析 JSON 字符串为任意值；空/非法 → Value::Null。
+/// Parse a JSON string into any value; empty/invalid → Value::Null.
 pub fn json_value(raw: Option<&str>) -> Value {
     match raw {
         Some(s) if !s.trim().is_empty() => {
@@ -103,7 +103,7 @@ pub fn json_value(raw: Option<&str>) -> Value {
     }
 }
 
-/// 解析 JSON 数组为字符串列表；空/非法 → 空列表。
+/// Parse a JSON array into a list of strings; empty/invalid → empty list.
 pub fn json_to_string_list(raw: Option<&str>) -> Vec<String> {
     match raw {
         Some(s) if !s.trim().is_empty() => match serde_json::from_str::<Value>(s) {
@@ -117,7 +117,7 @@ pub fn json_to_string_list(raw: Option<&str>) -> Vec<String> {
     }
 }
 
-/// 解析 JSON 数组为 long 列表；空/非法 → 空列表。
+/// Parse a JSON array into a list of longs; empty/invalid → empty list.
 pub fn json_to_long_list(raw: Option<&str>) -> Vec<i64> {
     match raw {
         Some(s) if !s.trim().is_empty() => match serde_json::from_str::<Value>(s) {

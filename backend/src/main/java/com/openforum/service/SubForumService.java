@@ -1,5 +1,8 @@
 package com.openforum.service;
 
+import com.openforum.dto.forum.AccessCheckResult;
+import com.openforum.dto.forum.AccessRuleSet;
+import com.openforum.service.AccessRuleEngine;
 import com.openforum.common.PageResponse;
 import com.openforum.dto.forum.CustomPageDTO;
 import com.openforum.dto.forum.ForumCreateRequest;
@@ -43,11 +46,12 @@ public class SubForumService {
     private final AuthGateService gateService;
     private final ForumAccessService accessService;
     private final HtmlSanitizer htmlSanitizer;
+    private final AccessRuleEngine accessRuleEngine;
 
     public SubForumService(SubForumRepository subForumRepository, ForumMemberRepository memberRepository,
                            UserRepository userRepository, PluginRegistry pluginRegistry,
                            AuthGateService gateService, ForumAccessService accessService,
-                           HtmlSanitizer htmlSanitizer) {
+                           HtmlSanitizer htmlSanitizer, AccessRuleEngine accessRuleEngine) {
         this.subForumRepository = subForumRepository;
         this.memberRepository = memberRepository;
         this.userRepository = userRepository;
@@ -55,6 +59,7 @@ public class SubForumService {
         this.gateService = gateService;
         this.accessService = accessService;
         this.htmlSanitizer = htmlSanitizer;
+        this.accessRuleEngine = accessRuleEngine;
     }
 
     public PageResponse<ForumSummaryDTO> list(int page, int size, String sort, String query, Long userId) {
@@ -127,6 +132,9 @@ public class SubForumService {
         forum.setTemplateConfig(request.templateConfig());
         forum.setCreatorId(userId);
         forum.setPublic(true);
+        if (request.accessRules() != null && !request.accessRules().isBlank()) {
+            forum.setAccessRules(request.accessRules());
+        }
         subForumRepository.save(forum);
 
         ForumMember member = new ForumMember();
@@ -166,6 +174,9 @@ public class SubForumService {
         }
         if (request.templateConfig() != null) {
             forum.setTemplateConfig(request.templateConfig());
+        }
+        if (request.accessRules() != null) {
+            forum.setAccessRules(request.accessRules());
         }
         subForumRepository.save(forum);
         return toDetail(forum, userId);
@@ -300,17 +311,30 @@ public class SubForumService {
 
     private ForumDetailDTO toDetail(SubForum forum, Long userId) {
         boolean isMember = accessService.isMember(forum.getId(), userId);
-        boolean canPost = userId != null && gateService.evaluate(userId, forum.getRequiredAuthTypes()).passed();
         String customHtml = forum.getCustomPageStatus() == CustomPageStatus.APPROVED ? forum.getCustomPageHtml() : null;
         String creatorName = userRepository.findById(forum.getCreatorId()).map(User::getUsername).orElse(null);
+
+        // 优先使用新式结构化门槛，回退到旧 CSV 门槛
+        AccessCheckResult accessCheck;
+        if (forum.getAccessRules() != null && !forum.getAccessRules().isBlank()) {
+            accessCheck = accessRuleEngine.check(userId, forum.getAccessRules());
+        } else {
+            boolean legacyPassed = userId != null && gateService.evaluate(userId, forum.getRequiredAuthTypes()).passed();
+            accessCheck = new AccessCheckResult(true, legacyPassed,
+                    List.of(), List.of(), null,
+                    legacyPassed ? null : "需要完成认证后方可操作");
+        }
+
         return new ForumDetailDTO(forum.getId(), forum.getSlug(), forum.getName(), forum.getDescription(),
                 forum.getIcon(), forum.getThemeColor(), forum.getRules(),
                 authTypeList(forum.getRequiredAuthTypes()),
                 forum.getTemplateType() == null ? TemplateType.DEFAULT.name() : forum.getTemplateType().name(),
                 forum.getTemplateConfig(),
                 forum.getCustomPageStatus() == null ? null : forum.getCustomPageStatus().name(),
-                customHtml, forum.getMemberCount(), forum.getPostCount(), isMember, canPost, forum.isPublic(),
-                forum.getCreatorId(), creatorName, forum.getCreatedAt());
+                customHtml, forum.getMemberCount(), forum.getPostCount(), isMember,
+                accessCheck.canAct(), forum.isPublic(),
+                forum.getCreatorId(), creatorName, forum.getCreatedAt(),
+                forum.getAccessRules(), accessCheck);
     }
 
     private CustomPageDTO toCustomPage(SubForum forum) {

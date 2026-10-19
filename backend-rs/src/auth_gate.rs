@@ -4,7 +4,7 @@ use crate::enums::{is_known_auth_type, AuthLevel};
 use crate::error::ApiError;
 use crate::json::json_to_map;
 
-/// 认证门槛判定结果，对应 Java `AuthGateService.GateResult`。
+/// Result of the authentication gate check, corresponding to Java's `AuthGateService.GateResult`.
 pub struct GateResult {
     pub passed: bool,
     pub message: String,
@@ -29,9 +29,9 @@ fn parse_requirements(required_csv: Option<&str>) -> Vec<String> {
     }
 }
 
-/// 评估子论坛的 `required_auth_types` 门槛。
+/// Evaluates a sub-forum's `required_auth_types` requirements.
 ///
-/// 元素形式：`TYPE`、`TYPE:LEVEL`（如 `REAL_NAME:HIGH`）、`AGE_n`（兼容旧语法）。
+/// Element forms: `TYPE`, `TYPE:LEVEL` (e.g. `REAL_NAME:HIGH`), `AGE_n` (legacy syntax).
 pub async fn evaluate(
     pool: &MySqlPool,
     user_id: Option<i64>,
@@ -41,7 +41,7 @@ pub async fn evaluate(
     if requirements.is_empty() {
         return Ok(GateResult {
             passed: true,
-            message: "无认证门槛".to_string(),
+            message: "No authentication requirements".to_string(),
         });
     }
     let user_id = match user_id {
@@ -49,7 +49,7 @@ pub async fn evaluate(
         None => {
             return Ok(GateResult {
                 passed: false,
-                message: "请先登录后再访问该板块".to_string(),
+                message: "Please sign in before accessing this forum".to_string(),
             })
         }
     };
@@ -106,12 +106,12 @@ pub async fn evaluate(
     if missing.is_empty() {
         Ok(GateResult {
             passed: true,
-            message: "已满足认证门槛".to_string(),
+            message: "Authentication requirements met".to_string(),
         })
     } else {
         Ok(GateResult {
             passed: false,
-            message: format!("需要完成认证: {}", missing.join(", ")),
+            message: format!("Authentication required: {}", missing.join(", ")),
         })
     }
 }

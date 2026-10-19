@@ -1,49 +1,68 @@
 use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 
-/// 清洗坛主提交的自定义页面 HTML，语义对齐 Java `HtmlSanitizer`（jsoup `Safelist.relaxed()`）。
-///
-/// ammonia 默认策略已移除 script/style/iframe/object/embed/form 等危险标签，
-/// 同时剥离 on* 事件属性与 `javascript:` 等不安全协议。
-pub fn sanitize(html: &str) -> String {
-    if html.trim().is_empty() {
-        return String::new();
-    }
-    ammonia::clean(html)
-}
-
-/// 个人主页 HTML 的严格净化。
-///
-/// 与论坛自定义页的 `sanitize` 不同，这里采用白名单策略并额外限制：
-/// - 不允许脚本、表单、iframe、SVG、外链资源；
-/// - 图片只允许站内 `/forum/api/media/{id}`；
-/// - 链接只允许 http/https/mailto、站内绝对路径与页内锚点；
-/// - style 属性按属性白名单与危险值过滤。
-pub fn sanitize_homepage(html: &str) -> String {
-    if html.trim().is_empty() {
-        return String::new();
-    }
-
-    let mut tags: HashSet<&'static str> = HashSet::new();
-    tags.extend([
+/// Base allowlisted tags (shared by both homepage types).
+fn base_tags() -> HashSet<&'static str> {
+    HashSet::from([
         "a", "abbr", "article", "aside", "b", "blockquote", "br", "caption", "code", "col",
         "colgroup", "dd", "del", "details", "div", "dl", "dt", "em", "figcaption", "figure",
         "footer", "h1", "h2", "h3", "h4", "h5", "h6", "header", "hr", "i", "img", "ins", "li",
-        "main", "mark", "nav", "of-posts", "of-profile", "of-stats", "ol", "p", "pre", "q", "s",
-        "section", "small", "span", "strong", "sub", "summary", "sup", "table", "tbody", "td",
-        "tfoot", "th", "thead", "tr", "u", "ul",
-    ]);
+        "main", "mark", "nav", "ol", "p", "pre", "q", "s", "section", "small", "span", "strong",
+        "sub", "summary", "sup", "table", "tbody", "td", "tfoot", "th", "thead", "tr", "u", "ul",
+    ])
+}
 
-    let mut clean_content_tags: HashSet<&'static str> = HashSet::new();
-    clean_content_tags.extend([
+/// Tags removed together with their content.
+fn clean_content_tags() -> HashSet<&'static str> {
+    HashSet::from([
         "script", "style", "iframe", "object", "embed", "noscript", "template", "svg", "math",
         "form", "input", "button", "select", "textarea", "video", "audio", "canvas", "applet",
         "frame", "frameset", "marquee", "meta", "link", "base",
-    ]);
+    ])
+}
 
-    let mut generic_attributes: HashSet<&'static str> = HashSet::new();
-    generic_attributes.extend(["class", "id", "title", "dir", "lang", "style"]);
+/// Generic attribute allowlist.
+fn generic_attributes() -> HashSet<&'static str> {
+    HashSet::from(["class", "id", "title", "dir", "lang", "style"])
+}
 
+/// Strict sanitization for user homepage HTML; keeps user homepage data components.
+pub fn sanitize_user_homepage(html: &str) -> String {
+    sanitize_component_page(
+        html,
+        &[
+            ("of-profile", &["heading"]),
+            ("of-stats", &["heading"]),
+            ("of-posts", &["type", "limit", "heading"]),
+        ],
+    )
+}
+
+/// Strict sanitization for custom forum homepage HTML; keeps forum data components.
+pub fn sanitize_forum_homepage(html: &str) -> String {
+    sanitize_component_page(
+        html,
+        &[
+            ("of-forum", &["heading"]),
+            ("of-forum-stats", &["heading"]),
+            ("of-forum-posts", &["type", "limit", "heading"]),
+            ("of-members", &["limit", "heading"]),
+        ],
+    )
+}
+
+/// Compatibility for legacy callers: equivalent to `sanitize_user_homepage`.
+pub fn sanitize_homepage(html: &str) -> String {
+    sanitize_user_homepage(html)
+}
+
+/// Shared sanitization pipeline: base allowlist plus specified data components and their attributes.
+fn sanitize_component_page(html: &str, components: &[(&'static str, &[&'static str])]) -> String {
+    if html.trim().is_empty() {
+        return String::new();
+    }
+
+    let mut tags = base_tags();
     let mut tag_attributes: HashMap<&'static str, HashSet<&'static str>> = HashMap::new();
     tag_attributes.insert("a", HashSet::from(["href", "title"]));
     tag_attributes.insert("img", HashSet::from(["src", "alt", "width", "height"]));
@@ -54,9 +73,10 @@ pub fn sanitize_homepage(html: &str) -> String {
     tag_attributes.insert("ol", HashSet::from(["start"]));
     tag_attributes.insert("li", HashSet::from(["value"]));
     tag_attributes.insert("details", HashSet::from(["open"]));
-    tag_attributes.insert("of-profile", HashSet::from(["heading"]));
-    tag_attributes.insert("of-stats", HashSet::from(["heading"]));
-    tag_attributes.insert("of-posts", HashSet::from(["type", "limit", "heading"]));
+    for (tag, attrs) in components {
+        tags.insert(tag);
+        tag_attributes.insert(tag, attrs.iter().copied().collect());
+    }
 
     let mut url_schemes: HashSet<&'static str> = HashSet::new();
     url_schemes.extend(["http", "https", "mailto"]);
@@ -64,8 +84,8 @@ pub fn sanitize_homepage(html: &str) -> String {
     let mut builder = ammonia::Builder::default();
     builder
         .tags(tags)
-        .clean_content_tags(clean_content_tags)
-        .generic_attributes(generic_attributes)
+        .clean_content_tags(clean_content_tags())
+        .generic_attributes(generic_attributes())
         .tag_attributes(tag_attributes)
         .url_schemes(url_schemes)
         .link_rel(Some("noopener noreferrer nofollow"))
@@ -82,7 +102,13 @@ pub fn sanitize_homepage(html: &str) -> String {
             }
             if element.starts_with("of-") {
                 if attribute.eq_ignore_ascii_case("type") {
-                    return normalize_component_type(value).map(Cow::Owned);
+                    if element == "of-forum-posts" {
+                        return normalize_forum_post_type(value).map(Cow::Owned);
+                    }
+                    if element == "of-posts" {
+                        return normalize_user_post_type(value).map(Cow::Owned);
+                    }
+                    return None;
                 }
                 if attribute.eq_ignore_ascii_case("limit") {
                     return normalize_component_limit(value).map(Cow::Owned);
@@ -100,7 +126,7 @@ pub fn sanitize_homepage(html: &str) -> String {
     builder.clean(html).to_string()
 }
 
-/// 图片地址只允许站内媒体代理：`/forum/api/media/{数字id}`。
+/// Image sources must be site media proxy paths: `/forum/api/media/{numeric id}`.
 fn is_site_media_src(value: &str) -> bool {
     let Some(rest) = value.trim().strip_prefix("/forum/api/media/") else {
         return false;
@@ -108,7 +134,7 @@ fn is_site_media_src(value: &str) -> bool {
     !rest.is_empty() && rest.chars().all(|c| c.is_ascii_digit())
 }
 
-/// 链接只允许 http/https/mailto、单个斜杠开头的站内路径、页内锚点。
+/// Links may only be http/https/mailto, single-slash-prefixed site paths, or in-page anchors.
 fn is_safe_href(value: &str) -> bool {
     let value = value.trim();
     if value.is_empty() {
@@ -124,20 +150,26 @@ fn is_safe_href(value: &str) -> bool {
     lower.starts_with("http://") || lower.starts_with("https://") || lower.starts_with("mailto:")
 }
 
-/// 数据组件的列表类型；非法值直接丢弃属性。
-fn normalize_component_type(value: &str) -> Option<String> {
+/// List type for the user homepage posts component; the attribute is dropped for invalid values.
+fn normalize_user_post_type(value: &str) -> Option<String> {
     let value = value.trim().to_ascii_lowercase();
     matches!(value.as_str(), "authored" | "liked" | "commented").then_some(value)
 }
 
-/// 数据组件的条数：只接受 1–10 的十进制整数。
+/// List type for the forum homepage posts component; the attribute is dropped for invalid values.
+fn normalize_forum_post_type(value: &str) -> Option<String> {
+    let value = value.trim().to_ascii_lowercase();
+    matches!(value.as_str(), "latest" | "hot").then_some(value)
+}
+
+/// Item count for data components: accepts only decimal integers from 1 to 10.
 fn normalize_component_limit(value: &str) -> Option<String> {
     let value = value.trim();
     let limit: u32 = value.parse().ok()?;
     (1..=10).contains(&limit).then(|| limit.to_string())
 }
 
-/// 数据组件的标题：1–30 个字符，且不含控制字符。
+/// Heading for data components: 1–30 characters with no control characters.
 fn normalize_component_heading(value: &str) -> Option<String> {
     let value = value.trim();
     if value.is_empty() || value.chars().count() > 30 || value.chars().any(char::is_control) {
@@ -146,7 +178,7 @@ fn normalize_component_heading(value: &str) -> Option<String> {
     Some(value.to_string())
 }
 
-/// 内联 CSS 属性白名单。
+/// Inline CSS property allowlist.
 fn css_properties() -> HashSet<&'static str> {
     HashSet::from([
         "display",
@@ -249,12 +281,12 @@ fn css_properties() -> HashSet<&'static str> {
 const MAX_CSS_BYTES: usize = 8 * 1024;
 const MAX_DECLARATION_CHARS: usize = 512;
 
-/// 过滤 style 属性，逐条丢弃非法声明；没有合法声明时移除整个属性。
+/// Filter the style attribute, dropping invalid declarations one by one; remove the entire attribute when no valid declarations remain.
 pub fn sanitize_css_declarations(input: &str) -> Option<String> {
     if input.len() > MAX_CSS_BYTES {
         return None;
     }
-    // CSS 转义可以绕过 `url(` 等字符串检查，直接拒绝反斜杠。
+    // CSS escapes can bypass string checks such as `url(`, so reject backslashes outright.
     if input.contains('\\') {
         return None;
     }
@@ -313,7 +345,7 @@ fn has_unsafe_css_value(value: &str) -> bool {
     FORBIDDEN.iter().any(|needle| lower.contains(needle))
 }
 
-/// 去掉 CSS 注释；注释未闭合时返回 None（整段样式丢弃）。
+/// Strip CSS comments; returns None if a comment is unterminated (the whole style is dropped).
 fn strip_css_comments(input: &str) -> Option<String> {
     let mut out = String::with_capacity(input.len());
     let bytes = input.as_bytes();
@@ -331,7 +363,7 @@ fn strip_css_comments(input: &str) -> Option<String> {
     Some(out)
 }
 
-/// 按分号拆分声明，忽略括号与引号内的分号。
+/// Split declarations on semicolons, ignoring semicolons inside parentheses and quotes.
 fn split_declarations(input: &str) -> Vec<&str> {
     let mut out = Vec::new();
     let mut start = 0usize;
@@ -467,20 +499,20 @@ mod tests {
     #[test]
     fn keeps_component_tags_and_valid_attributes() {
         let out = sanitize_homepage(
-            r#"<of-profile heading="关于我"></of-profile><of-stats heading="数据"></of-stats><of-posts type="liked" limit="10" heading="我点赞的帖子">加载中</of-posts>"#,
+            r#"<of-profile heading="About me"></of-profile><of-stats heading="Stats"></of-stats><of-posts type="liked" limit="10" heading="Posts I liked">Loading</of-posts>"#,
         );
         assert!(out.contains("<of-profile"), "{out}");
         assert!(out.contains("<of-stats"), "{out}");
         assert!(out.contains(r#"type="liked""#), "{out}");
         assert!(out.contains(r#"limit="10""#), "{out}");
-        assert!(out.contains("我点赞的帖子"), "{out}");
-        assert!(out.contains("加载中"), "{out}");
+        assert!(out.contains("Posts I liked"), "{out}");
+        assert!(out.contains("Loading"), "{out}");
     }
 
     #[test]
     fn drops_invalid_component_attributes() {
         let out = sanitize_homepage(
-            r#"<of-posts type="evil" limit="999" heading="这是一段超过三十个字符的标题这是一段超过三十个字符的标题这是一段超过三十个字符的标题" onclick="alert(1)">x</of-posts>"#,
+            r#"<of-posts type="evil" limit="999" heading="This heading is intentionally longer than thirty characters for testing" onclick="alert(1)">x</of-posts>"#,
         );
         assert!(!out.contains("type="), "{out}");
         assert!(!out.contains("limit="), "{out}");
@@ -505,5 +537,58 @@ mod tests {
         let out = sanitize_homepage("<div><p><a href=\"/x\">hello");
         assert!(!out.contains("script"));
         assert!(out.contains("hello"));
+    }
+
+    #[test]
+    fn forum_homepage_keeps_forum_components() {
+        let out = sanitize_forum_homepage(
+            r#"<of-forum heading="Forum info"></of-forum><of-forum-stats heading="Stats"></of-forum-stats><of-forum-posts type="hot" limit="8" heading="Popular posts"></of-forum-posts><of-members limit="6" heading="Members"></of-members>"#,
+        );
+        assert!(out.contains("<of-forum "), "{out}");
+        assert!(out.contains("<of-forum-stats "), "{out}");
+        assert!(out.contains(r#"type="hot""#), "{out}");
+        assert!(out.contains(r#"limit="8""#), "{out}");
+        assert!(out.contains("<of-members "), "{out}");
+        assert!(out.contains(r#"limit="6""#), "{out}");
+    }
+
+    #[test]
+    fn forum_homepage_removes_user_components() {
+        let out = sanitize_forum_homepage(
+            "<of-profile>Profile</of-profile><of-stats>Stats</of-stats><of-posts>Posts</of-posts>",
+        );
+        assert!(!out.contains("of-profile"), "{out}");
+        assert!(!out.contains("<of-stats"), "{out}");
+        assert!(!out.contains("<of-posts"), "{out}");
+        assert!(out.contains("Profile"), "{out}");
+        assert!(out.contains("Stats"), "{out}");
+        assert!(out.contains("Posts"), "{out}");
+    }
+
+    #[test]
+    fn user_homepage_removes_forum_components() {
+        let out = sanitize_user_homepage(
+            "<of-forum>Forum</of-forum><of-forum-stats>Stats</of-forum-stats><of-forum-posts>Posts</of-forum-posts><of-members>Members</of-members>",
+        );
+        for tag in ["<of-forum", "<of-forum-stats", "<of-forum-posts", "<of-members"] {
+            assert!(!out.contains(tag), "{tag} -> {out}");
+        }
+        assert!(out.contains("Forum"), "{out}");
+        assert!(out.contains("Members"), "{out}");
+    }
+
+    #[test]
+    fn forum_homepage_drops_invalid_component_attributes() {
+        let out = sanitize_forum_homepage(
+            r#"<of-forum-posts type="evil" limit="12" heading="This heading is intentionally longer than thirty characters for testing" onclick="alert(1)">x</of-forum-posts><of-members limit="0">y</of-members>"#,
+        );
+        assert!(!out.contains("type="), "{out}");
+        assert!(!out.contains("limit="), "{out}");
+        assert!(!out.contains("heading="), "{out}");
+        assert!(!out.contains("onclick"), "{out}");
+
+        let latest = sanitize_forum_homepage(r#"<of-forum-posts type="latest" limit="1">x</of-forum-posts>"#);
+        assert!(latest.contains(r#"type="latest""#), "{latest}");
+        assert!(latest.contains(r#"limit="1""#), "{latest}");
     }
 }

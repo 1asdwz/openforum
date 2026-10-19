@@ -5,12 +5,12 @@
     <div class="feed-column">
       <div class="content-card editor-head">
         <div>
-          <h1 class="page-title" style="margin: 0">主页装修</h1>
+          <h1 class="page-title" style="margin: 0">Homepage editor</h1>
           <p class="editor-desc">
-            选择普通个人主页，或用 HTML 设计自己的主页。自定义主页保存后立即生效。
+            Choose the standard profile homepage, or design your own with HTML. A custom homepage takes effect immediately after saving.
           </p>
         </div>
-        <el-button round @click="goProfile">查看我的主页</el-button>
+        <el-button round @click="goProfile">View my homepage</el-button>
       </div>
 
       <el-alert
@@ -18,15 +18,15 @@
         type="error"
         :closable="false"
         show-icon
-        title="你的自定义主页已被管理员下架"
-        :description="`原因：${blockReason || '未填写'}。修改内容后仍需管理员复核恢复。`"
+        title="Your custom homepage was taken down by an admin"
+        :description="`Reason: ${blockReason || 'Not provided'}. Even after editing, an admin must review it to restore it.`"
       />
 
       <el-skeleton v-if="loading" :rows="6" animated />
 
       <template v-else>
         <section class="content-card">
-          <h2 class="editor-section-title">选择主页模式</h2>
+          <h2 class="editor-section-title">Choose homepage mode</h2>
           <div class="mode-grid">
             <button
               type="button"
@@ -34,8 +34,8 @@
               :class="{ active: mode === 'NORMAL' }"
               @click="mode = 'NORMAL'"
             >
-              <span class="mode-name">普通个人主页</span>
-              <span class="mode-desc">沿用默认的帖子、评论与关于结构。</span>
+              <span class="mode-name">Standard profile homepage</span>
+              <span class="mode-desc">Uses the default posts, comments, and about layout.</span>
             </button>
             <button
               type="button"
@@ -43,8 +43,8 @@
               :class="{ active: mode === 'CUSTOM' }"
               @click="mode = 'CUSTOM'"
             >
-              <span class="mode-name">自定义个人主页</span>
-              <span class="mode-desc">上传静态 HTML，用内联样式自由排版。</span>
+              <span class="mode-name">Custom profile homepage</span>
+              <span class="mode-desc">Upload static HTML and lay it out freely with inline styles.</span>
             </button>
           </div>
         </section>
@@ -52,10 +52,10 @@
         <template v-if="mode === 'CUSTOM'">
           <section class="content-card">
             <div class="editor-toolbar">
-              <el-button size="small" @click="pickImage">插入图片</el-button>
-              <el-button size="small" @click="insertExample">插入完整示例</el-button>
-              <el-button size="small" @click="goGuide">组件文档</el-button>
-              <el-button size="small" @click="html = ''">清空</el-button>
+              <el-button size="small" @click="pickImage">Insert image</el-button>
+              <el-button size="small" @click="insertExample">Insert full example</el-button>
+              <el-button size="small" @click="goGuide">Component docs</el-button>
+              <el-button size="small" @click="html = ''">Clear</el-button>
               <span class="byte-count" :class="{ over: byteCount > MAX_BYTES }">
                 {{ sizeText }} / 64 KB
               </span>
@@ -72,30 +72,30 @@
               v-model="html"
               class="html-editor"
               spellcheck="false"
-              placeholder="在这里编写 HTML，例如：<div style=&quot;padding:24px&quot;>你好</div>"
+              placeholder="Write HTML here, e.g. <div style=&quot;padding:24px&quot;>Hello</div>"
             />
 
             <ul class="editor-tips">
-              <li>不支持 JavaScript，<code>&lt;script&gt;</code> 会被移除。</li>
-              <li>仅支持站内图片，外链图片会被移除。</li>
-              <li>仅支持 <code>style</code> 属性，不支持 <code>&lt;style&gt;</code> 标签。</li>
-              <li>外部链接点击时会弹出安全风险提示。</li>
+              <li>JavaScript is not supported; <code>&lt;script&gt;</code> is removed.</li>
+              <li>Only in-site images are supported; external images are removed.</li>
+              <li>Only the <code>style</code> attribute is supported; <code>&lt;style&gt;</code> tags are not.</li>
+              <li>Clicking an external link shows a security warning.</li>
               <li>
-                可用 <code>&lt;of-profile&gt;</code>、<code>&lt;of-stats&gt;</code>、<code>&lt;of-posts&gt;</code>
-                展示公开资料、统计与帖子列表，详见
-                <el-button link type="primary" size="small" @click="goGuide">组件文档</el-button>。
+                Use <code>&lt;of-profile&gt;</code>, <code>&lt;of-stats&gt;</code>, and <code>&lt;of-posts&gt;</code>
+                to show public info, stats, and post lists. See
+                <el-button link type="primary" size="small" @click="goGuide">Component docs</el-button>.
               </li>
             </ul>
           </section>
 
           <section class="content-card">
-            <h2 class="editor-section-title">实时预览</h2>
-            <SafeHomepageFrame :html="html" :user-id="auth.user?.id || 0" />
+            <h2 class="editor-section-title">Live preview</h2>
+            <SafeHomepageFrame :html="html" :load-data="loadPreviewData" />
           </section>
         </template>
 
         <div class="editor-actions">
-          <el-button :loading="resetting" @click="resetHomepage">恢复普通主页</el-button>
+          <el-button :loading="resetting" @click="resetHomepage">Restore standard homepage</el-button>
           <el-button
             type="primary"
             round
@@ -103,7 +103,7 @@
             :disabled="mode === 'CUSTOM' && !canSave"
             @click="save"
           >
-            保存
+            Save
           </el-button>
         </div>
       </template>
@@ -174,7 +174,7 @@ async function load() {
   try {
     applyState(await homepageApi.mine())
   } catch (e) {
-    ElMessage.error(errorMessage(e, '主页配置加载失败'))
+    ElMessage.error(errorMessage(e, 'Failed to load homepage settings'))
   } finally {
     loading.value = false
   }
@@ -182,7 +182,7 @@ async function load() {
 
 async function save() {
   if (mode.value === 'CUSTOM' && !canSave.value) {
-    ElMessage.warning('请检查内容大小')
+    ElMessage.warning('Check the content size')
     return
   }
   saving.value = true
@@ -192,9 +192,9 @@ async function save() {
       html: mode.value === 'CUSTOM' ? html.value : undefined,
     })
     applyState(data)
-    ElMessage.success('已保存')
+    ElMessage.success('Saved')
   } catch (e) {
-    ElMessage.error(errorMessage(e, '保存失败'))
+    ElMessage.error(errorMessage(e, 'Save failed'))
   } finally {
     saving.value = false
   }
@@ -203,9 +203,9 @@ async function save() {
 async function resetHomepage() {
   try {
     await ElMessageBox.confirm(
-      '将删除自定义内容与全部举报记录，并恢复为普通个人主页。是否继续？',
-      '恢复普通主页',
-      { confirmButtonText: '确认恢复', cancelButtonText: '取消', type: 'warning' }
+      'This deletes the custom content and all report records and restores the standard profile homepage. Continue?',
+      'Restore standard homepage',
+      { confirmButtonText: 'Restore', cancelButtonText: 'Cancel', type: 'warning' }
     )
   } catch {
     return
@@ -213,9 +213,9 @@ async function resetHomepage() {
   resetting.value = true
   try {
     applyState(await homepageApi.reset())
-    ElMessage.success('已恢复普通主页')
+    ElMessage.success('Standard homepage restored')
   } catch (e) {
-    ElMessage.error(errorMessage(e, '操作失败'))
+    ElMessage.error(errorMessage(e, 'Operation failed'))
   } finally {
     resetting.value = false
   }
@@ -225,26 +225,33 @@ function pickImage() {
   fileRef.value?.click()
 }
 
+/** The live preview loads data components through a separate request, matching the public homepage. */
+function loadPreviewData() {
+  const id = auth.user?.id
+  if (!id) return Promise.reject(new Error('Not signed in'))
+  return homepageApi.data(id)
+}
+
 async function onFileChange(event: Event) {
   const input = event.target as HTMLInputElement
   const file = input.files?.[0]
   input.value = ''
   if (!file) return
   if (!file.type.startsWith('image/')) {
-    ElMessage.warning('请选择图片文件')
+    ElMessage.warning('Please select an image file')
     return
   }
   if (file.size > 10 * 1024 * 1024) {
-    ElMessage.warning('图片不能超过 10MB')
+    ElMessage.warning('Image must be 10 MB or smaller')
     return
   }
   uploading.value = true
   try {
     const media = await mediaApi.upload(file)
     insertAtCursor(`<img src="/forum/api/media/${media.id}" alt="">`)
-    ElMessage.success('图片已插入')
+    ElMessage.success('Image inserted')
   } catch (e) {
-    ElMessage.error(errorMessage(e, '图片上传失败'))
+    ElMessage.error(errorMessage(e, 'Image upload failed'))
   } finally {
     uploading.value = false
   }
@@ -281,9 +288,9 @@ function goGuide() {
 onBeforeRouteLeave(async () => {
   if (!dirty.value) return true
   try {
-    await ElMessageBox.confirm('有未保存的修改，确定离开吗？', '离开页面', {
-      confirmButtonText: '离开',
-      cancelButtonText: '继续编辑',
+    await ElMessageBox.confirm('You have unsaved changes. Leave anyway?', 'Leave page', {
+      confirmButtonText: 'Leave',
+      cancelButtonText: 'Keep editing',
       type: 'warning',
     })
     return true

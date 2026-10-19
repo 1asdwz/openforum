@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <link
@@ -7,12 +7,12 @@
       href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23ff4500'/%3E%3Ctext x='16' y='22' font-size='18' text-anchor='middle' fill='white' font-family='Arial'%3EF%3C/text%3E%3C/svg%3E"
     />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>OpenForum - 开放式论坛系统</title>
-    <!-- 提前建连，缩短 Google 登录脚本的跨洋 TLS 握手耗时 -->
+    <title>OpenForum - Open Forum System</title>
+    <!-- Preconnect early to shorten the overseas TLS handshake for the Google sign-in script -->
     <link rel="preconnect" href="https://accounts.google.com" />
     <link rel="dns-prefetch" href="https://accounts.google.com" />
     <script>
-      // 首屏前套用主题，避免深色模式下闪白（与 stores/ui.ts 保持一致）
+      // Apply the theme before first paint to avoid a white flash in dark mode (kept in sync with stores/ui.ts)
       (function () {
         try {
           var t = localStorage.getItem('of-theme') || 'system';
@@ -28,7 +28,7 @@
         } catch (e) {}
       })();
     </script>
-    <!-- 全局加载 Google Identity Services，登录/注册页无需等待脚本再渲染按钮 -->
+    <!-- Load Google Identity Services globally so login/register pages can render buttons without waiting for the script -->
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <style>
       :root {
@@ -77,7 +77,7 @@
       #app {
         min-height: 100vh;
       }
-      /* ---------- 首屏骨架屏（Vue 挂载后自动替换） ---------- */
+      /* ---------- First-paint skeleton (automatically replaced once Vue mounts) ---------- */
       .of-sk-shimmer {
         background: linear-gradient(
           90deg,
@@ -270,7 +270,7 @@
   </head>
   <body>
     <div id="app">
-      <div aria-busy="true" aria-label="加载中">
+      <div aria-busy="true" aria-label="Loading">
         <header class="of-sk-topnav">
           <div class="of-sk-topnav-inner">
             <div class="of-sk-logo"></div>

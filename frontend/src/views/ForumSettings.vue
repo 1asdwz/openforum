@@ -5,134 +5,171 @@
     <div v-else-if="error" class="state-box error">
       {{ error }}
       <div style="margin-top: 12px">
-        <el-button size="small" @click="loadForum">重试</el-button>
+        <el-button size="small" @click="loadForum">Retry</el-button>
       </div>
     </div>
 
-    <div v-else-if="forum && !isOwner" class="state-box error">
-      你没有权限管理该子论坛
+    <div v-else-if="forum && !canManage" class="state-box error">
+      You need "Config" permission to change community settings.
     </div>
 
     <template v-else-if="forum">
-      <h1 class="page-title">管理 {{ forum.name }}</h1>
+      <div style="margin-bottom: 12px">
+        <el-button size="small" @click="router.push(`/f/${forum.slug}/mod`)">
+          Back to moderation console
+        </el-button>
+      </div>
+      <h1 class="page-title">Manage {{ forum.name }}</h1>
 
       <el-tabs v-model="activeTab">
-        <el-tab-pane label="基本信息" name="basic">
+        <el-tab-pane label="Basic info" name="basic">
           <el-form label-position="top">
-            <el-form-item label="名称">
+            <el-form-item label="Name">
               <el-input v-model="form.name" />
             </el-form-item>
-            <el-form-item label="简介">
+            <el-form-item label="Description">
               <el-input v-model="form.description" type="textarea" :rows="3" />
             </el-form-item>
-            <el-form-item label="图标（图片 URL）">
+            <el-form-item label="Icon (image URL)">
               <el-input v-model="form.icon" />
             </el-form-item>
-            <el-form-item label="主题色">
+            <el-form-item label="Theme color">
               <el-color-picker v-model="form.themeColor" />
             </el-form-item>
-            <el-form-item label="页面模板">
-              <el-radio-group v-model="form.templateType">
-                <el-radio value="DEFAULT">默认模板</el-radio>
-                <el-radio value="CUSTOM">自定义 HTML</el-radio>
-              </el-radio-group>
-            </el-form-item>
-            <el-form-item label="浏览门槛">
+            <el-form-item label="Browse threshold">
               <GateRuleEditor v-model="form.browseRule" :fields="flatFields" />
             </el-form-item>
-            <el-form-item label="操作门槛（发帖 / 评论 / 投票）">
+            <el-form-item label="Action threshold (post / comment / vote)">
               <GateRuleEditor v-model="form.operateRule" :fields="flatFields" />
             </el-form-item>
-            <el-form-item label="板块规则">
+            <el-form-item label="Community rules">
               <el-input v-model="form.rules" type="textarea" :rows="4" />
             </el-form-item>
             <div class="form-actions">
               <el-button type="primary" :loading="saving" @click="saveBasic">
-                保存修改
+                Save changes
               </el-button>
             </div>
           </el-form>
         </el-tab-pane>
 
-        <el-tab-pane label="默认模板" name="template">
-          <el-alert
-            v-if="form.templateType !== 'DEFAULT'"
-            type="info"
-            show-icon
-            :closable="false"
-            title="当前选择的是「自定义 HTML」页面，默认模板内容仅在切换为「默认模板」时对外展示"
-            style="margin-bottom: 12px"
-          />
+        <el-tab-pane label="Default template" name="template">
           <el-form label-position="top">
-            <el-form-item label="公告">
+            <el-form-item label="Announcement">
               <el-input
                 v-model="form.announcement"
                 type="textarea"
                 :rows="3"
-                placeholder="展示在子论坛页面顶部的公告"
+                placeholder="Announcement shown at the top of the forum page"
               />
             </el-form-item>
 
-            <el-form-item label="版块">
+            <el-form-item label="Sections">
               <div v-for="(s, i) in form.sections" :key="i" class="template-row">
-                <el-input v-model="s.title" placeholder="标题" style="width: 200px" />
-                <el-input v-model="s.content" placeholder="内容" />
-                <el-button text type="danger" @click="removeSection(i)">删除</el-button>
+                <el-input v-model="s.title" placeholder="Title" style="width: 200px" />
+                <el-input v-model="s.content" placeholder="Content" />
+                <el-button text type="danger" @click="removeSection(i)">Delete</el-button>
               </div>
-              <el-button size="small" @click="addSection">+ 添加版块</el-button>
+              <el-button size="small" @click="addSection">+ Add section</el-button>
             </el-form-item>
 
-            <el-form-item label="相关链接">
+            <el-form-item label="Related links">
               <div v-for="(l, i) in form.links" :key="i" class="template-row">
-                <el-input v-model="l.label" placeholder="名称" style="width: 180px" />
+                <el-input v-model="l.label" placeholder="Label" style="width: 180px" />
                 <el-input v-model="l.url" placeholder="https://…" />
-                <el-button text type="danger" @click="removeLink(i)">删除</el-button>
+                <el-button text type="danger" @click="removeLink(i)">Delete</el-button>
               </div>
-              <el-button size="small" @click="addLink">+ 添加链接</el-button>
+              <el-button size="small" @click="addLink">+ Add link</el-button>
             </el-form-item>
 
             <div class="form-actions">
               <el-button type="primary" :loading="saving" @click="saveBasic">
-                保存修改
+                Save changes
               </el-button>
             </div>
           </el-form>
         </el-tab-pane>
 
-        <el-tab-pane label="自定义页面" name="custom">
-          <div class="settings-status">
-            <span>当前状态：</span>
-            <el-tag :type="customStatusTag(customStatus)" effect="light">
-              {{ customStatusLabel(customStatus) }}
-            </el-tag>
-            <span v-if="customReviewNote" style="color: #d03050">
-              审核意见：{{ customReviewNote }}
-            </span>
-          </div>
+        <el-tab-pane label="Custom homepage" name="homepage">
+          <el-alert
+            v-if="homepageBlocked"
+            type="warning"
+            show-icon
+            :closable="false"
+            title="This custom homepage has been taken down by an administrator, so visitors currently see the default homepage. Changes will not restore it automatically; contact an administrator for review."
+            style="margin-bottom: 12px"
+          >
+            <template #default>Reason: {{ homepageBlockReason || 'Not provided' }}</template>
+          </el-alert>
 
-          <p style="color: var(--of-text-muted); margin-bottom: 10px">
-            页面 HTML 会经后端白名单净化后保存，提交审核通过后对外展示（沙箱 iframe 渲染）。
+          <el-form label-position="top">
+            <el-form-item label="Homepage mode">
+              <el-radio-group v-model="homepageMode">
+                <el-radio value="NORMAL">Default homepage</el-radio>
+                <el-radio value="CUSTOM">Custom homepage</el-radio>
+              </el-radio-group>
+            </el-form-item>
+          </el-form>
+
+          <p class="homepage-hint">
+            The custom homepage replaces the main content area on the left of the forum page while
+            keeping site navigation and the right sidebar. HTML is sanitized against an allowlist
+            before saving and rendered in a sandboxed iframe; read-only data components are
+            supported.
           </p>
 
-          <el-input
-            v-model="customHtml"
-            type="textarea"
-            :rows="16"
-            placeholder="粘贴自定义 HTML 片段，例如 <h1>欢迎</h1>"
-          />
+          <template v-if="homepageMode === 'CUSTOM'">
+            <div class="homepage-toolbar">
+              <el-button size="small" :loading="uploading" @click="pickImage">
+                Insert image
+              </el-button>
+              <el-button size="small" @click="insertExample">Insert full example</el-button>
+              <el-button size="small" @click="goGuide">Component docs</el-button>
+              <el-button size="small" @click="homepageHtml = ''">Clear</el-button>
+              <span class="byte-count" :class="{ over: homepageBytes > MAX_BYTES }">
+                {{ homepageHtml.length }} characters · {{ sizeText }} / 64 KB
+              </span>
+            </div>
+            <input
+              ref="fileRef"
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/gif"
+              style="display: none"
+              @change="onFileChange"
+            />
+            <textarea
+              ref="editorRef"
+              v-model="homepageHtml"
+              class="html-editor"
+              spellcheck="false"
+              placeholder="Write HTML here, for example: <div style=&quot;padding:24px&quot;>Welcome to the community</div>"
+            />
+            <ul class="homepage-tips">
+              <li>JavaScript and <code>&lt;script&gt;</code> are not supported; event attributes are removed.</li>
+              <li>Only the <code>style</code> attribute is supported; the <code>&lt;style&gt;</code> tag is not.</li>
+              <li>Images must be uploaded to the site; externally linked images are removed.</li>
+              <li>Clicking external links shows a security warning.</li>
+              <li>
+                Use <code>&lt;of-forum&gt;</code>, <code>&lt;of-forum-stats&gt;</code>,
+                <code>&lt;of-forum-posts&gt;</code>, and <code>&lt;of-members&gt;</code>
+                to display forum details, stats, posts, and members.
+              </li>
+            </ul>
+          </template>
 
           <div class="form-actions">
-            <el-button :loading="savingCustom" @click="saveCustom">
-              保存草稿
+            <el-button :loading="resettingHomepage" @click="resetHomepage">
+              Reset to default homepage
             </el-button>
             <el-button
               type="primary"
-              :loading="submittingCustom"
-              :disabled="!customHtml.trim()"
-              @click="submitCustom"
+              :loading="savingHomepage"
+              :disabled="homepageMode === 'CUSTOM' && !canSaveHomepage"
+              @click="saveHomepage"
             >
-              提交审核
+              Save
             </el-button>
+            <el-button text @click="goGuide">Open customization guide</el-button>
           </div>
         </el-tab-pane>
       </el-tabs>
@@ -142,16 +179,26 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
-import { useRoute } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { useRoute, useRouter } from 'vue-router'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import GateRuleEditor from '@/components/GateRuleEditor.vue'
-import { forumApi, infoApi } from '@/api'
-import { useAuthStore } from '@/stores/auth'
-import type { CustomPageStatus, GateRule, InfoField, InfoFieldGroup, SubForum } from '@/types'
+import { forumApi, infoApi, mediaApi } from '@/api'
+import type {
+  ForumHomepageMode,
+  GateRule,
+  HomepageStatus,
+  InfoField,
+  InfoFieldGroup,
+  MyForumHomepage,
+  SubForum,
+} from '@/types'
 import { errorMessage, parseTemplateConfig } from '@/utils/format'
+import { FORUM_HOMEPAGE_EXAMPLE_HTML } from '@/utils/forumHomepageGuide'
+
+const MAX_BYTES = 65_536
 
 const route = useRoute()
-const auth = useAuthStore()
+const router = useRouter()
 
 const fieldGroups = ref<InfoFieldGroup[]>([])
 const flatFields = computed<InfoField[]>(() =>
@@ -164,11 +211,15 @@ const error = ref('')
 const activeTab = ref('basic')
 const saving = ref(false)
 
-const customHtml = ref('')
-const customStatus = ref<CustomPageStatus | undefined>(undefined)
-const customReviewNote = ref('')
-const savingCustom = ref(false)
-const submittingCustom = ref(false)
+const homepageMode = ref<ForumHomepageMode>('NORMAL')
+const homepageHtml = ref('')
+const homepageStatus = ref<HomepageStatus>('ACTIVE')
+const homepageBlockReason = ref<string | null>(null)
+const savingHomepage = ref(false)
+const resettingHomepage = ref(false)
+const uploading = ref(false)
+const fileRef = ref<HTMLInputElement | null>(null)
+const editorRef = ref<HTMLTextAreaElement | null>(null)
 
 const form = reactive({
   name: '',
@@ -184,37 +235,25 @@ const form = reactive({
   links: [] as { label: string; url: string }[],
 })
 
-const isOwner = computed(
-  () => !!forum.value && !!auth.user && forum.value.creatorId === auth.user.id
+const canManage = computed(() => {
+  const permissions = forum.value?.myPermissions || []
+  return (
+    !!forum.value?.isCreator ||
+    permissions.includes('EVERYTHING') ||
+    permissions.includes('CONFIG')
+  )
+})
+const homepageBlocked = computed(
+  () => homepageStatus.value === 'BLOCKED' && homepageMode.value === 'CUSTOM'
 )
-
-function customStatusLabel(status?: CustomPageStatus): string {
-  switch (status) {
-    case 'DRAFT':
-      return '草稿'
-    case 'PENDING':
-      return '审核中'
-    case 'APPROVED':
-      return '已通过'
-    case 'REJECTED':
-      return '已驳回'
-    default:
-      return '未提交'
-  }
-}
-
-function customStatusTag(status?: CustomPageStatus) {
-  switch (status) {
-    case 'APPROVED':
-      return 'success'
-    case 'PENDING':
-      return 'warning'
-    case 'REJECTED':
-      return 'danger'
-    default:
-      return 'info'
-  }
-}
+const homepageBytes = computed(() => new TextEncoder().encode(homepageHtml.value).length)
+const sizeText = computed(() => {
+  const bytes = homepageBytes.value
+  return bytes >= 1024 ? `${(bytes / 1024).toFixed(1)} KB` : `${bytes} B`
+})
+const canSaveHomepage = computed(
+  () => homepageBytes.value > 0 && homepageBytes.value <= MAX_BYTES && !uploading.value
+)
 
 async function loadForum() {
   loading.value = true
@@ -242,25 +281,28 @@ async function loadForum() {
       url: l.url || '',
     }))
 
-    if (isOwner.value && data.id) {
-      await loadCustomPage(data.id)
+    if (canManage.value && data.id) {
+      await loadHomepage(data.id)
     }
   } catch (e) {
-    error.value = errorMessage(e, '子论坛加载失败')
+    error.value = errorMessage(e, 'Failed to load forum')
   } finally {
     loading.value = false
   }
 }
 
-async function loadCustomPage(id: number) {
+function applyHomepage(data: MyForumHomepage) {
+  homepageMode.value = data.mode === 'CUSTOM' ? 'CUSTOM' : 'NORMAL'
+  homepageHtml.value = data.html || ''
+  homepageStatus.value = data.status === 'BLOCKED' ? 'BLOCKED' : 'ACTIVE'
+  homepageBlockReason.value = data.blockReason
+}
+
+async function loadHomepage(id: number) {
   try {
-    const info = await forumApi.getCustomPage(id)
-    customHtml.value = info?.html || ''
-    customStatus.value = info?.status
-    customReviewNote.value = info?.reviewNote || info?.customPageReviewNote || ''
-  } catch {
-    customHtml.value = forum.value?.customPageHtml || ''
-    customStatus.value = forum.value?.customPageStatus
+    applyHomepage(await forumApi.myHomepage(id))
+  } catch (e) {
+    ElMessage.error(errorMessage(e, 'Failed to load homepage settings'))
   }
 }
 
@@ -283,10 +325,10 @@ async function saveBasic() {
       browseRule: form.browseRule,
       operateRule: form.operateRule,
     })
-    ElMessage.success('已保存')
+    ElMessage.success('Saved')
     await loadForum()
   } catch (e) {
-    ElMessage.error(errorMessage(e, '保存失败'))
+    ElMessage.error(errorMessage(e, 'Failed to save'))
   } finally {
     saving.value = false
   }
@@ -308,33 +350,101 @@ function removeLink(index: number) {
   form.links.splice(index, 1)
 }
 
-async function saveCustom() {
+async function saveHomepage() {
   if (!forum.value) return
-  savingCustom.value = true
+  if (homepageMode.value === 'CUSTOM' && !canSaveHomepage.value) {
+    ElMessage.warning('Please check the content size')
+    return
+  }
+  savingHomepage.value = true
   try {
-    const info = await forumApi.saveCustomPage(forum.value.id, customHtml.value)
-    customStatus.value = info?.status || 'DRAFT'
-    ElMessage.success('草稿已保存')
+    const data = await forumApi.saveHomepage(forum.value.id, {
+      mode: homepageMode.value,
+      html: homepageMode.value === 'CUSTOM' ? homepageHtml.value : undefined,
+    })
+    applyHomepage(data)
+    ElMessage.success('Saved')
   } catch (e) {
-    ElMessage.error(errorMessage(e, '保存失败'))
+    ElMessage.error(errorMessage(e, 'Failed to save'))
   } finally {
-    savingCustom.value = false
+    savingHomepage.value = false
   }
 }
 
-async function submitCustom() {
+async function resetHomepage() {
   if (!forum.value) return
-  submittingCustom.value = true
   try {
-    await forumApi.saveCustomPage(forum.value.id, customHtml.value)
-    await forumApi.submitCustomPage(forum.value.id)
-    customStatus.value = 'PENDING'
-    ElMessage.success('已提交审核')
-  } catch (e) {
-    ElMessage.error(errorMessage(e, '提交失败'))
-  } finally {
-    submittingCustom.value = false
+    await ElMessageBox.confirm(
+      'This will delete the custom homepage and all report records, and restore the default homepage. Continue?',
+      'Reset to default homepage',
+      { confirmButtonText: 'Reset', cancelButtonText: 'Cancel', type: 'warning' }
+    )
+  } catch {
+    return
   }
+  resettingHomepage.value = true
+  try {
+    applyHomepage(await forumApi.resetHomepage(forum.value.id))
+    ElMessage.success('Reset to default homepage')
+  } catch (e) {
+    ElMessage.error(errorMessage(e, 'Operation failed'))
+  } finally {
+    resettingHomepage.value = false
+  }
+}
+
+function pickImage() {
+  fileRef.value?.click()
+}
+
+async function onFileChange(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  if (!file) return
+  if (!file.type.startsWith('image/')) {
+    ElMessage.warning('Please select an image file')
+    return
+  }
+  if (file.size > 10 * 1024 * 1024) {
+    ElMessage.warning('Image must not exceed 10MB')
+    return
+  }
+  uploading.value = true
+  try {
+    const media = await mediaApi.upload(file)
+    insertAtCursor(`<img src="/forum/api/media/${media.id}" alt="">`)
+    ElMessage.success('Image inserted')
+  } catch (e) {
+    ElMessage.error(errorMessage(e, 'Failed to upload image'))
+  } finally {
+    uploading.value = false
+  }
+}
+
+function insertAtCursor(text: string) {
+  const el = editorRef.value
+  if (!el) {
+    homepageHtml.value += text
+    return
+  }
+  const start = el.selectionStart ?? homepageHtml.value.length
+  const end = el.selectionEnd ?? start
+  homepageHtml.value =
+    homepageHtml.value.slice(0, start) + text + homepageHtml.value.slice(end)
+  requestAnimationFrame(() => {
+    el.focus()
+    const pos = start + text.length
+    el.setSelectionRange(pos, pos)
+  })
+}
+
+function insertExample() {
+  insertAtCursor(FORUM_HOMEPAGE_EXAMPLE_HTML)
+}
+
+function goGuide() {
+  router.push('/settings/forum-homepage/guide')
 }
 
 onMounted(async () => {
@@ -342,7 +452,62 @@ onMounted(async () => {
   try {
     fieldGroups.value = (await infoApi.fields()) || []
   } catch {
-    // 目录加载失败时门槛编辑器为空，不影响其他管理功能
+    // If loading fields fails, the threshold editor stays empty; other settings are unaffected
   }
 })
 </script>
+
+<style scoped>
+.homepage-hint {
+  margin: 0 0 12px;
+  color: var(--of-text-muted);
+  font-size: 13px;
+  line-height: 1.8;
+}
+.homepage-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.byte-count {
+  margin-left: auto;
+  color: var(--of-text-muted);
+  font-size: 12px;
+}
+.byte-count.over {
+  color: #d03050;
+}
+.html-editor {
+  width: 100%;
+  min-height: 360px;
+  padding: 12px 14px;
+  border: 1px solid var(--of-border);
+  border-radius: var(--of-radius);
+  background: var(--of-surface-weak);
+  color: var(--of-text);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.7;
+  resize: vertical;
+  box-sizing: border-box;
+}
+.html-editor:focus {
+  outline: none;
+  border-color: var(--of-brand);
+}
+.homepage-tips {
+  margin: 12px 0 0;
+  padding-left: 18px;
+  color: var(--of-text-muted);
+  font-size: 12px;
+  line-height: 1.9;
+}
+.template-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+</style>

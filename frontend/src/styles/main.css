@@ -1,12 +1,12 @@
 /* ============================================================
-   openforum — 全站布局与视觉设计令牌
-   统一的设计系统变量与组件样式
+   openforum — site-wide layout and visual design tokens
+   Unified design system variables and component styles
    ============================================================ */
 
 :root {
-  /* ---------- 品牌与交互 ---------- */
-  --of-brand: #ff4500;            /* logo / 强调 */
-  --of-primary: #d93900;          /* CTA / 赞同 active */
+  /* ---------- Brand and interaction ---------- */
+  --of-brand: #ff4500;            /* logo / accent */
+  --of-primary: #d93900;          /* CTA / upvote active */
   --of-primary-hover: #ae2c00;
   --of-upvote: #d93900;
   --of-upvote-hover: #ae2c00;
@@ -15,31 +15,31 @@
   --of-link: #115bca;
   --of-link-hover: #0a449b;
 
-  /* ---------- 中性层次 ---------- */
-  --of-bg: #f6f8f9;               /* 页面底 */
-  --of-card: #ffffff;             /* 卡片 / 容器 */
-  --of-surface: #e5ebee;          /* 次级填充 */
+  /* ---------- Neutral scale ---------- */
+  --of-bg: #f6f8f9;               /* Page background */
+  --of-card: #ffffff;             /* Card / container */
+  --of-surface: #e5ebee;          /* Secondary fill */
   --of-surface-weak: #eef1f3;
-  --of-border: #e5ebee;           /* 分隔 / 描边 */
+  --of-border: #e5ebee;           /* Divider / stroke */
   --of-border-strong: #d3dde2;
-  --of-text: #181c1f;             /* 前景 strong */
+  --of-text: #181c1f;             /* Strong foreground */
   --of-text-body: #333d42;
   --of-text-muted: #5c6c74;
   --of-text-subtle: #8b979e;
 
-  /* ---------- 形状 ---------- */
+  /* ---------- Shape ---------- */
   --of-radius: 16px;
   --of-radius-md: 8px;
   --of-radius-sm: 4px;
   --of-radius-pill: 9999px;
 
-  /* ---------- 阴影 ---------- */
+  /* ---------- Shadows ---------- */
   --of-shadow-card: 0 1px 4px rgba(0, 0, 0, 0.149), 0 4px 4px rgba(0, 0, 0, 0.06);
   --of-shadow-nav: 0 4px 14px rgba(0, 0, 0, 0.1);
   --of-shadow-modal: 0 2px 15px rgba(26, 26, 27, 0.3);
   --of-shadow-pop: 0 2px 8px rgba(0, 0, 0, 0.15);
 
-  /* ---------- 排版 ---------- */
+  /* ---------- Typography ---------- */
   --of-font: -apple-system, system-ui, 'Segoe UI', Roboto, 'PingFang SC',
     'Hiragino Sans GB', 'Microsoft YaHei', Helvetica, Arial, sans-serif;
   --of-fs-title: 18px;
@@ -47,19 +47,19 @@
   --of-fs-body: 14px;
   --of-fs-meta: 12px;
 
-  /* ---------- 尺寸 ---------- */
+  /* ---------- Dimensions ---------- */
   --of-nav-height: 56px;
   --of-rail-left: 270px;
   --of-rail-right: 316px;
   --of-max-width: 1460px;
 
-  /* ---------- 旧令牌别名（保持调用点不变） ---------- */
+  /* ---------- Legacy token aliases (keeps call sites unchanged) ---------- */
   --of-primary-dark: var(--of-primary-hover);
   --of-primary-soft: var(--of-surface);
   --of-border-soft: var(--of-border);
   --of-shadow: var(--of-shadow-card);
 
-  /* ---------- Element Plus 对齐 ---------- */
+  /* ---------- Element Plus alignment ---------- */
   --el-color-primary: #d93900;
   --el-color-primary-light-3: #e2662f;
   --el-color-primary-light-5: #ec8a5e;
@@ -86,7 +86,7 @@
   --el-fill-color: #e5ebee;
 }
 
-/* ---------- 深色模式 ---------- */
+/* ---------- Dark mode ---------- */
 :root.dark,
 html.dark {
   --of-bg: #0b1416;
@@ -122,7 +122,7 @@ html.dark {
 }
 
 /* ============================================================
-   基础重置
+   Base reset
    ============================================================ */
 
 * {
@@ -188,7 +188,7 @@ button {
   font-family: inherit;
 }
 
-/* SVG 图标基类 */
+/* SVG icon base class */
 .of-ico {
   width: 20px;
   height: 20px;
@@ -197,7 +197,7 @@ button {
 }
 
 /* ============================================================
-   页面骨架
+   Page shell
    ============================================================ */
 
 .app-shell {
@@ -211,7 +211,7 @@ button {
   padding: 20px 24px 64px;
 }
 
-/* 三栏栅格：左导航 / 内容 / 右信息卡 */
+/* Three-column grid: left nav / content / right info card */
 .page-grid {
   display: grid;
   grid-template-columns: var(--of-rail-left) minmax(0, 1fr) var(--of-rail-right);
@@ -235,7 +235,7 @@ button {
 }
 
 /* ============================================================
-   卡片基线
+   Card baseline
    ============================================================ */
 
 .of-card {
@@ -261,7 +261,7 @@ button {
   color: var(--of-text);
 }
 
-/* ---------- 通用状态块 ---------- */
+/* ---------- Generic state block ---------- */
 .state-box {
   padding: 44px 20px;
   text-align: center;
@@ -295,7 +295,7 @@ html.dark .state-box.error {
 }
 
 /* ============================================================
-   顶栏
+   Top navigation
    ============================================================ */
 
 .topnav {
@@ -417,7 +417,7 @@ html.dark .state-box.error {
 }
 
 /* ============================================================
-   左侧导航栏 / 右侧信息栏
+   Left navigation / right info rail
    ============================================================ */
 
 .rail-left,
@@ -566,7 +566,7 @@ html.dark .state-box.error {
   color: var(--of-link);
 }
 
-/* 移动端抽屉遮罩 */
+/* Mobile drawer scrim */
 .rail-scrim {
   display: none;
   position: fixed;
@@ -575,7 +575,7 @@ html.dark .state-box.error {
   z-index: 190;
 }
 
-/* 旧侧栏命名（搜索页/兼容） */
+/* Legacy sidebar naming (search page / compatibility) */
 .sidebar-card {
   background: var(--of-card);
   border: 1px solid var(--of-border);
@@ -670,7 +670,7 @@ html.dark .state-box.error {
 }
 
 /* ============================================================
-   排序 chips（pill 分段控件）
+   Sort chips (pill segmented control)
    ============================================================ */
 
 .feed-toolbar {
@@ -711,7 +711,7 @@ html.dark .state-box.error {
 }
 
 /* ============================================================
-   信息流 / 帖子卡片
+   Feed / post cards
    ============================================================ */
 
 .post-list {
@@ -792,7 +792,7 @@ html.dark .state-box.error {
   overflow: hidden;
 }
 
-/* 帖子底部操作栏 */
+/* Post footer action bar */
 .post-footer {
   display: flex;
   align-items: center;
@@ -865,7 +865,7 @@ html.dark .state-box.error {
 }
 
 /* ============================================================
-   投票列
+   Vote column
    ============================================================ */
 
 .vote-col {
@@ -938,7 +938,7 @@ html.dark .state-box.error {
 }
 
 /* ============================================================
-   社区页
+   Community page
    ============================================================ */
 
 .forum-layout {
@@ -955,7 +955,7 @@ html.dark .state-box.error {
   gap: 16px;
 }
 
-/* ---------- 关于卡 ---------- */
+/* ---------- About card ---------- */
 .about-card {
   padding: 0;
   overflow: hidden;
@@ -988,7 +988,7 @@ html.dark .state-box.error {
   width: 100%;
 }
 
-/* ---------- 规则列表 ---------- */
+/* ---------- Rules list ---------- */
 .rule-item {
   display: flex;
   gap: 10px;
@@ -1090,7 +1090,7 @@ html.dark .state-box.error {
   padding-top: 16px;
 }
 
-/* ---------- 默认模板 ---------- */
+/* ---------- Default template ---------- */
 .template-row {
   display: flex;
   gap: 8px;
@@ -1156,7 +1156,7 @@ html.dark .state-box.error {
 }
 
 /* ============================================================
-   帖子详情
+   Post detail
    ============================================================ */
 
 .post-detail-card {
@@ -1204,7 +1204,7 @@ html.dark .state-box.error {
   margin-bottom: 10px;
 }
 
-/* ---------- 评论区 ---------- */
+/* ---------- Comments section ---------- */
 .comment-section-head {
   display: flex;
   align-items: center;
@@ -1373,7 +1373,7 @@ html.dark .state-box.error {
 }
 
 /* ============================================================
-   用户资料
+   User profile
    ============================================================ */
 
 .profile-banner {
@@ -1425,7 +1425,7 @@ html.dark .state-box.error {
   margin-top: 12px;
 }
 
-/* 用户页：封面卡（去内边距，封面贴顶） */
+/* User page: cover card (no padding, cover flush with the top) */
 .profile-card {
   padding: 0;
   overflow: hidden;
@@ -1462,7 +1462,7 @@ html.dark .state-box.error {
   color: var(--of-text-subtle);
 }
 
-/* 用户页：评论列表 */
+/* User page: comment list */
 .profile-comment {
   display: flex;
   flex-direction: column;
@@ -1505,7 +1505,7 @@ html.dark .state-box.error {
 }
 
 /* ============================================================
-   认证 / 表单卡
+   Verification / form cards
    ============================================================ */
 
 .auth-grid {
@@ -1569,7 +1569,7 @@ html.dark .record-reason {
 }
 
 /* ============================================================
-   登录 / 注册
+   Sign in / sign up
    ============================================================ */
 
 .auth-page {
@@ -1660,7 +1660,7 @@ html.dark .record-reason {
 }
 
 /* ============================================================
-   其它
+   Miscellaneous
    ============================================================ */
 
 .form-actions {
@@ -1714,7 +1714,7 @@ html.dark .record-reason {
 }
 
 /* ============================================================
-   Element Plus 组件微调
+   Element Plus component tweaks
    ============================================================ */
 
 .el-input__wrapper,
@@ -1775,10 +1775,10 @@ html.dark .record-reason {
 }
 
 /* ============================================================
-   响应式
+   Responsive
    ============================================================ */
 
-/* 收起右栏 */
+/* Collapse the right rail */
 @media (max-width: 1280px) {
   .page-grid {
     grid-template-columns: var(--of-rail-left) minmax(0, 1fr);
@@ -1794,7 +1794,7 @@ html.dark .record-reason {
   }
 }
 
-/* 收起左栏 → 抽屉 */
+/* Collapse the left rail → drawer */
 @media (max-width: 960px) {
   .page-grid,
   .page-grid.no-right {
@@ -1832,7 +1832,7 @@ html.dark .record-reason {
   }
 }
 
-/* 单列 + 顶栏两行 */
+/* Single column + two-row top nav */
 @media (max-width: 640px) {
   .app-main {
     padding: 12px 8px 48px;
@@ -1934,7 +1934,7 @@ html.dark .record-reason {
     padding-left: 8px;
   }
 
-  /* 宽表格在窄屏内横向滚动 */
+  /* Wide tables scroll horizontally on narrow screens */
   .markdown-body table {
     display: block;
     overflow-x: auto;

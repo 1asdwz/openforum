@@ -9,7 +9,7 @@ use crate::models::{AuthMedia, UserAuthentication};
 use crate::repo;
 use crate::state::AppState;
 
-const AI_VISION_PROMPT: &str = "你是用户认证审核助手。我会给你用户的认证类型、声明的字段以及证件/自拍照片。\n请判断材料是否真实、清晰、与声明一致，并尽量抽取关键字段。\n只返回严格 JSON，不要任何多余文字，格式：\n{\"status\":\"APPROVED|REJECTED|PENDING\",\"confidence\":0.0-1.0,\"reason\":\"简短说明\",\n \"extracted\":{\"fullName\":\"\",\"idNumber\":\"\"}}\n- 图片与声明一致且清晰：APPROVED，confidence 0.85 以上。\n- 图片模糊、遮挡、明显伪造或与声明不符：REJECTED。\n- 无法判断：PENDING。";
+const AI_VISION_PROMPT: &str = "You are a user verification review assistant. I will give you the user's verification type, declared fields, and ID/selfie photos.\nDetermine whether the materials are authentic, legible, and consistent with the declarations, and extract key fields where possible.\nReturn strict JSON only, with no extra text, in this format:\n{\"status\":\"APPROVED|REJECTED|PENDING\",\"confidence\":0.0-1.0,\"reason\":\"brief explanation\",\n \"extracted\":{\"fullName\":\"\",\"idNumber\":\"\"}}\n- Image matches the declaration and is legible: APPROVED with confidence above 0.85.\n- Image is blurry, occluded, clearly forged, or inconsistent with the declaration: REJECTED.\n- Cannot be determined: PENDING.";
 
 const MIN_DIMENSION: u32 = 300;
 
@@ -38,9 +38,9 @@ pub struct MediaRef {
     pub bytes: Vec<u8>,
 }
 
-/// 主审核流水线，对应 Java `AuthenticationReviewService.review`。
-/// 全流程（PENDING 落库 → 规则/插件审核 → 终态写回 → 审核日志）在单个事务内完成，
-/// 对齐 Java 方法上的 `@Transactional`，避免中途失败留下半成品状态。
+/// Main review pipeline, corresponding to Java's `AuthenticationReviewService.review`.
+/// The whole flow (persist PENDING → rule/plugin review → write final state → review log) runs in a single transaction,
+/// matching `@Transactional` on the Java method and avoiding half-finished state on mid-way failures.
 #[allow(clippy::too_many_arguments)]
 pub async fn review(
     state: &AppState,
@@ -76,7 +76,7 @@ pub async fn review(
             tx.commit().await?;
             Ok(saved)
         }
-        // tx 在此 drop：未提交即自动回滚。
+        // tx is dropped here: without commit it rolls back automatically.
         Err(e) => Err(e),
     }
 }
@@ -109,7 +109,7 @@ async fn review_inner(
         _ => Map::new(),
     };
 
-    // 1. 结构校验（其中活体挑战校验可能返回 400，需在落库前抛出）
+    // 1. Structural validation (the liveness challenge check may return 400 and must be raised before persisting)
     let structure_error = validate_structure(
         state,
         conn,
@@ -125,7 +125,7 @@ async fn review_inner(
     )
     .await?;
 
-    // 2. 落库为 PENDING
+    // 2. Persist as PENDING
     let mut auth = existing.unwrap_or_default();
     auth.user_id = user_id;
     auth.auth_type = auth_type.to_string();
@@ -158,7 +158,7 @@ async fn review_inner(
         "SUBMIT",
         auth.review_method.as_deref(),
         None,
-        Some(&format!("提交 {}:{}", auth.auth_type, auth.level.clone().unwrap_or_default())),
+        Some(&format!("Submitted {}:{}", auth.auth_type, auth.level.clone().unwrap_or_default())),
         Some(user_id),
     )
     .await?;
@@ -167,7 +167,7 @@ async fn review_inner(
         return finish(conn, auth, "REJECTED", "RULE", 0.95, &err, Some(&err)).await;
     }
 
-    // 3. LOW：直接采用规则引擎结论
+    // 3. LOW: use the rule engine result directly
     if level == AuthLevel::Low {
         let rule = rule_review(auth_type, &safe_data);
         if rule.status == "REJECTED" {
@@ -178,12 +178,12 @@ async fn review_inner(
         return Ok(saved);
     }
 
-    // 4. 绑定媒体（带 user_id 过滤，防止越权绑定他人材料）
+    // 4. Bind media (filtered by user_id to prevent attaching someone else's materials)
     if !media_ids.is_empty() {
         repo::attach_auth_media(&mut *conn, auth.id, user_id, &media_ids).await?;
     }
 
-    // 5. 专业审核
+    // 5. Professional review
     let documents = materialize(state, conn, &media_ids, user_id).await?;
     if !documents.iter().any(|d| d.kind == "DOCUMENT") {
         return finish(
@@ -192,14 +192,14 @@ async fn review_inner(
             "REJECTED",
             "RULE",
             0.9,
-            "至少需要上传 1 张证件照片",
-            Some("缺少证件照片"),
+            "At least one ID document photo is required",
+            Some("Missing ID document photo"),
         )
         .await;
     }
     let outcome = run_plugins(state, auth_type, level, &safe_data, &documents).await;
 
-    // 6. 活体降级：不自动通过，转人工
+    // 6. Liveness fallback: do not auto-approve; route to manual review
     let liveness_passed = liveness_map.get("passed").and_then(|v| v.as_bool()).unwrap_or(false);
     if level.rank() >= AuthLevel::High.rank() && !liveness_passed && outcome.status != "REJECTED" {
         return finish(
@@ -208,7 +208,7 @@ async fn review_inner(
             "PENDING",
             "MANUAL",
             0.0,
-            "活体检测未完成，转人工审核",
+            "Liveness check incomplete; routed to manual review",
             None,
         )
         .await;
@@ -274,22 +274,22 @@ async fn validate_structure(
         return Ok(None);
     }
     if media_ids.is_empty() {
-        return Ok(Some("该等级需要上传证件材料".to_string()));
+        return Ok(Some("This level requires document materials".to_string()));
     }
     if media_ids.len() > state.cfg.auth_max_document_count {
         return Ok(Some(format!(
-            "证件材料数量超出上限（最多 {} 张）",
+            "Too many document files (maximum {})",
             state.cfg.auth_max_document_count
         )));
     }
     if level.rank() >= AuthLevel::High.rank() {
         if video_media_id.is_none() {
-            return Ok(Some("该等级需要完成视频认证".to_string()));
+            return Ok(Some("This level requires video verification".to_string()));
         }
         consume_challenge(conn, challenge_id, user_id, liveness).await?;
     }
     if level == AuthLevel::Extreme && attestation.is_empty() {
-        return Ok(Some("极高等级需要通过移动 App 完成防伪录制".to_string()));
+        return Ok(Some("The highest level requires anti-spoofing recording via the mobile app".to_string()));
     }
     Ok(None)
 }
@@ -302,31 +302,31 @@ async fn consume_challenge(
 ) -> Result<(), ApiError> {
     let challenge_id = match challenge_id {
         Some(c) if !c.trim().is_empty() => c,
-        _ => return Err(ApiError::bad_request("缺少活体挑战标识")),
+        _ => return Err(ApiError::bad_request("Missing liveness challenge ID")),
     };
     let challenge = repo::find_challenge(&mut *conn, challenge_id, user_id)
         .await?
-        .ok_or_else(|| ApiError::bad_request("活体挑战无效或不属于当前用户"))?;
+        .ok_or_else(|| ApiError::bad_request("Liveness challenge is invalid or belongs to another user"))?;
     if challenge.used_at.is_some() {
-        return Err(ApiError::bad_request("活体挑战已使用，请重新开始视频认证"));
+        return Err(ApiError::bad_request("Liveness challenge has already been used; please restart video verification"));
     }
     if challenge.expires_at < Local::now().naive_local() {
-        return Err(ApiError::bad_request("活体挑战已过期，请重新开始视频认证"));
+        return Err(ApiError::bad_request("Liveness challenge has expired; please restart video verification"));
     }
     if liveness.is_empty() {
-        return Err(ApiError::bad_request("缺少活体检测结果"));
+        return Err(ApiError::bad_request("Missing liveness check result"));
     }
     let degraded = liveness.get("degraded").and_then(|v| v.as_bool()).unwrap_or(false);
     if liveness.get("passed").and_then(|v| v.as_bool()).unwrap_or(false) {
         let required = crate::json::json_to_string_list(challenge.actions.as_deref());
         validate_actions(&required, liveness)?;
     } else if !degraded {
-        return Err(ApiError::bad_request("活体检测未通过，请重新进行视频认证"));
+        return Err(ApiError::bad_request("Liveness check failed; please retry video verification"));
     }
-    // 原子消费：仅当尚未被使用时才成功；并发下只有一个请求能抢到，避免重复消费（TOCTOU）。
+    // Atomic consumption: succeeds only if not yet used; under concurrency only one request wins, preventing double consumption (TOCTOU).
     let consumed = repo::mark_challenge_used(&mut *conn, challenge_id, user_id).await?;
     if !consumed {
-        return Err(ApiError::bad_request("活体挑战已使用，请重新开始视频认证"));
+        return Err(ApiError::bad_request("Liveness challenge has already been used; please restart video verification"));
     }
     Ok(())
 }
@@ -334,7 +334,7 @@ async fn consume_challenge(
 fn validate_actions(required: &[String], liveness: &Map<String, Value>) -> Result<(), ApiError> {
     let list = match liveness.get("actions") {
         Some(Value::Array(a)) => a,
-        _ => return Err(ApiError::bad_request("活体检测结果缺少动作记录")),
+        _ => return Err(ApiError::bad_request("Liveness result is missing action records")),
     };
     for action in required {
         let passed = list.iter().any(|item| match item {
@@ -345,7 +345,7 @@ fn validate_actions(required: &[String], liveness: &Map<String, Value>) -> Resul
             _ => false,
         });
         if !passed {
-            return Err(ApiError::bad_request(format!("未完成指定动作: {action}")));
+            return Err(ApiError::bad_request(format!("Required action not completed: {action}")));
         }
     }
     Ok(())
@@ -362,7 +362,7 @@ async fn materialize(
     }
     let media: Vec<AuthMedia> = repo::list_auth_media_in(&mut *conn, user_id, media_ids).await?;
     if media.len() != media_ids.len() {
-        return Err(ApiError::bad_request("存在无效或不属于当前用户的媒体文件"));
+        return Err(ApiError::bad_request("Some media files are invalid or belong to another user"));
     }
     let mut refs = Vec::with_capacity(media.len());
     for item in media {
@@ -389,7 +389,7 @@ async fn run_plugins(
             status: "PENDING",
             method: "MANUAL",
             confidence: 0.0,
-            reason: "等待人工审核".to_string(),
+            reason: "Awaiting manual review".to_string(),
             extracted: Value::Object(Map::new()),
         };
     }
@@ -442,7 +442,7 @@ async fn run_plugins(
         status: "PENDING",
         method: "MANUAL",
         confidence: 0.0,
-        reason: "材料已收到，等待人工复核".to_string(),
+        reason: "Materials received; awaiting manual review".to_string(),
         extracted,
     }
 }
@@ -485,55 +485,55 @@ async fn finish(
     Ok(auth)
 }
 
-/// 规则引擎：校验各认证类型的必填字段与格式。
+/// Rule engine: validates required fields and formats for each verification type.
 pub fn rule_review(auth_type: &str, data: &Map<String, Value>) -> ReviewResult {
     let mut errors: Vec<String> = Vec::new();
     match auth_type {
-        "REAL_NAME" => require_text(data, "fullName", "真实姓名", 2, 50, &mut errors),
+        "REAL_NAME" => require_text(data, "fullName", "Real name", 2, 50, &mut errors),
         "ID_CARD" => validate_id_card(data, &mut errors),
         "GENDER" => validate_gender(data, &mut errors),
         "AGE" => validate_age(data, &mut errors),
-        "NATIONALITY" => require_text(data, "nationality", "国籍", 1, 50, &mut errors),
-        "CITY" => require_text(data, "city", "城市", 1, 40, &mut errors),
+        "NATIONALITY" => require_text(data, "nationality", "Nationality", 1, 50, &mut errors),
+        "CITY" => require_text(data, "city", "City", 1, 40, &mut errors),
         "OCCUPATION" => {
             let category = text(data, "category").unwrap_or_default().to_ascii_uppercase();
             if !crate::info::is_valid_occupation(&category) {
-                errors.push("请选择职业分类".to_string());
+                errors.push("Please select an occupation category".to_string());
             }
             if text(data, "title").map(|t| t.chars().count() > 50).unwrap_or(false) {
-                errors.push("职位名称不能超过 50 字".to_string());
+                errors.push("Job title cannot exceed 50 characters".to_string());
             }
         }
         "EDUCATION" => {
             let raw = text(data, "education").unwrap_or_default().to_ascii_uppercase();
             if crate::info::education_rank(&raw).is_none() {
-                errors.push("请选择学历".to_string());
+                errors.push("Please select an education level".to_string());
             }
         }
-        "DRIVER_LICENSE" => require_text(data, "licenseNumber", "驾照号", 6, 40, &mut errors),
+        "DRIVER_LICENSE" => require_text(data, "licenseNumber", "Driver's license number", 6, 40, &mut errors),
         "MARRIAGE_CERT" => {
-            require_text(data, "spouseName", "配偶姓名", 1, 50, &mut errors);
-            require_text(data, "certificateNumber", "结婚证号", 4, 40, &mut errors);
+            require_text(data, "spouseName", "Spouse name", 1, 50, &mut errors);
+            require_text(data, "certificateNumber", "Marriage certificate number", 4, 40, &mut errors);
         }
         "PROPERTY_CERT" => {
-            require_text(data, "certificateNumber", "产权证号", 4, 60, &mut errors);
-            require_text(data, "propertyAddress", "房产地址", 2, 200, &mut errors);
+            require_text(data, "certificateNumber", "Property certificate number", 4, 60, &mut errors);
+            require_text(data, "propertyAddress", "Property address", 2, 200, &mut errors);
         }
         "ASSETS" => validate_assets(data, &mut errors),
-        "CUSTOM" => require_text(data, "description", "说明", 2, 500, &mut errors),
+        "CUSTOM" => require_text(data, "description", "Description", 2, 500, &mut errors),
         _ => {}
     }
     if errors.is_empty() {
-        ReviewResult::new("APPROVED", 0.95, "规则校验通过")
+        ReviewResult::new("APPROVED", 0.95, "Rule validation passed")
     } else {
-        ReviewResult::new("REJECTED", 0.95, errors.join("；"))
+        ReviewResult::new("REJECTED", 0.95, errors.join("; "))
     }
 }
 
 fn validate_id_card(data: &Map<String, Value>, errors: &mut Vec<String>) {
     match text(data, "idNumber") {
-        None => errors.push("身份证号不能为空".to_string()),
-        Some(v) if v.is_empty() => errors.push("身份证号不能为空".to_string()),
+        None => errors.push("ID number is required".to_string()),
+        Some(v) if v.is_empty() => errors.push("ID number is required".to_string()),
         Some(v) => {
             let bytes = v.as_bytes();
             let valid_len = v.chars().count() == 18;
@@ -543,20 +543,20 @@ fn validate_id_card(data: &Map<String, Value>, errors: &mut Vec<String>) {
                 .map(|b| b.is_ascii_digit() || *b == b'X' || *b == b'x')
                 .unwrap_or(false);
             if !(valid_len && first17 && last_ok) {
-                errors.push("身份证号必须为 18 位（末位可为 X）".to_string());
+                errors.push("ID number must be 18 characters (the last may be X)".to_string());
             }
         }
     }
 }
 
 fn validate_gender(data: &Map<String, Value>, errors: &mut Vec<String>) {
-    const GENDERS: [&str; 6] = ["male", "female", "other", "男", "女", "其他"];
+    const GENDERS: [&str; 6] = ["male", "female", "other", "m", "f", "man"];
     match text(data, "gender") {
-        None => errors.push("性别不能为空".to_string()),
-        Some(v) if v.is_empty() => errors.push("性别不能为空".to_string()),
+        None => errors.push("Gender is required".to_string()),
+        Some(v) if v.is_empty() => errors.push("Gender is required".to_string()),
         Some(v) => {
             if !GENDERS.contains(&v.to_lowercase().as_str()) {
-                errors.push("性别取值不合法".to_string());
+                errors.push("Invalid gender value".to_string());
             }
         }
     }
@@ -566,30 +566,30 @@ fn validate_age(data: &Map<String, Value>, errors: &mut Vec<String>) {
     if let Some(birth) = text(data, "birthDate") {
         if !birth.is_empty() {
             if chrono::NaiveDate::parse_from_str(&birth, "%Y-%m-%d").is_err() {
-                errors.push("出生日期格式应为 YYYY-MM-DD".to_string());
+                errors.push("Birth date must use YYYY-MM-DD format".to_string());
             }
             return;
         }
     }
     match text(data, "age") {
-        None => errors.push("年龄不能为空".to_string()),
-        Some(v) if v.is_empty() => errors.push("年龄不能为空".to_string()),
+        None => errors.push("Age is required".to_string()),
+        Some(v) if v.is_empty() => errors.push("Age is required".to_string()),
         Some(v) => match v.parse::<i32>() {
             Ok(age) if (0..=120).contains(&age) => {}
-            Ok(_) => errors.push("年龄需在 0-120 之间".to_string()),
-            Err(_) => errors.push("年龄必须为数字".to_string()),
+            Ok(_) => errors.push("Age must be between 0 and 120".to_string()),
+            Err(_) => errors.push("Age must be a number".to_string()),
         },
     }
 }
 
 fn validate_assets(data: &Map<String, Value>, errors: &mut Vec<String>) {
     match text(data, "amount") {
-        None => errors.push("资产金额不能为空".to_string()),
-        Some(v) if v.is_empty() => errors.push("资产金额不能为空".to_string()),
+        None => errors.push("Asset amount is required".to_string()),
+        Some(v) if v.is_empty() => errors.push("Asset amount is required".to_string()),
         Some(v) => match v.parse::<f64>() {
             Ok(amount) if amount >= 0.0 => {}
-            Ok(_) => errors.push("资产金额不能为负数".to_string()),
-            Err(_) => errors.push("资产金额必须为数字".to_string()),
+            Ok(_) => errors.push("Asset amount cannot be negative".to_string()),
+            Err(_) => errors.push("Asset amount must be a number".to_string()),
         },
     }
 }
@@ -603,12 +603,12 @@ fn require_text(
     errors: &mut Vec<String>,
 ) {
     match text(data, key) {
-        None => errors.push(format!("{label}不能为空")),
-        Some(v) if v.is_empty() => errors.push(format!("{label}不能为空")),
+        None => errors.push(format!("{label} is required")),
+        Some(v) if v.is_empty() => errors.push(format!("{label} is required")),
         Some(v) => {
             let len = v.chars().count();
             if len < min || len > max {
-                errors.push(format!("{label}长度需在 {min}-{max} 之间"));
+                errors.push(format!("{label} must be {min}-{max} characters"));
             }
         }
     }
@@ -622,15 +622,15 @@ fn text(data: &Map<String, Value>, key: &str) -> Option<String> {
     }
 }
 
-/// 启发式证件审核：只能判 REJECTED 或 PENDING。
+/// Heuristic document review: can only return REJECTED or PENDING.
 pub fn heuristic_document(documents: &[MediaRef]) -> ReviewResult {
     let mut problems: Vec<String> = Vec::new();
     if documents.is_empty() {
-        problems.push("缺少证件图片".to_string());
+        problems.push("Missing document image".to_string());
     }
     for document in documents {
         if document.bytes.is_empty() {
-            problems.push("证件图片内容为空".to_string());
+            problems.push("Document image is empty".to_string());
             continue;
         }
         match image::ImageReader::new(std::io::Cursor::new(&document.bytes))
@@ -638,18 +638,18 @@ pub fn heuristic_document(documents: &[MediaRef]) -> ReviewResult {
             .ok()
             .and_then(|r| r.into_dimensions().ok())
         {
-            None => problems.push("证件图片无法解码".to_string()),
+            None => problems.push("Document image cannot be decoded".to_string()),
             Some((w, h)) => {
                 if w < MIN_DIMENSION || h < MIN_DIMENSION {
-                    problems.push(format!("证件图片分辨率过低（需 ≥ {MIN_DIMENSION}px）"));
+                    problems.push(format!("Document image resolution is too low (must be ≥ {MIN_DIMENSION}px)"));
                 }
             }
         }
     }
     if problems.is_empty() {
-        ReviewResult::new("PENDING", 0.3, "证件材料结构完整，转人工/其他插件复核")
+        ReviewResult::new("PENDING", 0.3, "Document materials are structurally complete; routing to manual/other plugin review")
     } else {
-        ReviewResult::new("REJECTED", 0.6, problems.join("；"))
+        ReviewResult::new("REJECTED", 0.6, problems.join("; "))
     }
 }
 
@@ -661,17 +661,17 @@ async fn ai_vision_review(
     documents: &[MediaRef],
 ) -> ReviewResult {
     if !state.cfg.ai_configured() {
-        return ReviewResult::new("PENDING", 0.0, "AI 未配置，跳过");
+        return ReviewResult::new("PENDING", 0.0, "AI is not configured; skipping");
     }
     let mut content: Vec<Value> = Vec::new();
     content.push(json!({
         "type": "text",
-        "text": format!("认证类型: {}\n认证等级: {}\n声明字段: {}", auth_type, level.name(), Value::Object(data.clone()))
+        "text": format!("Verification type: {}\nVerification level: {}\nDeclared fields: {}", auth_type, level.name(), Value::Object(data.clone()))
     }));
     for (index, document) in documents.iter().enumerate() {
         content.push(json!({
             "type": "text",
-            "text": format!("证件图片 #{}（{}）", index + 1, document.content_type.clone().unwrap_or_default())
+            "text": format!("Document image #{} ({})", index + 1, document.content_type.clone().unwrap_or_default())
         }));
         let mime = document
             .content_type
@@ -694,11 +694,11 @@ async fn ai_vision_review(
         ]
     });
     match post_chat(state, &body).await {
-        Ok(Some(raw)) => parse_ai_review(&raw, "AI 视觉审核"),
-        Ok(None) => ReviewResult::new("PENDING", 0.0, "AI 返回内容为空"),
+        Ok(Some(raw)) => parse_ai_review(&raw, "AI vision review"),
+        Ok(None) => ReviewResult::new("PENDING", 0.0, "AI returned empty content"),
         Err(e) => {
             tracing::warn!("AI vision review failed: {e}");
-            ReviewResult::new("PENDING", 0.0, "AI 视觉审核不可用")
+            ReviewResult::new("PENDING", 0.0, "AI vision review unavailable")
         }
     }
 }
@@ -809,7 +809,7 @@ async fn real_name_register(
     let full_name = match full_name {
         Some(v) => v,
         None => {
-            tracing::debug!("自动实名登记跳过：源认证 {source_type} 未提供 fullName");
+            tracing::debug!("Skipping automatic real-name registration: source auth {source_type} did not provide fullName");
             return Ok(());
         }
     };
@@ -838,7 +838,7 @@ async fn real_name_register(
     target.status = "APPROVED".to_string();
     target.review_method = Some("SYSTEM".to_string());
     target.confidence = Some(1.0);
-    target.reason = Some(format!("由 {}:{} 认证自动登记", source_type, level.name()));
+    target.reason = Some(format!("Auto-registered from {}:{} verification", source_type, level.name()));
     target.rejection_reason = None;
     target.reviewed_at = Some(Local::now().naive_local());
     repo::save_auth(&mut *conn, &mut target).await?;
@@ -850,7 +850,7 @@ async fn real_name_register(
         "APPROVE",
         Some("SYSTEM"),
         Some(1.0),
-        Some(&format!("由 {}:{} 认证自动登记实名", source_type, level.name())),
+        Some(&format!("Real name auto-registered from {}:{} verification", source_type, level.name())),
         None,
     )
     .await?;

@@ -5,7 +5,7 @@
         <button
           class="comment-toggle"
           type="button"
-          :aria-label="collapsed ? '展开评论' : '收起评论'"
+          :aria-label="collapsed ? 'Expand comment' : 'Collapse comment'"
           @click="collapsed = !collapsed"
         >
           {{ collapsed ? '+' : '−' }}
@@ -24,7 +24,7 @@
           <RichTextEditor
             v-model="replyText"
             compact
-            :placeholder="`回复 ${comment.authorName}`"
+            :placeholder="`Reply to ${comment.authorName}`"
           />
           <div class="form-actions">
             <el-button
@@ -34,16 +34,16 @@
               :loading="submitting"
               @click="submitReply"
             >
-              回复
+              Reply
             </el-button>
-            <el-button size="small" round @click="cancelReply">取消</el-button>
+            <el-button size="small" round @click="cancelReply">Cancel</el-button>
           </div>
         </div>
 
         <div class="comment-actions">
           <button
             type="button"
-            aria-label="赞同"
+            aria-label="Upvote"
             :class="{ 'active-up': comment.myVote === 1 }"
             @click="emit('vote', { comment, value: comment.myVote === 1 ? 0 : 1 })"
           >
@@ -58,7 +58,7 @@
           <button
             type="button"
             class="down"
-            aria-label="反对"
+            aria-label="Downvote"
             :class="{ 'active-down': comment.myVote === -1 }"
             @click="emit('vote', { comment, value: comment.myVote === -1 ? 0 : -1 })"
           >
@@ -67,11 +67,11 @@
 
           <button v-if="canReply" type="button" @click="showReply = !showReply">
             <IconComment class="ico" />
-            <span>回复</span>
+            <span>Reply</span>
           </button>
           <button type="button" @click="onShare">
             <IconShare class="ico" />
-            <span>分享</span>
+            <span>Share</span>
           </button>
         </div>
 
@@ -93,7 +93,7 @@
         type="button"
         @click="collapsed = false"
       >
-        {{ descendantCount }} 条回复已折叠
+        {{ descendantCount }} replies collapsed
       </button>
     </div>
   </div>
@@ -126,7 +126,7 @@ const showReply = ref(false)
 const replyText = ref('')
 const submitting = ref(false)
 
-// 支持两级回复：depth 0 与 1 可继续回复
+// Support two reply levels: depth 0 and 1 can still reply
 const canReply = computed(() => props.depth < 2)
 
 function countDescendants(list: Comment[]): number {
@@ -141,7 +141,7 @@ const descendantCount = computed(() => countDescendants(props.comment.replies ||
 function submitReply() {
   const content = replyText.value.trim()
   if (!content) {
-    ElMessage.warning('请输入回复内容')
+    ElMessage.warning('Please enter a reply')
     return
   }
   submitting.value = true
@@ -157,16 +157,16 @@ function cancelReply() {
 }
 
 async function onShare() {
-  const url = `${location.origin}/forum/post/${props.comment.postId}`
+  const url = `${location.origin}${import.meta.env.BASE_URL}post/${props.comment.postId}`
   try {
     if (navigator.share) {
       await navigator.share({ title: props.comment.authorName, url })
       return
     }
     await navigator.clipboard.writeText(url)
-    ElMessage.success('链接已复制')
+    ElMessage.success('Link copied')
   } catch {
-    // 用户取消分享
+    // User cancelled sharing
   }
 }
 </script>

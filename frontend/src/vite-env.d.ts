@@ -3,7 +3,7 @@
 interface ImportMetaEnv {
   readonly VITE_API_BASE_URL: string
   readonly VITE_APP_NAME: string
-  /** Google OAuth Client ID；留空则隐藏 Google 登录入口 */
+  /** Google OAuth Client ID; when empty, the Google sign-in entry is hidden */
   readonly VITE_GOOGLE_CLIENT_ID?: string
 }
 

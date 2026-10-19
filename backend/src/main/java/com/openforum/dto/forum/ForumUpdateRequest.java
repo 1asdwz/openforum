@@ -10,5 +10,7 @@ public record ForumUpdateRequest(
         String templateType,
         String templateConfig,
         String rules,
-        List<String> requiredAuthTypes) {
+        List<String> requiredAuthTypes,
+        /** 结构化访问门槛 JSON，优先级高于 requiredAuthTypes */
+        String accessRules) {
 }

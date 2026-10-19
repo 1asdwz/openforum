@@ -29,9 +29,6 @@ pub struct SubForum {
     pub required_auth_types: Option<String>,
     pub template_type: String,
     pub template_config: Option<String>,
-    pub custom_page_html: Option<String>,
-    pub custom_page_status: Option<String>,
-    pub custom_page_review_note: Option<String>,
     pub creator_id: i64,
     pub member_count: i32,
     pub post_count: i32,
@@ -109,7 +106,7 @@ pub struct AuthMedia {
     pub size_bytes: Option<i64>,
 }
 
-/// 用户个人主页配置；无记录等价于「普通主页 + 无自定义内容」。
+/// User profile homepage config; no record is equivalent to "normal homepage + no custom content".
 #[derive(Debug, Clone, FromRow)]
 pub struct UserHomepage {
     pub mode: String,
@@ -120,7 +117,18 @@ pub struct UserHomepage {
     pub updated_at: NaiveDateTime,
 }
 
-/// 作者精简信息（对应 Java `AuthorDTO`）。
+/// Forum custom homepage config; no record is equivalent to "normal homepage + no custom content".
+#[derive(Debug, Clone, FromRow)]
+pub struct ForumHomepage {
+    pub mode: String,
+    pub html: Option<String>,
+    pub status: String,
+    pub block_reason: Option<String>,
+    pub size_bytes: i32,
+    pub updated_at: NaiveDateTime,
+}
+
+/// Condensed author info (mirrors Java `AuthorDTO`).
 #[derive(Debug, Clone, Serialize)]
 pub struct AuthorDto {
     pub id: i64,

@@ -14,7 +14,7 @@
           filterable
           allow-create
           default-first-option
-          :placeholder="`输入${field.label || field.name}后回车`"
+          :placeholder="`Type ${field.label || field.name} and press Enter`"
           style="width: 100%"
         >
           <el-option
@@ -28,7 +28,7 @@
         <el-select
           v-else-if="field.type === 'select' || (field.options && field.options.length)"
           v-model="model[field.name]"
-          :placeholder="`请选择${field.label || field.name}`"
+          :placeholder="`Select ${field.label || field.name}`"
           style="width: 100%"
         >
           <el-option
@@ -57,30 +57,30 @@
         <el-input
           v-else
           v-model="model[field.name]"
-          :placeholder="`请输入${field.label || field.name}`"
+          :placeholder="`Enter ${field.label || field.name}`"
         />
       </el-form-item>
     </template>
 
     <template v-else>
       <div v-for="(row, index) in rows" :key="index" class="kv-row">
-        <el-input v-model="row.key" placeholder="字段名" style="width: 40%" />
-        <el-input v-model="row.value" placeholder="字段值" style="width: 45%" />
+        <el-input v-model="row.key" placeholder="Field name" style="width: 40%" />
+        <el-input v-model="row.value" placeholder="Field value" style="width: 45%" />
         <el-button
           :disabled="rows.length <= 1"
           @click="rows.splice(index, 1)"
         >
-          删除
+          Delete
         </el-button>
       </div>
       <el-button size="small" @click="rows.push({ key: '', value: '' })">
-        + 添加字段
+        + Add field
       </el-button>
     </template>
 
     <div v-if="!hideAction" class="form-actions" style="margin-top: 16px">
       <el-button type="primary" :loading="submitting" @click="onSubmit">
-        提交认证
+        Submit verification
       </el-button>
     </div>
   </el-form>
@@ -94,7 +94,7 @@ import type { AuthFieldDef, AuthTypeMeta } from '@/types'
 const props = defineProps<{
   meta: AuthTypeMeta
   submitting?: boolean
-  /** 隐藏内置提交按钮（由父组件控制提交时使用） */
+  /** Hide the built-in submit button (used when the parent controls submission) */
   hideAction?: boolean
 }>()
 
@@ -103,7 +103,7 @@ const emit = defineEmits<{
   (e: 'change', data: Record<string, unknown>): void
 }>()
 
-// 字段类型由后端 meta 动态决定，故用 any 承载 v-model 绑定
+// Field types are determined dynamically by backend meta, so any is used for v-model binding
 const model = reactive<Record<string, any>>({})
 const rows = reactive<{ key: string; value: string }[]>([{ key: '', value: '' }])
 
@@ -143,7 +143,7 @@ watch(
   { immediate: true }
 )
 
-/** 收集当前表单数据 */
+/** Collect current form data */
 function collect(): Record<string, unknown> {
   if (hasFields.value) return { ...model }
   const data: Record<string, unknown> = {}
@@ -154,20 +154,20 @@ function collect(): Record<string, unknown> {
   return data
 }
 
-/** 校验表单，返回错误信息（null 表示通过） */
+/** Validate the form and return an error message (null means valid) */
 function validate(): string | null {
   if (hasFields.value) {
     for (const f of props.meta.fields) {
       if (f.required) {
         const v = model[f.name]
         if (v === undefined || v === null || v === '') {
-          return `请填写「${f.label || f.name}」`
+          return `Please fill in "${f.label || f.name}"`
         }
       }
     }
     return null
   }
-  return Object.keys(collect()).length ? null : '请至少填写一个字段'
+  return Object.keys(collect()).length ? null : 'Please fill in at least one field'
 }
 
 function onSubmit() {

@@ -73,6 +73,65 @@ jobs:
           scp -i ~/.ssh/deploy_key -o ServerAliveInterval=15 -o ServerAliveCountMax=8 \
             /tmp/openforum-frontend.tar.gz root@43.157.5.182:/tmp/
 
+      # 前端通过 /forum/rs/api 访问 Rust 后端；此步骤幂等补齐 nginx 路由，
+      # 配置测试失败时自动回滚，避免新版前端上线后接口 404。
+      - name: Ensure nginx route for Rust backend
+        run: |
+          ssh -i ~/.ssh/deploy_key root@43.157.5.182 << 'EOF'
+            set -e
+            CONF=/tmp/openforum-nginx-default.conf
+            docker cp nginx:/etc/nginx/conf.d/default.conf "$CONF"
+
+            if grep -qE 'location[[:space:]]+(\^~[[:space:]]+)?/forum/rs/api/' "$CONF"; then
+              rm -f "$CONF"
+              echo "nginx: /forum/rs/api/ already configured"
+              exit 0
+            fi
+
+            if ! grep -qE 'location[[:space:]]+(\^~[[:space:]]+)?/forum/api/' "$CONF"; then
+              echo "ERROR: anchor 'location /forum/api/' not found; nginx config left untouched" >&2
+              rm -f "$CONF"
+              exit 1
+            fi
+
+            awk '
+              !done && /location[[:space:]]+(\^~[[:space:]]+)?\/forum\/api\// {
+                match($0, /^[[:space:]]*/)
+                ind = substr($0, 1, RLENGTH)
+                print ind "location /forum/rs/api/ {"
+                print ind "    proxy_pass http://10.9.0.13:8091/api/;"
+                print ind "    proxy_set_header Host $host;"
+                print ind "    proxy_set_header X-Real-IP $remote_addr;"
+                print ind "    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;"
+                print ind "    proxy_set_header X-Forwarded-Proto $scheme;"
+                print ind "    client_max_body_size 60m;"
+                print ind "}"
+                done = 1
+              }
+              { print }
+              END { if (!done) exit 3 }
+            ' "$CONF" > "$CONF.new" || {
+              echo "ERROR: failed to insert nginx location; config left untouched" >&2
+              rm -f "$CONF" "$CONF.new"
+              exit 1
+            }
+            mv "$CONF.new" "$CONF"
+
+            docker exec nginx cp /etc/nginx/conf.d/default.conf \
+              "/etc/nginx/conf.d/default.conf.bak.$(date +%Y%m%d%H%M%S)"
+            docker cp "$CONF" nginx:/etc/nginx/conf.d/default.conf
+            rm -f "$CONF"
+
+            if ! docker exec nginx nginx -t; then
+              echo "ERROR: nginx config test failed; restoring previous config" >&2
+              docker exec nginx sh -c 'cp "$(ls -1t /etc/nginx/conf.d/default.conf.bak.* | head -n 1)" /etc/nginx/conf.d/default.conf'
+              docker exec nginx nginx -t || true
+              exit 1
+            fi
+            docker exec nginx nginx -s reload
+            echo "nginx: /forum/rs/api/ -> 10.9.0.13:8091"
+          EOF
+
       - name: Deploy on server
         run: |
           ssh -i ~/.ssh/deploy_key root@43.157.5.182 << 'EOF'
@@ -101,11 +160,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up JDK 25
+      - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '25'
+          java-version: '21'
           cache: maven
 
       - name: Build jar

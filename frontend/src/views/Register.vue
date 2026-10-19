@@ -2,23 +2,23 @@
   <div class="auth-page">
     <div class="auth-panel">
       <header class="auth-head">
-        <h1>注册 OpenForum</h1>
-        <p>创建账号，加入你感兴趣的子论坛</p>
+        <h1>Sign up for OpenForum</h1>
+        <p>Create an account and join the forums you care about</p>
       </header>
 
       <el-form label-position="top" @submit.prevent="onSubmit">
-        <el-form-item label="用户名">
-          <el-input v-model="form.username" placeholder="3-32 位用户名" size="large" />
+        <el-form-item label="Username">
+          <el-input v-model="form.username" placeholder="3-32 character username" size="large" />
         </el-form-item>
-        <el-form-item label="邮箱">
-          <el-input v-model="form.email" placeholder="请输入邮箱" size="large" />
+        <el-form-item label="Email">
+          <el-input v-model="form.email" placeholder="Enter your email" size="large" />
         </el-form-item>
-        <el-form-item label="密码">
+        <el-form-item label="Password">
           <el-input
             v-model="form.password"
             type="password"
             show-password
-            placeholder="至少 6 位密码"
+            placeholder="At least 6 characters"
             size="large"
             @keyup.enter="onSubmit"
           />
@@ -30,15 +30,15 @@
           :loading="auth.loading"
           @click="onSubmit"
         >
-          注册
+          Sign up
         </el-button>
       </el-form>
 
       <GoogleLoginButton text="signup_with" @credential="onGoogle" />
 
       <p class="auth-switch">
-        已有账号？
-        <router-link :to="{ name: 'login' }">返回登录</router-link>
+        Already have an account?
+        <router-link :to="{ name: 'login' }">Back to login</router-link>
       </p>
     </div>
   </div>
@@ -59,11 +59,11 @@ const form = reactive({ username: '', email: '', password: '' })
 
 async function onSubmit() {
   if (!form.username.trim() || !form.email.trim() || !form.password) {
-    ElMessage.warning('请完整填写注册信息')
+    ElMessage.warning('Please complete all registration fields')
     return
   }
   if (form.password.length < 6) {
-    ElMessage.warning('密码至少 6 位')
+    ElMessage.warning('Password must be at least 6 characters')
     return
   }
   try {
@@ -72,20 +72,20 @@ async function onSubmit() {
       email: form.email.trim(),
       password: form.password,
     })
-    ElMessage.success('注册成功')
+    ElMessage.success('Registration successful')
     router.push('/')
   } catch (e) {
-    ElMessage.error(errorMessage(e, '注册失败'))
+    ElMessage.error(errorMessage(e, 'Registration failed'))
   }
 }
 
 async function onGoogle(credential: string) {
   try {
     await auth.loginWithGoogle(credential)
-    ElMessage.success('注册成功')
+    ElMessage.success('Registration successful')
     router.push('/')
   } catch (e) {
-    ElMessage.error(errorMessage(e, 'Google 登录失败'))
+    ElMessage.error(errorMessage(e, 'Google login failed'))
   }
 }
 </script>

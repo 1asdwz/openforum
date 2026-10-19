@@ -59,7 +59,31 @@ CREATE TABLE IF NOT EXISTS user_homepage_reports (\
   KEY idx_target_time (user_id, created_at)\
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
 
-/// 启动时幂等执行的迁移：建表、补列、种子字段、旧规则转换、旧认证回填。
+const CREATE_FORUM_HOMEPAGES: &str = "\
+CREATE TABLE IF NOT EXISTS forum_homepages (\
+  forum_id BIGINT NOT NULL PRIMARY KEY,\
+  mode VARCHAR(10) NOT NULL DEFAULT 'NORMAL',\
+  html MEDIUMTEXT NULL,\
+  status VARCHAR(10) NOT NULL DEFAULT 'ACTIVE',\
+  block_reason VARCHAR(255) NULL,\
+  blocked_by BIGINT NULL,\
+  blocked_at DATETIME NULL,\
+  size_bytes INT NOT NULL DEFAULT 0,\
+  created_at DATETIME NOT NULL,\
+  updated_at DATETIME NOT NULL\
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
+
+const CREATE_FORUM_HOMEPAGE_REPORTS: &str = "\
+CREATE TABLE IF NOT EXISTS forum_homepage_reports (\
+  id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,\
+  forum_id BIGINT NOT NULL,\
+  reporter_id BIGINT NOT NULL,\
+  reason VARCHAR(500) NOT NULL,\
+  created_at DATETIME NOT NULL,\
+  KEY idx_target_time (forum_id, created_at)\
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
+
+/// Idempotent migrations run at startup: create tables, add columns, seed fields, convert legacy rules, backfill legacy authentications.
 pub async fn run(state: &AppState) -> Result<(), ApiError> {
     let pool = &state.pool;
 
@@ -67,34 +91,79 @@ pub async fn run(state: &AppState) -> Result<(), ApiError> {
     sqlx::query(CREATE_USER_INFO).execute(pool).await?;
     sqlx::query(CREATE_USER_HOMEPAGES).execute(pool).await?;
     sqlx::query(CREATE_USER_HOMEPAGE_REPORTS).execute(pool).await?;
-    tracing::info!("迁移植：info_fields / user_info / user_homepages 就绪");
+    sqlx::query(CREATE_FORUM_HOMEPAGES).execute(pool).await?;
+    sqlx::query(CREATE_FORUM_HOMEPAGE_REPORTS).execute(pool).await?;
+    tracing::info!("Migration: info_fields / user_info / user_homepages / forum_homepages ready");
 
     ensure_column(pool, "browse_rule", "TEXT NULL").await?;
     ensure_column(pool, "operate_rule", "TEXT NULL").await?;
     ensure_column(pool, "gate_version", "INT NOT NULL DEFAULT 0").await?;
 
+    let permissions_added = ensure_table_column(
+        pool,
+        "forum_members",
+        "permissions",
+        "VARCHAR(255) NOT NULL DEFAULT ''",
+    )
+    .await?;
+    ensure_table_column(pool, "forum_members", "promoted_at", "DATETIME NULL").await?;
+    ensure_table_column(pool, "forum_members", "promoted_by", "BIGINT NULL").await?;
+    if permissions_added {
+        backfill_moderator_permissions(pool).await?;
+    }
+
     seed_fields(pool).await?;
     convert_legacy_rules(pool).await?;
     backfill_user_info(pool).await?;
 
-    tracing::info!("迁移植：完成");
+    tracing::info!("Migration: complete");
     Ok(())
 }
 
 async fn ensure_column(pool: &MySqlPool, column: &str, definition: &str) -> Result<(), ApiError> {
+    ensure_table_column(pool, "sub_forums", column, definition).await?;
+    Ok(())
+}
+
+/// Idempotently add a column; returns whether it was created this run (for one-time historical backfills).
+async fn ensure_table_column(
+    pool: &MySqlPool,
+    table: &str,
+    column: &str,
+    definition: &str,
+) -> Result<bool, ApiError> {
     let exists: (i64,) = sqlx::query_as(
         "SELECT COUNT(*) FROM information_schema.COLUMNS \
-         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'sub_forums' AND COLUMN_NAME = ?",
+         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?",
     )
+    .bind(table)
     .bind(column)
     .fetch_one(pool)
     .await?;
     if exists.0 > 0 {
-        return Ok(());
+        return Ok(false);
     }
-    let sql = format!("ALTER TABLE sub_forums ADD COLUMN {column} {definition}");
+    let sql = format!("ALTER TABLE {table} ADD COLUMN {column} {definition}");
     sqlx::query(&sql).execute(pool).await?;
-    tracing::info!("迁移植：sub_forums 新增列 {column}");
+    tracing::info!("Migration: added column {column} to {table}");
+    Ok(true)
+}
+
+/// Historical MODERATORs previously had full management rights; grant EVERYTHING during migration to preserve behavior.
+async fn backfill_moderator_permissions(pool: &MySqlPool) -> Result<(), ApiError> {
+    let result = sqlx::query(
+        "UPDATE forum_members SET permissions = 'EVERYTHING', \
+         promoted_at = COALESCE(promoted_at, joined_at) \
+         WHERE role = 'MODERATOR' AND (permissions IS NULL OR permissions = '')",
+    )
+    .execute(pool)
+    .await?;
+    if result.rows_affected() > 0 {
+        tracing::info!(
+            "Migration: granted EVERYTHING to {} historical moderators",
+            result.rows_affected()
+        );
+    }
     Ok(())
 }
 
@@ -147,11 +216,11 @@ async fn convert_legacy_rules(pool: &MySqlPool) -> Result<(), ApiError> {
         .execute(pool)
         .await?;
     }
-    tracing::info!("迁移植：已转换 {total} 个板块的旧认证规则");
+    tracing::info!("Migration: converted legacy auth rules for {total} forums");
     Ok(())
 }
 
-/// 旧 `required_auth_types` → 新规则。
+/// Legacy `required_auth_types` → new rule.
 pub fn legacy_rule_from_csv(csv: Option<&str>) -> GateRule {
     let mut conditions: Vec<GateCondition> = Vec::new();
     let text = match csv {
@@ -189,7 +258,7 @@ pub fn legacy_rule_from_csv(csv: Option<&str>) -> GateRule {
             type_part.as_str()
         };
         if info::find_field(field_key).is_none() {
-            tracing::warn!("迁移植：跳过未知认证类型 {type_part}");
+            tracing::warn!("Migration: skipping unknown auth type {type_part}");
             continue;
         }
         let level = level_part.unwrap_or_else(|| "LOW".to_string());
@@ -218,7 +287,7 @@ async fn backfill_user_info(pool: &MySqlPool) -> Result<(), ApiError> {
             .unwrap_or(AuthLevel::Low)
             .name();
         for (field_key, value) in info::granted_fields(&auth_type, &data) {
-            // 只补缺失项，不覆盖用户后续填写/认证的新值。
+            // Only fill in missing entries; do not overwrite values later entered or verified by the user.
             let result = sqlx::query(
                 "INSERT IGNORE INTO user_info (user_id, field_key, value_json, auth_level, auth_status, auth_id, created_at, updated_at) \
                  VALUES (?, ?, ?, ?, 'APPROVED', ?, NOW(), NOW())",
@@ -234,7 +303,7 @@ async fn backfill_user_info(pool: &MySqlPool) -> Result<(), ApiError> {
         }
     }
     if written > 0 {
-        tracing::info!("迁移植：回填 {written} 条用户信息");
+        tracing::info!("Migration: backfilled {written} user info rows");
     }
     Ok(())
 }

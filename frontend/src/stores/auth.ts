@@ -49,7 +49,7 @@ export const useAuthStore = defineStore('auth', () => {
       const me = await authApi.me()
       setUser(me)
     } catch {
-      // 401 已由拦截器清理；其它错误保留本地缓存
+      // 401 is already handled by the interceptor; keep the local cache on other errors
     }
   }
 
@@ -75,7 +75,7 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  /** 使用 Google ID Token 登录或自动注册 */
+  /** Sign in with a Google ID token or auto-register */
   async function loginWithGoogle(credential: string) {
     loading.value = true
     try {
@@ -87,7 +87,7 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  /** 应用启动时恢复登录态 */
+  /** Restore login state on app startup */
   async function bootstrap() {
     await fetchMe()
   }

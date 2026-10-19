@@ -13,7 +13,6 @@ declare module 'vue' {
   export interface GlobalComponents {
     AuthTypeForm: typeof import('./components/AuthTypeForm.vue')['default']
     CommentNode: typeof import('./components/CommentNode.vue')['default']
-    CustomPageRenderer: typeof import('./components/CustomPageRenderer.vue')['default']
     DocumentUpload: typeof import('./components/DocumentUpload.vue')['default']
     ElAlert: typeof import('element-plus/es')['ElAlert']
     ElAvatar: typeof import('element-plus/es')['ElAvatar']
@@ -39,6 +38,8 @@ declare module 'vue' {
     ElSkeleton: typeof import('element-plus/es')['ElSkeleton']
     ElStep: typeof import('element-plus/es')['ElStep']
     ElSteps: typeof import('element-plus/es')['ElSteps']
+    ElTable: typeof import('element-plus/es')['ElTable']
+    ElTableColumn: typeof import('element-plus/es')['ElTableColumn']
     ElTabPane: typeof import('element-plus/es')['ElTabPane']
     ElTabs: typeof import('element-plus/es')['ElTabs']
     ElTag: typeof import('element-plus/es')['ElTag']
@@ -68,5 +69,8 @@ declare module 'vue' {
     TopNav: typeof import('./components/TopNav.vue')['default']
     VideoCapture: typeof import('./components/VideoCapture.vue')['default']
     VoteColumn: typeof import('./components/VoteColumn.vue')['default']
+  }
+  export interface GlobalDirectives {
+    vLoading: typeof import('element-plus/es')['ElLoadingDirective']
   }
 }

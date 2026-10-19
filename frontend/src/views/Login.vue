@@ -2,24 +2,24 @@
   <div class="auth-page">
     <div class="auth-panel">
       <header class="auth-head">
-        <h1>登录 OpenForum</h1>
-        <p>欢迎回来，继续加入讨论</p>
+        <h1>Log in to OpenForum</h1>
+        <p>Welcome back. Join the conversation.</p>
       </header>
 
       <el-form label-position="top" @submit.prevent="onSubmit">
-        <el-form-item label="用户名或邮箱">
+        <el-form-item label="Username or email">
           <el-input
             v-model="form.usernameOrEmail"
-            placeholder="请输入用户名或邮箱"
+            placeholder="Enter your username or email"
             size="large"
           />
         </el-form-item>
-        <el-form-item label="密码">
+        <el-form-item label="Password">
           <el-input
             v-model="form.password"
             type="password"
             show-password
-            placeholder="请输入密码"
+            placeholder="Enter your password"
             size="large"
             @keyup.enter="onSubmit"
           />
@@ -31,15 +31,15 @@
           :loading="auth.loading"
           @click="onSubmit"
         >
-          登录
+          Log in
         </el-button>
       </el-form>
 
       <GoogleLoginButton text="signin_with" @credential="onGoogle" />
 
       <p class="auth-switch">
-        还没有账号？
-        <router-link :to="{ name: 'register' }">立即注册</router-link>
+        Don't have an account?
+        <router-link :to="{ name: 'register' }">Sign up now</router-link>
       </p>
     </div>
   </div>
@@ -66,7 +66,7 @@ function redirectAfterLogin() {
 
 async function onSubmit() {
   if (!form.usernameOrEmail.trim() || !form.password) {
-    ElMessage.warning('请输入用户名/邮箱和密码')
+    ElMessage.warning('Please enter your username/email and password')
     return
   }
   try {
@@ -74,20 +74,20 @@ async function onSubmit() {
       usernameOrEmail: form.usernameOrEmail.trim(),
       password: form.password,
     })
-    ElMessage.success('登录成功')
+    ElMessage.success('Logged in successfully')
     redirectAfterLogin()
   } catch (e) {
-    ElMessage.error(errorMessage(e, '登录失败'))
+    ElMessage.error(errorMessage(e, 'Login failed'))
   }
 }
 
 async function onGoogle(credential: string) {
   try {
     await auth.loginWithGoogle(credential)
-    ElMessage.success('登录成功')
+    ElMessage.success('Logged in successfully')
     redirectAfterLogin()
   } catch (e) {
-    ElMessage.error(errorMessage(e, 'Google 登录失败'))
+    ElMessage.error(errorMessage(e, 'Google login failed'))
   }
 }
 </script>

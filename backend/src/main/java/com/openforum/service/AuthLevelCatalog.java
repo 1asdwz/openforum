@@ -50,7 +50,10 @@ public class AuthLevelCatalog {
             case MARRIAGE_CERT -> "结婚证";
             case PROPERTY_CERT -> "房产证";
             case NATIONALITY -> "国籍证明";
-            case GENDER, AGE, ASSETS, CUSTOM -> "相关证明材料";
+            case EDUCATION -> "学历证书（毕业证/学位证）";
+            case OCCUPATION -> "在职证明或名片";
+            case CITY -> "居住地址证明";
+            case GENDER, AGE, ASSETS, INTERESTS, CUSTOM -> "相关证明材料";
         };
     }
 
@@ -65,6 +68,10 @@ public class AuthLevelCatalog {
             case MARRIAGE_CERT -> "婚姻";
             case PROPERTY_CERT -> "房产";
             case ASSETS -> "资产";
+            case EDUCATION -> "学历";
+            case OCCUPATION -> "职业";
+            case CITY -> "城市";
+            case INTERESTS -> "兴趣爱好";
             case CUSTOM -> "自定义";
         };
     }

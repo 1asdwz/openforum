@@ -30,7 +30,7 @@ struct Claims {
     exp: i64,
 }
 
-/// 与 Java `JwtTokenProvider` 对齐：HS256，subject=id，claims=username/role。
+/// Aligned with Java's `JwtTokenProvider`: HS256, subject=id, claims=username/role.
 pub fn create_token(cfg: &Config, user: &User) -> String {
     let now = Utc::now();
     let expiry = now + Duration::hours(cfg.jwt_expiration_hours);
@@ -49,7 +49,7 @@ pub fn create_token(cfg: &Config, user: &User) -> String {
     .expect("jwt encode")
 }
 
-/// 解析 token；任意异常 → None（对应 Java 过滤器"解析失败即视为未登录"）。
+/// Parse a token; any error yields None (matching the Java filter: a failed parse means unauthenticated).
 pub fn parse_token(cfg: &Config, token: &str) -> Option<AuthUser> {
     let data = decode::<Claims>(
         token,
@@ -65,25 +65,25 @@ pub fn parse_token(cfg: &Config, token: &str) -> Option<AuthUser> {
 }
 
 pub fn hash_password(raw: &str) -> Result<String, ApiError> {
-    bcrypt::hash(raw, 10).map_err(|e| ApiError::internal(format!("密码加密失败: {e}")))
+    bcrypt::hash(raw, 10).map_err(|e| ApiError::internal(format!("Failed to hash password: {e}")))
 }
 
 pub fn verify_password(raw: &str, hash: &str) -> bool {
     bcrypt::verify(raw, hash).unwrap_or(false)
 }
 
-/// 请求级当前用户（可为空）。对应 Java `SecurityUtils.currentUser()`。
+/// Request-scoped current user (may be absent). Mirrors Java's `SecurityUtils.currentUser()`.
 pub struct CurrentUser(pub Option<AuthUser>);
 
 impl CurrentUser {
     pub fn require(&self) -> Result<&AuthUser, ApiError> {
-        self.0.as_ref().ok_or_else(|| ApiError::unauthorized("请先登录"))
+        self.0.as_ref().ok_or_else(|| ApiError::unauthorized("Please sign in first"))
     }
     pub fn require_admin(&self) -> Result<&AuthUser, ApiError> {
         match self.0.as_ref() {
-            None => Err(ApiError::unauthorized("请先登录")),
+            None => Err(ApiError::unauthorized("Please sign in first")),
             Some(u) if u.is_admin() => Ok(u),
-            Some(_) => Err(ApiError::forbidden("需要管理员权限")),
+            Some(_) => Err(ApiError::forbidden("Administrator privileges required")),
         }
     }
 }

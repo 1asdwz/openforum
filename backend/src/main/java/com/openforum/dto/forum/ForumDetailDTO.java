@@ -25,12 +25,16 @@ public class ForumDetailDTO {
     private final Long creatorId;
     private final String creatorName;
     private final LocalDateTime createdAt;
+    /** 结构化访问门槛 JSON（供前端规则构建器回显） */
+    private final String accessRules;
+    /** 当前用户的门槛检查结果（null = 无门槛或未登录） */
+    private final AccessCheckResult accessCheck;
 
     public ForumDetailDTO(Long id, String slug, String name, String description, String icon, String themeColor,
                           String rules, List<String> requiredAuthTypes, String templateType, String templateConfig,
                           String customPageStatus, String customPageHtml, int memberCount, int postCount,
                           boolean isMember, boolean canPost, boolean isPublic, Long creatorId, String creatorName,
-                          LocalDateTime createdAt) {
+                          LocalDateTime createdAt, String accessRules, AccessCheckResult accessCheck) {
         this.id = id;
         this.slug = slug;
         this.name = name;
@@ -51,6 +55,8 @@ public class ForumDetailDTO {
         this.creatorId = creatorId;
         this.creatorName = creatorName;
         this.createdAt = createdAt;
+        this.accessRules = accessRules;
+        this.accessCheck = accessCheck;
     }
 
     public Long getId() {
@@ -131,5 +137,13 @@ public class ForumDetailDTO {
 
     public LocalDateTime getCreatedAt() {
         return createdAt;
+    }
+
+    public String getAccessRules() {
+        return accessRules;
+    }
+
+    public AccessCheckResult getAccessCheck() {
+        return accessCheck;
     }
 }

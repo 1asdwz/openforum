@@ -1,8 +1,8 @@
 <template>
   <div v-if="enabled" class="google-login">
-    <div class="auth-divider"><span>或</span></div>
+    <div class="auth-divider"><span>or</span></div>
     <div class="google-btn-wrap">
-      <!-- 展示用的自定义按钮，样式跟随站点主题 -->
+      <!-- Custom display button styled to match the site theme -->
       <button
         type="button"
         class="google-btn"
@@ -30,7 +30,7 @@
         </svg>
         <span>{{ label }}</span>
       </button>
-      <!-- Google 官方按钮（透明覆盖），仅用于接管点击与回调 -->
+      <!-- Official Google button (transparent overlay), used only to capture clicks and callbacks -->
       <div ref="slotRef" class="google-slot" :class="{ 'is-ready': ready }"></div>
     </div>
   </div>
@@ -70,9 +70,9 @@ const props = withDefaults(defineProps<{ text?: GoogleButtonText }>(), {
 const emit = defineEmits<{ (e: 'credential', credential: string): void }>()
 
 const LABELS: Record<GoogleButtonText, string> = {
-  signin_with: '使用 Google 账号登录',
-  signup_with: '使用 Google 账号注册',
-  continue_with: '使用 Google 继续',
+  signin_with: 'Sign in with Google',
+  signup_with: 'Sign up with Google',
+  continue_with: 'Continue with Google',
 }
 const label = computed(() => LABELS[props.text])
 
@@ -118,7 +118,7 @@ function renderButton() {
   el.innerHTML = ''
   api.accounts.id.renderButton(el, {
     type: 'standard',
-    // 该按钮被透明覆盖，外观不可见；主题仅作为兜底
+    // This button is covered by a transparent overlay and is not visible; the theme is only a fallback
     theme: 'outline',
     size: 'large',
     shape: 'rectangular',
@@ -150,7 +150,7 @@ onMounted(async () => {
     ready.value = true
     window.addEventListener('resize', onResize)
   } catch {
-    ElMessage.warning('Google 登录加载失败，请使用账号密码登录')
+    ElMessage.warning('Failed to load Google sign-in. Please sign in with your account and password.')
   }
 })
 
@@ -200,7 +200,7 @@ onBeforeUnmount(() => {
   height: 18px;
   flex-shrink: 0;
 }
-/* Google 官方按钮的透明覆盖层，接管点击 */
+/* Transparent overlay for the official Google button that captures clicks */
 .google-slot {
   position: absolute;
   inset: 0;

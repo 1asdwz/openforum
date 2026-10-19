@@ -4,8 +4,8 @@
       class="vote-btn"
       :class="{ active: myVote === 1 }"
       :disabled="disabled"
-      title="赞同"
-      aria-label="赞同"
+      title="Upvote"
+      aria-label="Upvote"
       @click="vote(1)"
     >
       <IconUpArrow />
@@ -15,8 +15,8 @@
       class="vote-btn down"
       :class="{ active: myVote === -1 }"
       :disabled="disabled"
-      title="反对"
-      aria-label="反对"
+      title="Downvote"
+      aria-label="Downvote"
       @click="vote(-1)"
     >
       <IconDownArrow />

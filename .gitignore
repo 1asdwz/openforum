@@ -37,3 +37,9 @@ Thumbs.db
 # Temp
 *.tmp
 temp/
+
+# Local parity/debug scratch files
+of-ord.py
+of-parity.py
+of-q.sh
+of-rs-src.tar.gz

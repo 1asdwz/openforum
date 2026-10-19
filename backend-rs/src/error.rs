@@ -3,16 +3,16 @@ use axum::response::{IntoResponse, Response};
 use axum::Json;
 use serde_json::{json, Value};
 
-/// 与 Java `ApiException` 对齐：携带业务 code，HTTP 状态码即 code，body 为 `{code,message,data:null}`。
+/// Mirrors Java `ApiException`: carries a business code, the HTTP status code is the code, and the body is `{code,message,data:null}`.
 ///
-/// `raw = true` 时输出 `{code,message}`（不带 `data`），用于复刻 Java `SecurityConfig.writeJson`
-/// 在 Spring Security 过滤器层产生的 401/403 响应。
+/// When `raw = true`, outputs `{code,message}` (without `data`), reproducing the 401/403 responses
+/// produced by Java `SecurityConfig.writeJson` at the Spring Security filter layer.
 #[derive(Debug, Clone)]
 pub struct ApiError {
     pub code: u16,
     pub message: String,
     pub raw: bool,
-    /// 业务错误可携带结构化数据（如门槛缺失条件）。
+    /// Business errors may carry structured data (e.g. unmet gate conditions).
     pub data: Option<Value>,
 }
 
@@ -20,7 +20,7 @@ impl ApiError {
     pub fn new(code: u16, message: impl Into<String>) -> Self {
         Self { code, message: message.into(), raw: false, data: None }
     }
-    /// 过滤器层风格：`{code,message}`，不带 `data` 字段。
+    /// Filter-layer style: `{code,message}`, without a `data` field.
     pub fn raw(code: u16, message: impl Into<String>) -> Self {
         Self { code, message: message.into(), raw: true, data: None }
     }
@@ -56,22 +56,22 @@ impl std::error::Error for ApiError {}
 impl From<sqlx::Error> for ApiError {
     fn from(e: sqlx::Error) -> Self {
         tracing::error!("database error: {e}");
-        ApiError::internal("服务器内部错误")
+        ApiError::internal("Internal server error")
     }
 }
 
 impl From<anyhow::Error> for ApiError {
     fn from(e: anyhow::Error) -> Self {
         tracing::error!("internal error: {e}");
-        ApiError::internal("服务器内部错误")
+        ApiError::internal("Internal server error")
     }
 }
 
 impl IntoResponse for ApiError {
     fn into_response(self) -> Response {
         let status = StatusCode::from_u16(self.code).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
-        // 业务错误与 Java `ApiResponse.error(code, message)` 对齐，带 `data: null`；
-        // 过滤器层错误（raw）与 Java `SecurityConfig.writeJson` 对齐，不带 `data`。
+        // Business errors mirror Java `ApiResponse.error(code, message)` and include `data: null`;
+        // filter-layer errors (raw) mirror Java `SecurityConfig.writeJson` and omit `data`.
         let body = if self.raw {
             json!({ "code": self.code, "message": self.message })
         } else {

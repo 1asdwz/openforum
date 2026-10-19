@@ -9,7 +9,7 @@ use crate::json as j;
 use crate::models::UserAuthentication;
 use crate::repo;
 use crate::routes::authentications::auth_dto;
-use crate::routes::{forums, homepages, users};
+use crate::routes::{forum_homepages, homepages, users};
 use crate::security::CurrentUser;
 use crate::state::AppState;
 
@@ -38,7 +38,7 @@ fn parse_status(raw: &str) -> Result<String, ApiError> {
     let up = raw.trim().to_uppercase();
     match up.as_str() {
         "PENDING" | "APPROVED" | "REJECTED" => Ok(up),
-        _ => Err(ApiError::bad_request(format!("非法的状态: {raw}"))),
+        _ => Err(ApiError::bad_request(format!("Invalid status: {raw}"))),
     }
 }
 
@@ -90,12 +90,12 @@ pub async fn approve_authentication(
     let me = admin.require_admin()?;
     let mut auth = repo::find_auth_by_id(&state.pool, id)
         .await?
-        .ok_or_else(|| ApiError::not_found("认证记录不存在"))?;
+        .ok_or_else(|| ApiError::not_found("Authentication record not found"))?;
     let reason = body
         .as_ref()
         .and_then(|Json(v)| v.get("reason").and_then(|r| r.as_str()).map(|s| s.to_string()))
         .filter(|s| !s.trim().is_empty())
-        .unwrap_or_else(|| "管理员通过".to_string());
+        .unwrap_or_else(|| "Approved by admin".to_string());
 
     auth.status = "APPROVED".to_string();
     auth.review_method = Some("MANUAL".to_string());
@@ -104,7 +104,7 @@ pub async fn approve_authentication(
     auth.reason = Some(reason);
     auth.rejection_reason = None;
 
-    // 手动通过同样要把认证结果写入用户信息项，供板块门槛判定使用。
+    // Manual approval must also write the authentication result into user info fields for forum gate checks.
     let data = j::json_value(auth.auth_data.as_deref());
     let data_map = data.as_object().cloned().unwrap_or_default();
     let level_name = auth.level.clone().unwrap_or_else(|| "LOW".to_string());
@@ -133,12 +133,12 @@ pub async fn reject_authentication(
     let me = admin.require_admin()?;
     let mut auth = repo::find_auth_by_id(&state.pool, id)
         .await?
-        .ok_or_else(|| ApiError::not_found("认证记录不存在"))?;
+        .ok_or_else(|| ApiError::not_found("Authentication record not found"))?;
     let reason = body
         .as_ref()
         .and_then(|Json(v)| v.get("reason").and_then(|r| r.as_str()).map(|s| s.to_string()))
         .filter(|s| !s.trim().is_empty())
-        .unwrap_or_else(|| "管理员驳回".to_string());
+        .unwrap_or_else(|| "Rejected by admin".to_string());
 
     auth.status = "REJECTED".to_string();
     auth.review_method = Some("MANUAL".to_string());
@@ -147,37 +147,6 @@ pub async fn reject_authentication(
     auth.rejection_reason = Some(reason);
     repo::save_auth(&state.pool, &mut auth).await?;
     Ok(j::ok(auth_dto(&state, &auth).await?))
-}
-
-/// GET /admin/custom-pages
-pub async fn list_custom_pages(
-    state: State<AppState>,
-    admin: CurrentUser,
-    query: Query<forums::CustomPageListQuery>,
-) -> ApiResult<Json<Value>> {
-    admin.require_admin()?;
-    forums::admin_list_custom_pages(state, query).await
-}
-
-/// POST /admin/custom-pages/{id}/approve
-pub async fn approve_custom_page(
-    state: State<AppState>,
-    admin: CurrentUser,
-    path: Path<i64>,
-) -> ApiResult<Json<Value>> {
-    admin.require_admin()?;
-    forums::admin_approve_custom_page(state, path).await
-}
-
-/// POST /admin/custom-pages/{id}/reject
-pub async fn reject_custom_page(
-    state: State<AppState>,
-    admin: CurrentUser,
-    path: Path<i64>,
-    body: Option<Json<Value>>,
-) -> ApiResult<Json<Value>> {
-    admin.require_admin()?;
-    forums::admin_reject_custom_page(state, path, body).await
 }
 
 /// GET /admin/users
@@ -225,7 +194,7 @@ pub async fn list_user_homepages(
     admin.require_admin()?;
     let status = qp.status.trim().to_ascii_uppercase();
     if !matches!(status.as_str(), "ALL" | "ACTIVE" | "BLOCKED") {
-        return Err(ApiError::bad_request(format!("非法的状态: {}", qp.status)));
+        return Err(ApiError::bad_request(format!("Invalid status: {}", qp.status)));
     }
 
     let mut rows: Vec<AdminHomepageRow> = sqlx::query_as(
@@ -273,16 +242,16 @@ pub async fn block_user_homepage(
         .and_then(|Json(v)| v.get("reason").and_then(|r| r.as_str()))
         .map(|s| s.trim().to_string())
         .filter(|s| !s.is_empty())
-        .ok_or_else(|| ApiError::bad_request("请填写下架原因"))?;
+        .ok_or_else(|| ApiError::bad_request("Please provide a block reason"))?;
     let chars = reason.chars().count();
     if !(2..=200).contains(&chars) {
-        return Err(ApiError::bad_request("下架原因需为 2-200 个字符"));
+        return Err(ApiError::bad_request("Block reason must be 2-200 characters"));
     }
 
     homepages::find_homepage(&state.pool, user_id)
         .await?
         .filter(|r| r.mode == "CUSTOM")
-        .ok_or_else(|| ApiError::not_found("该用户没有自定义主页"))?;
+        .ok_or_else(|| ApiError::not_found("This user has no custom homepage"))?;
 
     sqlx::query(
         "UPDATE user_homepages SET status = 'BLOCKED', block_reason = ?, blocked_by = ?, \
@@ -292,6 +261,126 @@ pub async fn block_user_homepage(
     .bind(me.id)
     .bind(chrono::Local::now().naive_local())
     .bind(user_id)
+    .execute(&state.pool)
+    .await?;
+    Ok(j::ok(json!({ "ok": true })))
+}
+
+#[derive(Debug, sqlx::FromRow)]
+struct AdminForumHomepageRow {
+    forum_id: i64,
+    forum_name: String,
+    forum_slug: String,
+    creator_name: String,
+    status: String,
+    size_bytes: i32,
+    block_reason: Option<String>,
+    updated_at: chrono::NaiveDateTime,
+    report_count: i64,
+}
+
+/// GET /admin/forum-homepages
+pub async fn list_forum_homepages(
+    State(state): State<AppState>,
+    admin: CurrentUser,
+    Query(qp): Query<HomepageListQuery>,
+) -> ApiResult<Json<Value>> {
+    admin.require_admin()?;
+    let status = qp.status.trim().to_ascii_uppercase();
+    if !matches!(status.as_str(), "ALL" | "ACTIVE" | "BLOCKED") {
+        return Err(ApiError::bad_request(format!("Invalid status: {}", qp.status)));
+    }
+
+    let mut rows: Vec<AdminForumHomepageRow> = sqlx::query_as(
+        "SELECT h.forum_id, f.name AS forum_name, f.slug AS forum_slug, \
+         u.username AS creator_name, h.status, h.size_bytes, h.block_reason, h.updated_at, \
+         (SELECT COUNT(*) FROM forum_homepage_reports r WHERE r.forum_id = h.forum_id) AS report_count \
+         FROM forum_homepages h \
+         JOIN sub_forums f ON f.id = h.forum_id \
+         JOIN users u ON u.id = f.creator_id \
+         WHERE h.mode = 'CUSTOM' ORDER BY h.updated_at DESC LIMIT 100",
+    )
+    .fetch_all(&state.pool)
+    .await?;
+    if status != "ALL" {
+        rows.retain(|r| r.status == status);
+    }
+
+    let total = rows.len() as i64;
+    let (slice, _) = j::slice_page(rows, qp.page, qp.size);
+    let content: Vec<Value> = slice
+        .iter()
+        .map(|r| {
+            json!({
+                "forumId": r.forum_id,
+                "forumName": r.forum_name,
+                "forumSlug": r.forum_slug,
+                "creatorName": r.creator_name,
+                "status": r.status,
+                "sizeBytes": r.size_bytes,
+                "blockReason": r.block_reason,
+                "reportCount": r.report_count,
+                "updatedAt": j::jts(r.updated_at),
+            })
+        })
+        .collect();
+    Ok(j::ok(j::PageResponse::of(content, qp.page, qp.size, total)))
+}
+
+/// POST /admin/forum-homepages/{forumId}/block
+pub async fn block_forum_homepage(
+    State(state): State<AppState>,
+    admin: CurrentUser,
+    Path(forum_id): Path<i64>,
+    body: Option<Json<Value>>,
+) -> ApiResult<Json<Value>> {
+    let me = admin.require_admin()?;
+    let reason = body
+        .as_ref()
+        .and_then(|Json(v)| v.get("reason").and_then(|r| r.as_str()))
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .ok_or_else(|| ApiError::bad_request("Please provide a block reason"))?;
+    let chars = reason.chars().count();
+    if !(5..=500).contains(&chars) {
+        return Err(ApiError::bad_request("Block reason must be 5-500 characters"));
+    }
+
+    forum_homepages::find_homepage(&state.pool, forum_id)
+        .await?
+        .filter(|r| r.mode == "CUSTOM")
+        .ok_or_else(|| ApiError::not_found("This forum has no custom homepage"))?;
+
+    sqlx::query(
+        "UPDATE forum_homepages SET status = 'BLOCKED', block_reason = ?, blocked_by = ?, \
+         blocked_at = ? WHERE forum_id = ?",
+    )
+    .bind(&reason)
+    .bind(me.id)
+    .bind(chrono::Local::now().naive_local())
+    .bind(forum_id)
+    .execute(&state.pool)
+    .await?;
+    Ok(j::ok(json!({ "ok": true })))
+}
+
+/// POST /admin/forum-homepages/{forumId}/unblock
+pub async fn unblock_forum_homepage(
+    State(state): State<AppState>,
+    admin: CurrentUser,
+    Path(forum_id): Path<i64>,
+) -> ApiResult<Json<Value>> {
+    admin.require_admin()?;
+    forum_homepages::find_homepage(&state.pool, forum_id)
+        .await?
+        .filter(|r| r.mode == "CUSTOM")
+        .ok_or_else(|| ApiError::not_found("This forum has no custom homepage"))?;
+
+    sqlx::query(
+        "UPDATE forum_homepages SET status = 'ACTIVE', block_reason = NULL, blocked_by = NULL, \
+         blocked_at = NULL WHERE forum_id = ?",
+    )
+    .bind(forum_id)
     .execute(&state.pool)
     .await?;
     Ok(j::ok(json!({ "ok": true })))
@@ -307,7 +396,7 @@ pub async fn unblock_user_homepage(
     homepages::find_homepage(&state.pool, user_id)
         .await?
         .filter(|r| r.mode == "CUSTOM")
-        .ok_or_else(|| ApiError::not_found("该用户没有自定义主页"))?;
+        .ok_or_else(|| ApiError::not_found("This user has no custom homepage"))?;
 
     sqlx::query(
         "UPDATE user_homepages SET status = 'ACTIVE', block_reason = NULL, blocked_by = NULL, \

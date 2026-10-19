@@ -20,10 +20,10 @@ use crate::state::AppState;
 const AUTH_IMAGE_TYPES: [&str; 3] = ["image/jpeg", "image/png", "image/webp"];
 const AUTH_VIDEO_TYPES: [&str; 2] = ["video/webm", "video/mp4"];
 const TIPS: [&str; 4] = [
-    "请在光线充足、背景简洁的环境下拍摄",
-    "面部保持无遮挡，请勿戴帽子、墨镜或口罩",
-    "正对镜头并保持稳定，按屏幕提示依次完成动作",
-    "证件需四角完整、文字清晰、无反光或遮挡",
+    "Take the photo in a well-lit area with a plain background",
+    "Keep your face unobstructed; do not wear a hat, sunglasses, or a mask",
+    "Face the camera and stay still; follow the on-screen prompts to complete each action",
+    "The document must show all four corners, clear text, and no glare or obstruction",
 ];
 
 #[derive(Debug, Deserialize)]
@@ -63,35 +63,35 @@ pub struct RetryRequest {
 
 fn short_label(t: &str) -> &'static str {
     match t {
-        "REAL_NAME" => "实名",
-        "ID_CARD" => "身份证",
-        "GENDER" => "性别",
-        "AGE" => "年龄",
-        "NATIONALITY" => "国籍",
-        "CITY" => "城市",
-        "OCCUPATION" => "职业",
-        "EDUCATION" => "学历",
-        "DRIVER_LICENSE" => "驾照",
-        "MARRIAGE_CERT" => "婚姻",
-        "PROPERTY_CERT" => "房产",
-        "ASSETS" => "资产",
-        "CUSTOM" => "自定义",
-        _ => "自定义",
+        "REAL_NAME" => "Real Name",
+        "ID_CARD" => "ID Card",
+        "GENDER" => "Gender",
+        "AGE" => "Age",
+        "NATIONALITY" => "Nationality",
+        "CITY" => "City",
+        "OCCUPATION" => "Occupation",
+        "EDUCATION" => "Education",
+        "DRIVER_LICENSE" => "Driver's License",
+        "MARRIAGE_CERT" => "Marriage",
+        "PROPERTY_CERT" => "Property",
+        "ASSETS" => "Assets",
+        "CUSTOM" => "Custom",
+        _ => "Custom",
     }
 }
 
 fn document_name(t: &str) -> &'static str {
     match t {
-        "REAL_NAME" => "证件（身份证/护照）",
-        "ID_CARD" => "身份证",
-        "DRIVER_LICENSE" => "驾驶证",
-        "MARRIAGE_CERT" => "结婚证",
-        "PROPERTY_CERT" => "房产证",
-        "NATIONALITY" => "国籍证明",
-        "CITY" => "居住证明",
-        "OCCUPATION" => "在职证明",
-        "EDUCATION" => "学历证书",
-        _ => "相关证明材料",
+        "REAL_NAME" => "Document (ID card/passport)",
+        "ID_CARD" => "ID card",
+        "DRIVER_LICENSE" => "Driver's license",
+        "MARRIAGE_CERT" => "Marriage certificate",
+        "PROPERTY_CERT" => "Property certificate",
+        "NATIONALITY" => "Proof of nationality",
+        "CITY" => "Proof of residence",
+        "OCCUPATION" => "Employment certificate",
+        "EDUCATION" => "Education certificate",
+        _ => "Supporting documents",
     }
 }
 
@@ -106,38 +106,38 @@ fn levels_for(t: &str) -> Vec<Value> {
     vec![
         json!({
             "level": "LOW",
-            "label": "低",
-            "requirements": [format!("填写{label}相关信息")],
+            "label": "Low",
+            "requirements": [format!("Fill in {label} information")],
             "tips": Vec::<String>::new(),
         }),
         json!({
             "level": "MEDIUM",
-            "label": "中",
+            "label": "Medium",
             "requirements": [
-                format!("填写{label}相关信息"),
-                format!("上传{doc}照片（正面清晰）"),
-                "由 AI 审核材料真实性".to_string(),
+                format!("Fill in {label} information"),
+                format!("Upload a clear photo of the front of your {doc}"),
+                "AI reviews the authenticity of the materials".to_string(),
             ],
             "tips": tips,
         }),
         json!({
             "level": "HIGH",
-            "label": "高",
+            "label": "High",
             "requirements": [
-                format!("填写{label}相关信息"),
-                "完成视频活体认证（随机动作序列 + 人脸分析）".to_string(),
-                format!("上传{doc}照片"),
-                "AI 审核通过后自动登记实名认证".to_string(),
+                format!("Fill in {label} information"),
+                "Complete video liveness verification (random action sequence + face analysis)".to_string(),
+                format!("Upload a photo of your {doc}"),
+                "Real-name authentication is registered automatically after AI approval".to_string(),
             ],
             "tips": tips,
         }),
         json!({
             "level": "EXTREME",
-            "label": "极高",
+            "label": "Extreme",
             "requirements": [
-                "完成「高」等级的全部步骤".to_string(),
-                "使用 OpenForum 移动 App 防伪录制视频".to_string(),
-                "通过后可获得最高可信度标识".to_string(),
+                "Complete all steps of the High level".to_string(),
+                "Record an anti-spoofing video with the OpenForum mobile app".to_string(),
+                "Earn the highest trust badge after passing".to_string(),
             ],
             "tips": tips,
         }),
@@ -154,69 +154,69 @@ fn fields_for(t: &str) -> Vec<Value> {
         "options": options,
     });
     match t {
-        "REAL_NAME" => vec![f("fullName", "真实姓名", "text")],
+        "REAL_NAME" => vec![f("fullName", "Full name", "text")],
         "ID_CARD" => vec![
-            f("fullName", "真实姓名", "text"),
-            f("idNumber", "身份证号", "text"),
+            f("fullName", "Full name", "text"),
+            f("idNumber", "ID number", "text"),
             sel(
                 "gender",
-                "性别",
-                json!([{"value": "MALE", "label": "男"}, {"value": "FEMALE", "label": "女"}]),
+                "Gender",
+                json!([{"value": "MALE", "label": "Male"}, {"value": "FEMALE", "label": "Female"}]),
             ),
-            f("birthDate", "出生日期", "date"),
+            f("birthDate", "Date of birth", "date"),
             sel(
                 "country",
-                "国家/地区",
+                "Country/Region",
                 crate::info::options_value(crate::info::find_field("COUNTRY").expect("COUNTRY field")),
             ),
-            f("city", "城市", "text"),
+            f("city", "City", "text"),
         ],
         "GENDER" => vec![sel(
             "gender",
-            "性别",
-            json!([{"value": "MALE", "label": "男"}, {"value": "FEMALE", "label": "女"}]),
+            "Gender",
+            json!([{"value": "MALE", "label": "Male"}, {"value": "FEMALE", "label": "Female"}]),
         )],
-        "AGE" => vec![f("birthDate", "出生日期", "date")],
+        "AGE" => vec![f("birthDate", "Date of birth", "date")],
         "NATIONALITY" => vec![sel(
             "nationality",
-            "国籍",
+            "Nationality",
             crate::info::options_value(crate::info::find_field("COUNTRY").expect("COUNTRY field")),
         )],
         "CITY" => vec![
             sel(
                 "country",
-                "国家/地区",
+                "Country/Region",
                 crate::info::options_value(crate::info::find_field("COUNTRY").expect("COUNTRY field")),
             ),
-            f("city", "城市", "text"),
+            f("city", "City", "text"),
         ],
         "OCCUPATION" => vec![
             sel(
                 "category",
-                "职业分类",
+                "Occupation category",
                 crate::info::options_value(crate::info::find_field("OCCUPATION").expect("OCCUPATION field")),
             ),
-            f("title", "职位名称", "text"),
+            f("title", "Job title", "text"),
         ],
         "EDUCATION" => vec![sel(
             "education",
-            "学历",
+            "Education",
             crate::info::options_value(crate::info::find_field("EDUCATION").expect("EDUCATION field")),
         )],
-        "DRIVER_LICENSE" => vec![f("licenseNumber", "驾照号", "text")],
+        "DRIVER_LICENSE" => vec![f("licenseNumber", "License number", "text")],
         "MARRIAGE_CERT" => vec![
-            f("spouseName", "配偶姓名", "text"),
-            f("certificateNumber", "结婚证号", "text"),
+            f("spouseName", "Spouse name", "text"),
+            f("certificateNumber", "Marriage certificate number", "text"),
         ],
         "PROPERTY_CERT" => vec![
-            f("certificateNumber", "产权证号", "text"),
-            f("propertyAddress", "房产地址", "text"),
-            f("cities", "房产所在城市", "tags"),
-            f("districts", "房产所在区县", "tags"),
-            f("count", "房产数量", "number"),
+            f("certificateNumber", "Property certificate number", "text"),
+            f("propertyAddress", "Property address", "text"),
+            f("cities", "Property city", "tags"),
+            f("districts", "Property district", "tags"),
+            f("count", "Number of properties", "number"),
         ],
-        "ASSETS" => vec![f("amount", "资产金额", "number")],
-        "CUSTOM" => vec![f("description", "说明", "textarea")],
+        "ASSETS" => vec![f("amount", "Asset amount", "number")],
+        "CUSTOM" => vec![f("description", "Description", "textarea")],
         _ => Vec::new(),
     }
 }
@@ -274,12 +274,12 @@ pub async fn challenge(
 fn parse_kind(raw: Option<&str>) -> Result<String, ApiError> {
     let v = match raw {
         Some(s) if !s.trim().is_empty() => s.trim().to_string(),
-        _ => return Err(ApiError::bad_request("文件类型 kind 不能为空")),
+        _ => return Err(ApiError::bad_request("kind must not be empty")),
     };
     let up = v.to_uppercase();
     match up.as_str() {
         "DOCUMENT" | "SELFIE" | "VIDEO" => Ok(up),
-        _ => Err(ApiError::bad_request(format!("未知的文件类型: {v}"))),
+        _ => Err(ApiError::bad_request(format!("Unknown file type: {v}"))),
     }
 }
 
@@ -294,26 +294,26 @@ pub async fn upload_media(
     let kind = parse_kind(q.kind.as_deref())?;
     let (bytes, content_type) = media_route::read_file_field(&mut multipart).await?;
     if bytes.is_empty() {
-        return Err(ApiError::bad_request("上传文件不能为空"));
+        return Err(ApiError::bad_request("Uploaded file must not be empty"));
     }
     if !state.storage.is_enabled() {
-        return Err(ApiError::bad_request("文件存储未启用，无法上传认证材料"));
+        return Err(ApiError::bad_request("File storage is not enabled; cannot upload authentication materials"));
     }
     let lower = content_type.to_lowercase();
     let size = bytes.len() as i64;
     if kind == "VIDEO" {
         if !AUTH_VIDEO_TYPES.contains(&lower.as_str()) {
-            return Err(ApiError::bad_request("视频格式不支持，仅允许 webm/mp4"));
+            return Err(ApiError::bad_request("Unsupported video format; only webm/mp4 are allowed"));
         }
         if size > state.cfg.auth_max_video_bytes {
-            return Err(ApiError::bad_request("视频过大，上限 50MB"));
+            return Err(ApiError::bad_request("Video is too large; the limit is 50MB"));
         }
     } else {
         if !AUTH_IMAGE_TYPES.contains(&lower.as_str()) {
-            return Err(ApiError::bad_request("图片格式不支持，仅允许 jpeg/png/webp"));
+            return Err(ApiError::bad_request("Unsupported image format; only jpeg/png/webp are allowed"));
         }
         if size > state.cfg.auth_max_image_bytes {
-            return Err(ApiError::bad_request("图片过大，上限 10MB"));
+            return Err(ApiError::bad_request("Image is too large; the limit is 10MB"));
         }
     }
 
@@ -344,12 +344,12 @@ pub async fn get_media(
     let me = user.require()?;
     let media = repo::find_auth_media(&state.pool, media_id)
         .await?
-        .ok_or_else(|| ApiError::not_found("媒体文件不存在"))?;
+        .ok_or_else(|| ApiError::not_found("Media file not found"))?;
     if media.user_id != me.id && !me.is_admin() {
-        return Err(ApiError::forbidden("无权访问该媒体文件"));
+        return Err(ApiError::forbidden("You do not have access to this media file"));
     }
     if !state.storage.is_enabled() {
-        return Err(ApiError::bad_request("文件存储未启用"));
+        return Err(ApiError::bad_request("File storage is not enabled"));
     }
     let bytes = state.storage.get(&media.object_key).await?;
     let ct = media
@@ -399,7 +399,7 @@ pub async fn auth_dto(state: &AppState, auth: &UserAuthentication) -> ApiResult<
         "authData": auth_data,
         "createdAt": j::jts(auth.created_at),
         "reviewedAt": j::jts_opt(auth.reviewed_at),
-        // Java 实体 `level` 字段声明默认值为 LOW，DB 中为 NULL 的历史记录序列化后即为 "LOW"。
+        // The Java entity declares a default of LOW for the `level` field; historical records with NULL in the DB serialize as "LOW".
         "level": auth.level.clone().unwrap_or_else(|| "LOW".to_string()),
         "media": media,
         "liveness": if liveness.is_null() { json!({}) } else { liveness },
@@ -410,12 +410,12 @@ pub async fn auth_dto(state: &AppState, auth: &UserAuthentication) -> ApiResult<
 fn parse_auth_type(raw: Option<&str>) -> Result<String, ApiError> {
     let v = match raw {
         Some(s) if !s.trim().is_empty() => s.trim().to_uppercase(),
-        _ => return Err(ApiError::bad_request("type type 不能为空")),
+        _ => return Err(ApiError::bad_request("type must not be empty")),
     };
     if crate::enums::is_known_auth_type(&v) {
         Ok(v)
     } else {
-        Err(ApiError::bad_request(format!("未知认证类型: {v}")))
+        Err(ApiError::bad_request(format!("Unknown authentication type: {v}")))
     }
 }
 
@@ -448,7 +448,7 @@ pub async fn submit(
         let can_upgrade = e.status == "REJECTED" || old.rank() < level.rank();
         if !can_upgrade {
             return Err(ApiError::bad_request(
-                "该类型认证已存在，如需重新提交请使用重试接口",
+                "This authentication type already exists; use the retry endpoint to resubmit",
             ));
         }
     }
@@ -504,9 +504,9 @@ pub async fn retry(
     let me = user.require()?;
     let auth = repo::find_auth_by_id(&state.pool, id)
         .await?
-        .ok_or_else(|| ApiError::not_found("认证记录不存在"))?;
+        .ok_or_else(|| ApiError::not_found("Authentication record not found"))?;
     if auth.user_id != me.id {
-        return Err(ApiError::forbidden("无权操作该认证"));
+        return Err(ApiError::forbidden("You do not have permission to modify this authentication"));
     }
     let old_level = AuthLevel::parse_or_null(auth.level.as_deref()).unwrap_or(AuthLevel::Low);
     let new_level = match req.level.as_deref() {
@@ -516,7 +516,7 @@ pub async fn retry(
     let rejected = auth.status == "REJECTED";
     let upgrade = new_level.rank() > old_level.rank();
     if !rejected && !upgrade {
-        return Err(ApiError::bad_request("仅被拒绝的认证或提升等级时可以重新提交"));
+        return Err(ApiError::bad_request("Only rejected authentications or level upgrades can be resubmitted"));
     }
     let data = match req.data {
         Some(v @ Value::Object(_)) => v,

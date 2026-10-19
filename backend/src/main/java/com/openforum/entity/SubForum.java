@@ -73,6 +73,14 @@ public class SubForum {
     @Column(name = "is_public", nullable = false)
     private boolean isPublic = true;
 
+    /**
+     * 结构化访问门槛规则（JSON），替代旧的 required_auth_types 纯字符串。
+     * 格式见 {@link com.openforum.dto.forum.AccessRuleSet}。
+     * 旧数据仅有 required_auth_types 时，此字段为 null，系统回退到旧门槛逻辑。
+     */
+    @Column(name = "access_rules", columnDefinition = "LONGTEXT")
+    private String accessRules;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -227,6 +235,14 @@ public class SubForum {
 
     public void setPublic(boolean isPublic) {
         this.isPublic = isPublic;
+    }
+
+    public String getAccessRules() {
+        return accessRules;
+    }
+
+    public void setAccessRules(String accessRules) {
+        this.accessRules = accessRules;
     }
 
     public LocalDateTime getCreatedAt() {

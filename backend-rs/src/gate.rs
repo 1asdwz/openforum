@@ -28,13 +28,13 @@ impl GateKind {
 
     pub fn label(self) -> &'static str {
         match self {
-            GateKind::Browse => "浏览",
-            GateKind::Operate => "操作",
+            GateKind::Browse => "browse",
+            GateKind::Operate => "operate",
         }
     }
 }
 
-/// 板块门槛规则。空条件表示无门槛。
+/// Forum gate rule. An empty condition list means no gate.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GateRule {
@@ -52,7 +52,7 @@ pub struct GateCondition {
     pub op: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub values: Option<Vec<String>>,
-    /// 与 `values` 一一对应的展示名称，仅用于生成可读提示。
+    /// Display names aligned one-to-one with `values`, used only to build readable messages.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub labels: Option<Vec<String>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -88,7 +88,7 @@ pub struct MissingItem {
 pub struct GateVerdict {
     pub passed: bool,
     pub login_required: bool,
-    /// 旧规则回退时的可读提示。
+    /// Readable message used when falling back to legacy rules.
     pub message: Option<String>,
     pub missing: Vec<MissingItem>,
 }
@@ -103,11 +103,11 @@ impl GateVerdict {
 
     pub fn deny(&self, kind: GateKind, forum: &SubForum) -> ApiError {
         let message = if self.login_required {
-            "请先登录后再访问该板块".to_string()
+            "Please sign in before accessing this forum".to_string()
         } else if let Some(msg) = &self.message {
             msg.clone()
         } else {
-            format!("你还未满足本板块的{}门槛", kind.label())
+            format!("You do not yet meet the {} requirements for this forum", kind.label())
         };
         ApiError::forbidden(message).with_data(json!({
             "gate": kind.code(),
@@ -119,36 +119,36 @@ impl GateVerdict {
     }
 }
 
-// -------- 规则解析与校验 --------
+// -------- Rule parsing and validation --------
 
 pub fn parse_rule_text(raw: Option<&str>) -> Option<GateRule> {
     let text = raw.map(|s| s.trim()).filter(|s| !s.is_empty())?;
     match serde_json::from_str::<GateRule>(text) {
         Ok(rule) => Some(rule),
         Err(e) => {
-            tracing::warn!("门槛规则 JSON 解析失败（忽略）: {e}");
+            tracing::warn!("Failed to parse gate rule JSON (ignored): {e}");
             None
         }
     }
 }
 
 fn bad(index: usize, message: impl std::fmt::Display) -> ApiError {
-    ApiError::bad_request(format!("第 {} 个门槛条件：{message}", index + 1))
+    ApiError::bad_request(format!("Gate condition {}: {message}", index + 1))
 }
 
-/// 校验并规范化前端提交的规则。`None`/`null` 表示未设置。
+/// Validate and normalize a rule submitted by the frontend. `None`/`null` means unset.
 pub fn normalize_rule(value: Option<&Value>) -> Result<Option<GateRule>, ApiError> {
     let value = match value {
         None | Some(Value::Null) => return Ok(None),
         Some(v) => v,
     };
     let mut rule: GateRule = serde_json::from_value(value.clone())
-        .map_err(|e| ApiError::bad_request(format!("门槛规则格式不正确: {e}")))?;
+        .map_err(|e| ApiError::bad_request(format!("Invalid gate rule format: {e}")))?;
     if rule.version == 0 {
         rule.version = 1;
     }
     if rule.version != 1 {
-        return Err(ApiError::bad_request("不支持的门槛规则版本"));
+        return Err(ApiError::bad_request("Unsupported gate rule version"));
     }
     let mut conditions = Vec::with_capacity(rule.conditions.len());
     for (index, cond) in rule.conditions.iter().enumerate() {
@@ -160,7 +160,7 @@ pub fn normalize_rule(value: Option<&Value>) -> Result<Option<GateRule>, ApiErro
 
 fn normalize_condition(index: usize, cond: &GateCondition) -> Result<GateCondition, ApiError> {
     let field = info::find_field(&cond.field)
-        .ok_or_else(|| bad(index, format!("未知信息项 {}", cond.field)))?;
+        .ok_or_else(|| bad(index, format!("Unknown info field {}", cond.field)))?;
     let op = cond
         .op
         .as_deref()
@@ -173,24 +173,24 @@ fn normalize_condition(index: usize, cond: &GateCondition) -> Result<GateConditi
         .filter(|s| !s.is_empty());
 
     if op.is_none() && auth_level.is_none() {
-        return Err(bad(index, "至少需要一个取值条件或认证等级要求"));
+        return Err(bad(index, "At least one value condition or auth level requirement is needed"));
     }
     if let Some(op) = &op {
         let allowed = info::gate_ops(field);
         if !allowed.contains(&op.as_str()) {
-            return Err(bad(index, format!("字段 {} 不支持算子 {}", field.key, op)));
+            return Err(bad(index, format!("Field {} does not support operator {}", field.key, op)));
         }
     }
     let auth_level = match auth_level {
         None => None,
         Some(raw) => {
             if field.key == "INTERESTS" {
-                return Err(bad(index, "兴趣标签不支持认证等级"));
+                return Err(bad(index, "Interest tags do not support auth levels"));
             }
             if !field.authable {
-                return Err(bad(index, format!("字段 {} 不支持认证等级", field.key)));
+                return Err(bad(index, format!("Field {} does not support auth levels", field.key)));
             }
-            Some(AuthLevel::parse(raw).map_err(|_| bad(index, format!("未知认证等级 {raw}")))?)
+            Some(AuthLevel::parse(raw).map_err(|_| bad(index, format!("Unknown auth level {raw}")))?)
         }
     };
 
@@ -208,13 +208,13 @@ fn normalize_condition(index: usize, cond: &GateCondition) -> Result<GateConditi
             let mut values: Vec<String> = Vec::new();
             for raw in raw_values {
                 let v = normalize_gate_value(field.key, raw)
-                    .ok_or_else(|| bad(index, format!("{} 的取值 {raw} 不合法", field.label)))?;
+                    .ok_or_else(|| bad(index, format!("Invalid value {raw} for {}", field.label)))?;
                 if !values.contains(&v) {
                     values.push(v);
                 }
             }
             if values.is_empty() {
-                return Err(bad(index, "请至少选择一个取值"));
+                return Err(bad(index, "Select at least one value"));
             }
             out.labels = align_labels(cond.labels.as_deref(), &values);
             out.values = Some(values);
@@ -229,14 +229,14 @@ fn normalize_condition(index: usize, cond: &GateCondition) -> Result<GateConditi
                     .or_else(|| cond.value.as_deref().and_then(|v| v.trim().parse().ok()));
                 match op.as_deref() {
                     Some("gte") if min.is_none() => {
-                        return Err(bad(index, "请填写下限"))
+                        return Err(bad(index, "Please provide a lower bound"))
                     }
                     Some("lte") if max.is_none() => {
-                        return Err(bad(index, "请填写上限"))
+                        return Err(bad(index, "Please provide an upper bound"))
                     }
                     Some("eq") => {
                         if min.is_none() && max.is_none() {
-                            return Err(bad(index, "请填写取值"));
+                            return Err(bad(index, "Please provide a value"));
                         }
                     }
                     _ => {}
@@ -247,12 +247,12 @@ fn normalize_condition(index: usize, cond: &GateCondition) -> Result<GateConditi
                 let raw = cond.value.as_deref().unwrap_or("");
                 let edu = info::education_rank(raw)
                     .map(|_| raw.trim().to_ascii_uppercase())
-                    .ok_or_else(|| bad(index, "学历取值不合法"))?;
+                    .ok_or_else(|| bad(index, "Invalid education value"))?;
                 out.value = Some(edu);
             } else {
                 let raw = cond.value.as_deref().unwrap_or("").trim();
                 if raw.is_empty() {
-                    return Err(bad(index, "请填写取值"));
+                    return Err(bad(index, "Please provide a value"));
                 }
                 out.value = Some(raw.to_string());
             }
@@ -260,8 +260,8 @@ fn normalize_condition(index: usize, cond: &GateCondition) -> Result<GateConditi
         Some("between") => {
             let (min, max) = match (cond.min, cond.max) {
                 (Some(min), Some(max)) if min <= max => (min, max),
-                (Some(_), Some(_)) => return Err(bad(index, "下限不能大于上限")),
-                _ => return Err(bad(index, "区间条件需要同时填写下限和上限")),
+                (Some(_), Some(_)) => return Err(bad(index, "Lower bound cannot exceed upper bound")),
+                _ => return Err(bad(index, "Range conditions require both a lower and upper bound")),
             };
             out.min = Some(min);
             out.max = Some(max);
@@ -315,7 +315,7 @@ fn align_labels(labels: Option<&[String]>, values: &[String]) -> Option<Vec<Stri
     }
 }
 
-// -------- 用户上下文 --------
+// -------- User context --------
 
 #[derive(Debug, Clone, Default)]
 pub struct InfoRow {
@@ -390,7 +390,7 @@ pub async fn load_context(
                 }
             }
             Err(e) if db_code(&e).as_deref() == Some("1146") => {
-                tracing::warn!("user_info 表不存在，门槛按旧逻辑回退");
+                tracing::warn!("user_info table is missing; falling back to legacy gate logic");
             }
             Err(e) => return Err(e.into()),
         }
@@ -425,7 +425,7 @@ impl GateContext {
         let field = match info::find_field(&cond.field) {
             Some(f) => f,
             None => {
-                tracing::warn!("门槛引用了未知信息项 {}，已跳过", cond.field);
+                tracing::warn!("Gate references unknown info field {}; skipped", cond.field);
                 return None;
             }
         };
@@ -608,14 +608,14 @@ fn matches_any(field_key: &str, value: &Value, values: &[String]) -> bool {
     }
 }
 
-// -------- 可读提示 --------
+// -------- Readable messages --------
 
 fn auth_level_label(level: &str) -> &'static str {
     match level.trim().to_ascii_uppercase().as_str() {
-        "MEDIUM" => "中",
-        "HIGH" => "高",
-        "EXTREME" => "极高",
-        _ => "低",
+        "MEDIUM" => "medium",
+        "HIGH" => "high",
+        "EXTREME" => "very high",
+        _ => "low",
     }
 }
 
@@ -639,8 +639,8 @@ fn value_label(index: usize, field_key: &str, cond: &GateCondition, raw: &str) -
 
 fn unit_of(field_key: &str) -> &'static str {
     match field_key {
-        "AGE" => "岁",
-        "PROPERTY_COUNT" => "套",
+        "AGE" => " years",
+        "PROPERTY_COUNT" => " properties",
         _ => "",
     }
 }
@@ -664,11 +664,11 @@ fn requirement_text(field: &info::FieldDef, cond: &GateCondition) -> String {
                     .enumerate()
                     .map(|(i, v)| value_label(i, field.key, cond, v))
                     .collect();
-                let joined = labels.join(" 或 ");
+                let joined = labels.join(" or ");
                 if op == "in" {
                     joined
                 } else {
-                    format!("不含 {joined}")
+                    format!("excludes {joined}")
                 }
             }
             "between" => {
@@ -707,26 +707,26 @@ fn requirement_text(field: &info::FieldDef, cond: &GateCondition) -> String {
         }
     }
     if let Some(level) = cond.auth_level.as_deref() {
-        parts.push(format!("认证 ≥ {}", auth_level_label(level)));
+        parts.push(format!("Verified ≥ {}", auth_level_label(level)));
     }
     match parts.len() {
         0 => String::new(),
         1 => parts.remove(0),
         _ => {
             let auth = parts.pop().unwrap_or_default();
-            format!("{}（{auth}）", parts.join("，"))
+            format!("{} ({auth})", parts.join(", "))
         }
     }
 }
 
-// -------- 规则存储与判定 --------
+// -------- Rule storage and evaluation --------
 
 #[derive(Debug, Clone, Default)]
 pub struct ForumRules {
     pub browse: Option<GateRule>,
     pub operate: Option<GateRule>,
     pub legacy: Option<String>,
-    /// 迁移未执行（缺列）时为 false，此时按旧 `required_auth_types` 回退。
+    /// False when the migration has not run (missing columns); in that case falls back to legacy `required_auth_types`.
     pub columns_available: bool,
 }
 
@@ -778,7 +778,7 @@ pub async fn load_rules(pool: &MySqlPool, forum_id: i64) -> Result<ForumRules, A
     }
 }
 
-/// 判定板块门槛。
+/// Evaluate the forum gate.
 pub async fn check(
     pool: &MySqlPool,
     user_id: Option<i64>,
@@ -789,7 +789,7 @@ pub async fn check(
     let rules = load_rules(pool, forum.id).await?;
 
     if !rules.columns_available {
-        // 迁移未执行：浏览不拦截，操作沿用旧 CSV 认证门槛。
+        // Migration has not run: browsing is unrestricted, and operate keeps the legacy CSV auth gate.
         if kind == GateKind::Browse {
             return Ok(GateVerdict::allow());
         }
@@ -873,7 +873,7 @@ pub async fn ensure(
     }
 }
 
-/// 返回用户可浏览的板块 id 集合（用于列表/搜索过滤）。
+/// Returns the set of forum ids the user may browse (used for list/search filtering).
 pub async fn allowed_forum_ids(
     pool: &MySqlPool,
     user_id: Option<i64>,
@@ -994,7 +994,7 @@ mod tests {
         let r = rule(r#"{"version":1,"conditions":[{"field":"REAL_NAME","authLevel":"MEDIUM"}]}"#);
         let ctx = context(vec![(
             "REAL_NAME",
-            json!({"fullName":"张三"}),
+            json!({"fullName":"John Doe"}),
             Some("LOW"),
             Some("APPROVED"),
         )]);

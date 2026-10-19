@@ -6,23 +6,28 @@ import type {
   AuthTypeMeta,
   AuthenticationSubmitPayload,
   Comment,
-  CustomPageInfo,
+  ForumHomepageData,
+  ForumHomepageMode,
   ForumMember,
+  ForumModerator,
+  ForumPermission,
   GateRule,
   HomepageData,
   HomepageMode,
   InfoFieldGroup,
   MediaKind,
   MediaUploadResult,
+  MyForumHomepage,
   MyHomepage,
   Post,
+  PublicForumHomepage,
   PublicHomepage,
   SubForum,
   User,
   UserInfoResponse,
 } from '@/types'
 
-/** 前端分页从 1 开始，后端 Spring Pageable 从 0 开始，统一在此转换 */
+/** Frontend paging starts at 1 while backend Spring Pageable starts at 0; convert here. */
 function shiftPage<T extends { page?: number }>(params: T): T {
   if (typeof params.page !== 'number') return params
   return { ...params, page: Math.max(0, params.page - 1) }
@@ -56,7 +61,7 @@ export const authApi = {
     api.post<AuthResult>('/auth/login', payload),
   register: (payload: RegisterPayload) =>
     api.post<AuthResult>('/auth/register', payload),
-  /** 使用 Google ID Token 登录/注册 */
+  /** Sign in / sign up with a Google ID token */
   google: (credential: string) =>
     api.post<AuthResult>('/auth/google', { credential }),
   me: () => api.get<User>('/auth/me', { skipAuthRedirect: true }),
@@ -73,29 +78,29 @@ export const userApi = {
 }
 
 export const homepageApi = {
-  /** 公开读取某用户主页 */
+  /** Publicly read a user's homepage */
   get: (id: number | string) => api.get<PublicHomepage>(`/users/${id}/homepage`),
-  /** 数据组件所需的公开资料、统计与只读列表 */
+  /** Public profile, stats, and read-only lists required by data components */
   data: (id: number | string) =>
     api.get<HomepageData>(`/users/${id}/homepage-data`, { skipAuthRedirect: true }),
-  /** 读取自己的主页配置 */
+  /** Read your own homepage configuration */
   mine: () => api.get<MyHomepage>('/users/me/homepage'),
-  /** 保存模式与自定义 HTML */
+  /** Save mode and custom HTML */
   save: (payload: { mode: HomepageMode; html?: string }) =>
     api.put<MyHomepage>('/users/me/homepage', payload),
-  /** 重置为普通主页并清除举报记录 */
+  /** Reset to the normal homepage and clear report records */
   reset: () => api.post<MyHomepage>('/users/me/homepage/reset'),
-  /** 举报他人的自定义主页 */
+  /** Report another user's custom homepage */
   report: (id: number | string, reason: string) =>
     api.post<{ ok: boolean }>(`/users/${id}/homepage/report`, { reason }),
 }
 
 export const infoApi = {
-  /** 信息项目录（分组 + 字段元数据） */
+  /** Info field catalog (groups + field metadata) */
   fields: () => api.get<InfoFieldGroup[]>('/info/fields'),
-  /** 我的资料（含完整度） */
+  /** My profile (including completeness) */
   me: () => api.get<UserInfoResponse>('/info/me'),
-  /** 填写/更新单个信息项 */
+  /** Fill in / update a single info item */
   update: (fieldKey: string, value: Record<string, unknown>) =>
     api.put<UserInfoResponse['groups'][number]['items'][number]>(
       `/info/me/${fieldKey}`,
@@ -115,16 +120,45 @@ export const forumApi = {
   get: (slug: string) => api.get<SubForum>(`/forums/${slug}`),
   update: (id: number | string, payload: Partial<CreateForumPayload>) =>
     api.put<SubForum>(`/forums/${id}`, payload),
-  getCustomPage: (id: number | string) =>
-    api.get<CustomPageInfo>(`/forums/${id}/custom-page`),
-  saveCustomPage: (id: number | string, html: string) =>
-    api.put<CustomPageInfo>(`/forums/${id}/custom-page`, { html }),
-  submitCustomPage: (id: number | string) =>
-    api.post<CustomPageInfo>(`/forums/${id}/custom-page/submit`),
+  /** Publicly read forum homepage mode and HTML (after passing the browse gate) */
+  homepage: (id: number | string) =>
+    api.get<PublicForumHomepage>(`/forums/${id}/homepage`),
+  /** Manager reads the full homepage configuration */
+  myHomepage: (id: number | string) =>
+    api.get<MyForumHomepage>(`/forums/${id}/homepage/mine`),
+  /** Save mode and custom HTML */
+  saveHomepage: (id: number | string, payload: { mode: ForumHomepageMode; html?: string }) =>
+    api.put<MyForumHomepage>(`/forums/${id}/homepage`, payload),
+  /** Reset to the normal homepage and clear report records */
+  resetHomepage: (id: number | string) =>
+    api.post<MyForumHomepage>(`/forums/${id}/homepage/reset`),
+  /** Report another forum's custom homepage */
+  reportHomepage: (id: number | string, reason: string) =>
+    api.post<{ ok: boolean }>(`/forums/${id}/homepage/report`, { reason }),
+  /** Public info, stats, and read-only lists required by data components */
+  homepageData: (id: number | string) =>
+    api.get<ForumHomepageData>(`/forums/${id}/homepage-data`, { skipAuthRedirect: true }),
   join: (id: number | string) => api.post<unknown>(`/forums/${id}/join`),
   leave: (id: number | string) => api.post<unknown>(`/forums/${id}/leave`),
   members: (id: number | string) =>
     api.get<ForumMember[]>(`/forums/${id}/members`),
+  /** Moderators and permission list */
+  moderators: (id: number | string) =>
+    api.get<ForumModerator[]>(`/forums/${id}/moderators`),
+  /** Invite / promote to moderator */
+  addModerator: (
+    id: number | string,
+    payload: { username: string; permissions: ForumPermission[] }
+  ) => api.post<ForumModerator>(`/forums/${id}/moderators`, payload),
+  /** Update moderator permissions */
+  updateModerator: (
+    id: number | string,
+    userId: number,
+    permissions: ForumPermission[]
+  ) => api.put<ForumModerator>(`/forums/${id}/moderators/${userId}`, { permissions }),
+  /** Remove a moderator (demote back to a regular member) */
+  removeModerator: (id: number | string, userId: number) =>
+    api.delete<unknown>(`/forums/${id}/moderators/${userId}`),
 }
 
 export const postApi = {
@@ -164,7 +198,7 @@ export interface AuthMediaUploadResult {
 }
 
 export const mediaApi = {
-  /** 上传帖子媒体（需登录），返回媒体 id */
+  /** Upload post media (requires login), returns the media id */
   upload: (file: File) => {
     const form = new FormData()
     form.append('file', file)
@@ -172,15 +206,15 @@ export const mediaApi = {
       headers: { 'Content-Type': 'multipart/form-data' },
     })
   },
-  /** 媒体公开访问地址 */
+  /** Public media URL */
   url: (id: number | string) => `${BASE_URL}/media/${id}`,
 }
 
 export const authenticationApi = {
   types: () => api.get<AuthTypeMeta[]>('/authentications/types'),
-  /** 获取一次性活体检测挑战（随机动作序列） */
+  /** Get a one-time liveness challenge (random action sequence) */
   challenge: () => api.get<AuthChallenge>('/authentications/challenge'),
-  /** 上传证件/自拍/视频，返回媒体 id */
+  /** Upload an ID/selfie/video, returns the media id */
   uploadMedia: (file: File, kind: MediaKind) => {
     const form = new FormData()
     form.append('file', file)
@@ -189,9 +223,9 @@ export const authenticationApi = {
       headers: { 'Content-Type': 'multipart/form-data' },
     })
   },
-  /** 媒体访问地址（需鉴权，页面用 mediaBlob 带 token 获取） */
+  /** Media URL (requires auth; pages fetch it with mediaBlob and a token) */
   mediaUrl: (id: number | string) => `${BASE_URL}/authentications/media/${id}`,
-  /** 带鉴权获取媒体内容（用于缩略图/预览） */
+  /** Fetch media content with auth (for thumbnails/previews) */
   mediaBlob: (id: number | string) =>
     api.get<Blob>(`/authentications/media/${id}`, { responseType: 'blob' }),
   submit: (payload: AuthenticationSubmitPayload) =>
@@ -208,13 +242,13 @@ export const adminApi = {
     api.post<unknown>(`/admin/authentications/${id}/approve`),
   rejectAuthentication: (id: number | string, reason?: string) =>
     api.post<unknown>(`/admin/authentications/${id}/reject`, { reason }),
-  customPages: (params: { status?: string; page?: number; size?: number } = {}) =>
-    api.get<unknown>('/admin/custom-pages', { params: shiftPage(params) }),
-  approveCustomPage: (id: number | string) =>
-    api.post<unknown>(`/admin/custom-pages/${id}/approve`),
-  rejectCustomPage: (id: number | string, reason?: string) =>
-    api.post<unknown>(`/admin/custom-pages/${id}/reject`, { reason }),
   users: () => api.get<unknown>('/admin/users'),
+  forumHomepages: (params: { status?: string; page?: number; size?: number } = {}) =>
+    api.get<unknown>('/admin/forum-homepages', { params: shiftPage(params) }),
+  blockForumHomepage: (forumId: number | string, reason: string) =>
+    api.post<{ ok: boolean }>(`/admin/forum-homepages/${forumId}/block`, { reason }),
+  unblockForumHomepage: (forumId: number | string) =>
+    api.post<{ ok: boolean }>(`/admin/forum-homepages/${forumId}/unblock`),
   userHomepages: (params: { status?: string; page?: number; size?: number } = {}) =>
     api.get<unknown>('/admin/user-homepages', { params: shiftPage(params) }),
   blockUserHomepage: (userId: number | string, reason: string) =>

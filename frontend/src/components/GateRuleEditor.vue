@@ -1,14 +1,14 @@
 <template>
   <div class="gate-editor">
     <div v-if="!conditions.length" class="gate-empty">
-      未设置条件，任何人（含未登录用户）均可通过。
+      No conditions set; anyone (including signed-out users) can pass.
     </div>
 
     <div v-for="(c, i) in conditions" :key="i" class="gate-row">
       <el-select
         v-model="c.field"
         class="gate-field"
-        placeholder="信息项"
+        placeholder="Field"
         @change="onFieldChange(c)"
       >
         <el-option
@@ -19,7 +19,7 @@
         />
       </el-select>
 
-      <el-select v-model="c.op" class="gate-op" placeholder="条件" @change="onOpChange(c)">
+      <el-select v-model="c.op" class="gate-op" placeholder="Condition" @change="onOpChange(c)">
         <el-option
           v-for="op in opsOf(c.field)"
           :key="op"
@@ -36,7 +36,7 @@
             filterable
             :allow-create="allowCreate(c.field)"
             default-first-option
-            placeholder="选择或输入取值"
+            placeholder="Select or enter values"
             style="width: 100%"
             @change="syncLabels(c)"
           >
@@ -51,9 +51,9 @@
 
         <template v-else-if="isRangeField(c.field) && c.op === 'between'">
           <div class="gate-range">
-            <el-input-number v-model="c.min" :controls="false" :min="0" placeholder="下限" />
+            <el-input-number v-model="c.min" :controls="false" :min="0" placeholder="Min" />
             <span>—</span>
-            <el-input-number v-model="c.max" :controls="false" :min="0" placeholder="上限" />
+            <el-input-number v-model="c.max" :controls="false" :min="0" placeholder="Max" />
           </div>
         </template>
 
@@ -62,12 +62,12 @@
             v-model="c[c.op === 'lte' ? 'max' : 'min']"
             :controls="false"
             :min="0"
-            placeholder="数值"
+            placeholder="Value"
           />
         </template>
 
         <template v-else-if="c.field === 'EDUCATION'">
-          <el-select v-model="c.value" placeholder="学历" style="width: 100%">
+          <el-select v-model="c.value" placeholder="Education" style="width: 100%">
             <el-option
               v-for="o in optionsOf(c.field)"
               :key="o.value"
@@ -77,7 +77,7 @@
           </el-select>
         </template>
 
-        <el-input v-else v-model="c.value" placeholder="取值" />
+        <el-input v-else v-model="c.value" placeholder="Value" />
       </div>
 
       <el-select
@@ -85,20 +85,20 @@
         v-model="c.authLevel"
         class="gate-auth"
         clearable
-        placeholder="无认证等级要求"
+        placeholder="No verification level required"
       >
-        <el-option label="认证 ≥ 低" value="LOW" />
-        <el-option label="认证 ≥ 中" value="MEDIUM" />
-        <el-option label="认证 ≥ 高" value="HIGH" />
-        <el-option label="认证 ≥ 极高" value="EXTREME" />
+        <el-option label="Verification ≥ Low" value="LOW" />
+        <el-option label="Verification ≥ Medium" value="MEDIUM" />
+        <el-option label="Verification ≥ High" value="HIGH" />
+        <el-option label="Verification ≥ Extreme" value="EXTREME" />
       </el-select>
 
-      <el-button text type="danger" @click="removeCondition(i)">删除</el-button>
+      <el-button text type="danger" @click="removeCondition(i)">Delete</el-button>
     </div>
 
-    <el-button size="small" @click="addCondition">+ 添加条件</el-button>
+    <el-button size="small" @click="addCondition">+ Add condition</el-button>
     <p class="gate-hint">
-      多个条件需同时满足；同一条件内多选取值满足其一即可。操作门槛会自动叠加浏览门槛。
+      All conditions must be met; within a single condition, any one of the selected values is sufficient. Action gates automatically stack with the browsing gate.
     </p>
   </div>
 </template>
@@ -152,17 +152,17 @@ function optionsOf(field: string): { value: string; label: string }[] {
 function opLabel(op: string): string {
   switch (op) {
     case 'in':
-      return '属于'
+      return 'is one of'
     case 'not_in':
-      return '不属于'
+      return 'is not one of'
     case 'between':
-      return '介于'
+      return 'between'
     case 'gte':
       return '≥'
     case 'lte':
       return '≤'
     case 'eq':
-      return '等于'
+      return 'equals'
     default:
       return op
   }

@@ -16,13 +16,13 @@ use crate::sanitizer;
 use crate::security::CurrentUser;
 use crate::state::AppState;
 
-/// 原始 HTML 上限 64KB。
+/// Maximum raw HTML size: 64KB.
 pub const MAX_HOMEPAGE_BYTES: usize = 65_536;
-/// 净化后（含实体转义膨胀）上限 128KB。
+/// Maximum sanitized size (including entity escape expansion): 128KB.
 pub const MAX_SANITIZED_BYTES: usize = 131_072;
-/// 保存冷却（秒）。
+/// Save cooldown (seconds).
 const SAVE_COOLDOWN_SECONDS: i64 = 3;
-/// 举报原因长度区间（字符数）。
+/// Report reason length range (characters).
 const REPORT_MIN_CHARS: usize = 5;
 const REPORT_MAX_CHARS: usize = 500;
 
@@ -40,7 +40,7 @@ pub async fn find_homepage(
     Ok(row)
 }
 
-/// 公开视角：被下架内容对非本人/非管理员完全隐藏。
+/// Public view: blocked content is completely hidden from anyone other than the owner/admin.
 fn public_view(row: Option<&UserHomepage>, privileged: bool) -> Value {
     let Some(hp) = row else {
         return json!({ "mode": "NORMAL" });
@@ -61,7 +61,7 @@ fn public_view(row: Option<&UserHomepage>, privileged: bool) -> Value {
     })
 }
 
-/// 本人视角：完整返回模式、状态与下架原因。
+/// Owner view: returns the full mode, status, and block reason.
 fn me_view(row: Option<&UserHomepage>) -> Value {
     match row {
         None => json!({
@@ -122,20 +122,20 @@ pub async fn save(
     let me = user.require()?;
     let mode = req.mode.trim().to_ascii_uppercase();
     if mode != "NORMAL" && mode != "CUSTOM" {
-        return Err(ApiError::bad_request("非法的个人主页模式"));
+        return Err(ApiError::bad_request("Invalid personal homepage mode"));
     }
 
     let existing = find_homepage(&state.pool, me.id).await?;
     if let Some(hp) = &existing {
         let elapsed = Local::now().naive_local() - hp.updated_at;
         if elapsed < Duration::seconds(SAVE_COOLDOWN_SECONDS) {
-            return Err(ApiError::new(429, "保存过于频繁，请稍后再试"));
+            return Err(ApiError::new(429, "Saving too frequently, please try again later"));
         }
     }
 
     let now = Local::now().naive_local();
     if mode == "NORMAL" {
-        // 只切换模式，保留已存 HTML 与下架状态，便于随时切回。
+        // Only switch the mode; keep the stored HTML and blocked status so it can be switched back at any time.
         sqlx::query(
             "INSERT INTO user_homepages (user_id, mode, html, status, size_bytes, created_at, updated_at) \
              VALUES (?, 'NORMAL', NULL, 'ACTIVE', 0, ?, ?) \
@@ -149,23 +149,23 @@ pub async fn save(
     } else {
         let raw_html = req.html.unwrap_or_default();
         if raw_html.trim().is_empty() {
-            return Err(ApiError::bad_request("主页内容不能为空"));
+            return Err(ApiError::bad_request("Homepage content must not be empty"));
         }
         if raw_html.len() > MAX_HOMEPAGE_BYTES {
-            return Err(ApiError::bad_request("主页内容不能超过 64KB"));
+            return Err(ApiError::bad_request("Homepage content must not exceed 64KB"));
         }
         let cleaned = sanitizer::sanitize_homepage(&raw_html);
         if cleaned.trim().is_empty() {
             return Err(ApiError::bad_request(
-                "主页内容净化后为空，请移除不支持的标签",
+                "Homepage content is empty after sanitization; please remove unsupported tags",
             ));
         }
         if cleaned.len() > MAX_SANITIZED_BYTES {
-            return Err(ApiError::bad_request("主页内容净化后过大"));
+            return Err(ApiError::bad_request("Homepage content is too large after sanitization"));
         }
         let size = cleaned.len() as i32;
 
-        // 不触碰 status：已被下架的用户修改内容后仍需管理员复核恢复。
+        // Leave status untouched: a blocked user's homepage still requires admin review to be restored after editing.
         sqlx::query(
             "INSERT INTO user_homepages (user_id, mode, html, status, size_bytes, created_at, updated_at) \
              VALUES (?, 'CUSTOM', ?, 'ACTIVE', ?, ?, ?) \
@@ -215,11 +215,11 @@ pub async fn report(
 ) -> ApiResult<Json<Value>> {
     let me = user.require()?;
     if me.id == id {
-        return Err(ApiError::bad_request("不能举报自己的主页"));
+        return Err(ApiError::bad_request("You cannot report your own homepage"));
     }
     repo::require_user(&state.pool, id).await?;
 
-    let no_custom = || ApiError::bad_request("该用户没有可举报的自定义主页");
+    let no_custom = || ApiError::bad_request("This user has no custom homepage to report");
     let row = find_homepage(&state.pool, id).await?.ok_or_else(no_custom)?;
     if row.mode != "CUSTOM" || row.status != "ACTIVE" {
         return Err(no_custom());
@@ -228,7 +228,7 @@ pub async fn report(
     let reason = req.reason.trim();
     let chars = reason.chars().count();
     if !(REPORT_MIN_CHARS..=REPORT_MAX_CHARS).contains(&chars) {
-        return Err(ApiError::bad_request("举报原因需为 5-500 个字符"));
+        return Err(ApiError::bad_request("Report reason must be 5-500 characters"));
     }
 
     let since = Local::now().naive_local() - Duration::hours(24);
@@ -242,7 +242,7 @@ pub async fn report(
     .fetch_one(&state.pool)
     .await?;
     if dup.0 > 0 {
-        return Err(ApiError::bad_request("你已举报过该主页"));
+        return Err(ApiError::bad_request("You have already reported this homepage"));
     }
 
     sqlx::query(
@@ -259,9 +259,9 @@ pub async fn report(
     Ok(j::ok(json!({ "ok": true })))
 }
 
-/// 单个列表最多返回的条数。
+/// Maximum number of items returned per list.
 const HOMEPAGE_LIST_LIMIT: usize = 10;
-/// 简介最多展示的字符数。
+/// Maximum number of bio characters displayed.
 const HOMEPAGE_BIO_CHARS: usize = 200;
 
 #[derive(Debug, sqlx::FromRow)]
@@ -288,7 +288,7 @@ fn post_row_json(row: &HomepagePostRow) -> Value {
     })
 }
 
-/// 先按查看者可见板块过滤，再截断，避免被隐藏内容占用条数。
+/// Filter by forums visible to the viewer first, then truncate, so hidden content does not consume list slots.
 fn visible_posts(rows: Vec<HomepagePostRow>, allowed: &HashSet<i64>) -> Vec<Value> {
     rows.into_iter()
         .filter(|row| allowed.contains(&row.forum_id))
@@ -297,7 +297,7 @@ fn visible_posts(rows: Vec<HomepagePostRow>, allowed: &HashSet<i64>) -> Vec<Valu
         .collect()
 }
 
-/// 把可见板块集合写入 `IN (...)` 占位符列表。
+/// Writes the visible forum set into an `IN (...)` placeholder list.
 fn push_forum_filter(qb: &mut QueryBuilder<'_, MySql>, ids: &[i64]) {
     qb.push("(");
     let mut separated = qb.separated(", ");
@@ -307,7 +307,7 @@ fn push_forum_filter(qb: &mut QueryBuilder<'_, MySql>, ids: &[i64]) {
     separated.push_unseparated(")");
 }
 
-/// 统计只覆盖查看者有权浏览的板块，避免通过计数感知受限板块内容。
+/// Stats only cover forums the viewer can browse, preventing restricted forum content from being inferred via counts.
 async fn viewer_scoped_stats(
     pool: &MySqlPool,
     user_id: i64,
@@ -358,8 +358,8 @@ fn truncate_bio(raw: Option<&str>) -> Option<String> {
 
 /// GET /users/{id}/homepage-data
 ///
-/// 自定义主页数据组件专用：只返回公开资料、公开统计与三个只读帖子列表。
-/// 不返回邮箱、认证信息、用户信息项；统计与列表都按查看者的板块浏览权限过滤。
+/// For custom homepage data components: returns only public profile info, public stats, and three read-only post lists.
+/// Email, authentication info, and user info fields are not returned; stats and lists are filtered by the viewer's forum browse permissions.
 pub async fn homepage_data(
     State(state): State<AppState>,
     viewer: CurrentUser,

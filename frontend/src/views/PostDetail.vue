@@ -5,10 +5,10 @@
     <div v-else-if="blocked" class="page-grid no-right">
       <LeftRail />
       <div class="content-card gate-blocked">
-        <h1 class="page-title" style="margin-top: 0">无法查看该帖子</h1>
+        <h1 class="page-title" style="margin-top: 0">Unable to view this post</h1>
         <p class="gate-blocked-desc">{{ blocked.message }}</p>
         <div v-if="blocked.missing.length" class="gate-missing">
-          <div class="gate-missing-title">还需要满足：</div>
+          <div class="gate-missing-title">Still required:</div>
           <div v-for="item in blocked.missing" :key="item.fieldKey" class="gate-missing-row">
             <span class="gate-missing-label">{{ item.label }}</span>
             <span class="gate-missing-required">{{ item.required }}</span>
@@ -20,9 +20,9 @@
             type="primary"
             @click="router.push({ name: 'login', query: { redirect: route.fullPath } })"
           >
-            登录后重试
+            Log in and retry
           </el-button>
-          <el-button type="primary" @click="router.push('/profile')">完善资料与认证</el-button>
+          <el-button type="primary" @click="router.push('/profile')">Complete profile and verification</el-button>
         </div>
       </div>
     </div>
@@ -30,7 +30,7 @@
     <div v-else-if="error" class="state-box error">
       {{ error }}
       <div style="margin-top: 12px">
-        <el-button size="small" @click="load">重试</el-button>
+        <el-button size="small" @click="load">Retry</el-button>
       </div>
     </div>
 
@@ -61,11 +61,11 @@
             <div class="post-footer">
               <span class="post-stat">
                 <IconComment class="ico" />
-                <span>{{ post.commentCount }} 条评论</span>
+                <span>{{ post.commentCount }} comments</span>
               </span>
               <button class="post-action" type="button" @click="sharePost">
                 <IconShare class="ico" />
-                <span>分享</span>
+                <span>Share</span>
               </button>
               <button class="post-action" type="button" @click="copyPostLink">
                 <IconMore class="ico" />
@@ -75,12 +75,12 @@
         </article>
 
         <div class="comment-box">
-          <h3 style="margin-bottom: 10px">发表评论</h3>
+          <h3 style="margin-bottom: 10px">Add a comment</h3>
           <template v-if="auth.isAuthenticated">
             <RichTextEditor
               v-model="commentText"
               compact
-              placeholder="友善地表达你的看法…"
+              placeholder="Share your thoughts in a friendly way…"
             />
             <div class="form-actions">
               <el-button
@@ -89,23 +89,23 @@
                 :loading="submittingComment"
                 @click="submitComment"
               >
-                评论
+                Comment
               </el-button>
             </div>
           </template>
           <p v-else style="color: var(--of-text-muted)">
-            <button class="link-btn" @click="goLogin">登录</button> 后参与讨论
+            <button class="link-btn" @click="goLogin">Log in</button> to join the discussion
           </p>
         </div>
 
         <div class="comment-section-head">
-          <span class="comment-count">{{ post.commentCount }} 条评论</span>
+          <span class="comment-count">{{ post.commentCount }} comments</span>
           <SortChips v-model="commentSort" :options="commentSorts" />
         </div>
 
         <el-skeleton v-if="commentsLoading" :rows="4" animated />
         <div v-else-if="!comments.length" class="state-box">
-          还没有评论，来抢沙发吧
+          No comments yet. Be the first to comment.
         </div>
         <div v-else class="comment-list">
           <CommentNode
@@ -157,15 +157,15 @@ const comments = ref<Comment[]>([])
 const commentsLoading = ref(false)
 const commentSort = ref('best')
 const commentSorts: SortOption[] = [
-  { label: '最佳', value: 'best' },
-  { label: '最新', value: 'new' },
-  { label: '最早', value: 'old' },
+  { label: 'Best', value: 'best' },
+  { label: 'Newest', value: 'new' },
+  { label: 'Oldest', value: 'old' },
 ]
 
 const commentText = ref('')
 const submittingComment = ref(false)
 
-/** 递归排序评论树（原地排序，保持对象引用以支持乐观更新） */
+/** Recursively sort the comment tree (in place, preserving object references for optimistic updates) */
 function sortTree(list: Comment[], key: string) {
   const compare =
     key === 'new'
@@ -198,10 +198,10 @@ async function load() {
       if (data?.gate === 'BROWSE') {
         blocked.value = { ...data, message: e.message }
       } else {
-        error.value = errorMessage(e, '帖子加载失败')
+        error.value = errorMessage(e, 'Failed to load post')
       }
     } else {
-      error.value = errorMessage(e, '帖子加载失败')
+      error.value = errorMessage(e, 'Failed to load post')
     }
   } finally {
     loading.value = false
@@ -216,7 +216,7 @@ async function loadComments() {
     comments.value = toArray<unknown>(data).map(normalizeComment)
     sortTree(comments.value, commentSort.value)
   } catch (e) {
-    ElMessage.error(errorMessage(e, '评论加载失败'))
+    ElMessage.error(errorMessage(e, 'Failed to load comments'))
   } finally {
     commentsLoading.value = false
   }
@@ -227,7 +227,7 @@ function goLogin() {
 }
 
 function postLink() {
-  return `${location.origin}/forum/post/${post.value?.id}`
+  return `${location.origin}${import.meta.env.BASE_URL}post/${post.value?.id}`
 }
 
 async function sharePost() {
@@ -238,30 +238,30 @@ async function sharePost() {
       return
     }
     await navigator.clipboard.writeText(postLink())
-    ElMessage.success('链接已复制')
+    ElMessage.success('Link copied')
   } catch {
-    // 用户取消分享
+    // User cancelled sharing
   }
 }
 
 async function copyPostLink() {
   try {
     await navigator.clipboard.writeText(postLink())
-    ElMessage.success('链接已复制')
+    ElMessage.success('Link copied')
   } catch {
-    ElMessage.error('复制失败，请手动复制地址栏链接')
+    ElMessage.error('Copy failed. Please copy the URL from the address bar manually.')
   }
 }
 
 async function onVotePost(value: number) {
   if (!post.value) return
   if (!auth.isAuthenticated) {
-    ElMessage.warning('请先登录后投票')
+    ElMessage.warning('Please log in to vote')
     goLogin()
     return
   }
   if (post.value.canVote === false) {
-    ElMessage.warning('你暂时没有投票权限')
+    ElMessage.warning('You do not have permission to vote at this time')
     return
   }
   try {
@@ -281,7 +281,7 @@ async function onVotePost(value: number) {
 async function onVoteComment(payload: { comment: Comment; value: number }) {
   const { comment, value } = payload
   if (!auth.isAuthenticated) {
-    ElMessage.warning('请先登录后投票')
+    ElMessage.warning('Please log in to vote')
     goLogin()
     return
   }
@@ -303,7 +303,7 @@ async function submitComment() {
   if (!post.value) return
   const content = commentText.value.trim()
   if (!content) {
-    ElMessage.warning('请输入评论内容')
+    ElMessage.warning('Please enter a comment')
     return
   }
   submittingComment.value = true
@@ -313,7 +313,7 @@ async function submitComment() {
     if (post.value) post.value.commentCount += 1
     await loadComments()
   } catch (e) {
-    ElMessage.error(errorMessage(e, '评论失败'))
+    ElMessage.error(errorMessage(e, 'Failed to post comment'))
   } finally {
     submittingComment.value = false
   }
@@ -322,7 +322,7 @@ async function submitComment() {
 async function onReply(payload: { parentId: number; content: string }) {
   if (!post.value) return
   if (!auth.isAuthenticated) {
-    ElMessage.warning('请先登录')
+    ElMessage.warning('Please log in')
     goLogin()
     return
   }
@@ -335,7 +335,7 @@ async function onReply(payload: { parentId: number; content: string }) {
     if (post.value) post.value.commentCount += 1
     await loadComments()
   } catch (e) {
-    ElMessage.error(errorMessage(e, '回复失败'))
+    ElMessage.error(errorMessage(e, 'Failed to reply'))
   }
 }
 

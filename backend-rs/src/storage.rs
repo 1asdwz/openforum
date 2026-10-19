@@ -4,9 +4,9 @@ use s3::{Bucket, Region};
 use crate::config::Config;
 use crate::error::ApiError;
 
-/// 媒体字节存储抽象。生产环境为 MinIO 私有桶；未启用时所有写入/读取均拒绝。
+/// Media byte storage abstraction. Production uses a private MinIO bucket; when disabled, all reads/writes are rejected.
 ///
-/// Java 端使用流式读写，此处媒体上限 50MB，直接整块读入内存以简化实现。
+/// The Java side streams reads and writes; here media is capped at 50MB and read into memory in one piece to keep things simple.
 pub enum Storage {
     Disabled,
     Minio(MinioStorage),
@@ -29,9 +29,9 @@ impl MinioStorage {
             None,
             None,
         )
-        .map_err(|e| anyhow::anyhow!("MinIO 凭证无效: {e}"))?;
+        .map_err(|e| anyhow::anyhow!("Invalid MinIO credentials: {e}"))?;
         let bucket = Bucket::new(&cfg.minio_bucket, region, credentials)
-            .map_err(|e| anyhow::anyhow!("MinIO 初始化失败: {e}"))?
+            .map_err(|e| anyhow::anyhow!("MinIO initialization failed: {e}"))?
             .with_path_style();
         Ok(Self { bucket })
     }
@@ -52,30 +52,30 @@ impl Storage {
 
     pub async fn put(&self, key: &str, bytes: Vec<u8>, content_type: &str) -> Result<(), ApiError> {
         match self {
-            Storage::Disabled => Err(ApiError::bad_request("文件存储未启用，无法上传认证材料")),
+            Storage::Disabled => Err(ApiError::bad_request("File storage is disabled; cannot upload verification materials")),
             Storage::Minio(minio) => minio
                 .bucket
                 .put_object_with_content_type(key, &bytes, content_type)
                 .await
                 .map(|_| ())
                 .map_err(|e| {
-                    tracing::error!("MinIO 上传失败: {e}");
-                    ApiError::bad_request("文件上传失败，请稍后重试")
+                    tracing::error!("MinIO upload failed: {e}");
+                    ApiError::bad_request("File upload failed; please try again later")
                 }),
         }
     }
 
     pub async fn get(&self, key: &str) -> Result<Vec<u8>, ApiError> {
         match self {
-            Storage::Disabled => Err(ApiError::bad_request("文件存储未启用")),
+            Storage::Disabled => Err(ApiError::bad_request("File storage is disabled")),
             Storage::Minio(minio) => minio
                 .bucket
                 .get_object(key)
                 .await
                 .map(|data| data.bytes().to_vec())
                 .map_err(|e| {
-                    tracing::error!("MinIO 读取失败: {e}");
-                    ApiError::not_found("文件不存在或无法读取")
+                    tracing::error!("MinIO read failed: {e}");
+                    ApiError::not_found("File not found or unreadable")
                 }),
         }
     }

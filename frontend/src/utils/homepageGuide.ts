@@ -1,17 +1,17 @@
-/** 自定义主页完整示例：装修页与规范文档页共用。 */
+/** Complete custom homepage example: shared by the editor and the guidelines page. */
 export const HOMEPAGE_EXAMPLE_HTML = `<div style="max-width: 760px; margin: 0 auto; padding: 24px 16px;">
-  <h1 style="margin: 0 0 8px; font-size: 26px;">你好，欢迎来到我的主页</h1>
-  <p style="margin: 0 0 24px; color: #666;">这里展示我的公开资料与近期动态。</p>
+  <h1 style="margin: 0 0 8px; font-size: 26px;">Hello, welcome to my homepage</h1>
+  <p style="margin: 0 0 24px; color: #666;">Here you can see my public profile and recent activity.</p>
 
-  <of-profile heading="关于我"></of-profile>
-  <of-stats heading="社区数据"></of-stats>
+  <of-profile heading="About me"></of-profile>
+  <of-stats heading="Community stats"></of-stats>
 
-  <of-posts type="authored" limit="5" heading="我的帖子"></of-posts>
-  <of-posts type="liked" limit="5" heading="我点赞的帖子"></of-posts>
-  <of-posts type="commented" limit="5" heading="我评论过的帖子"></of-posts>
+  <of-posts type="authored" limit="5" heading="My posts"></of-posts>
+  <of-posts type="liked" limit="5" heading="Posts I liked"></of-posts>
+  <of-posts type="commented" limit="5" heading="Posts I commented on"></of-posts>
 </div>`
 
-/** 允许使用的 HTML 标签（与后端净化器白名单一致）。 */
+/** Allowed HTML tags (matches the backend sanitizer allowlist). */
 export const HOMEPAGE_ALLOWED_TAGS = [
   'a', 'abbr', 'article', 'aside', 'b', 'blockquote', 'br', 'caption', 'code', 'col',
   'colgroup', 'dd', 'del', 'details', 'div', 'dl', 'dt', 'em', 'figcaption', 'figure',
@@ -21,35 +21,35 @@ export const HOMEPAGE_ALLOWED_TAGS = [
   'tfoot', 'th', 'thead', 'tr', 'u', 'ul',
 ]
 
-/** 会被移除的标签及原因。 */
+/** Tags that will be removed, with reasons. */
 export const HOMEPAGE_BLOCKED_TAGS: { tag: string; reason: string }[] = [
-  { tag: 'script', reason: '脚本执行' },
-  { tag: 'style', reason: '整段样式表；请改用 style 属性' },
-  { tag: 'iframe', reason: '嵌入外部页面' },
-  { tag: 'object', reason: '嵌入外部内容' },
-  { tag: 'embed', reason: '嵌入外部内容' },
-  { tag: 'noscript', reason: '脚本相关' },
-  { tag: 'template', reason: '延迟内容' },
-  { tag: 'svg', reason: '可携带脚本与外部引用' },
-  { tag: 'math', reason: '可携带外部引用' },
-  { tag: 'form', reason: '表单提交' },
-  { tag: 'input', reason: '表单控件' },
-  { tag: 'button', reason: '表单控件' },
-  { tag: 'select', reason: '表单控件' },
-  { tag: 'textarea', reason: '表单控件' },
-  { tag: 'video', reason: '外部媒体' },
-  { tag: 'audio', reason: '外部媒体' },
-  { tag: 'canvas', reason: '脚本绘制' },
-  { tag: 'applet', reason: '已废弃的嵌入内容' },
-  { tag: 'frame', reason: '框架页面' },
-  { tag: 'frameset', reason: '框架页面' },
-  { tag: 'marquee', reason: '已废弃标签' },
-  { tag: 'meta', reason: '可触发跳转' },
-  { tag: 'link', reason: '外部样式或资源' },
-  { tag: 'base', reason: '改变相对地址基准' },
+  { tag: 'script', reason: 'Script execution' },
+  { tag: 'style', reason: 'Full stylesheet; use the style attribute instead' },
+  { tag: 'iframe', reason: 'Embeds external pages' },
+  { tag: 'object', reason: 'Embeds external content' },
+  { tag: 'embed', reason: 'Embeds external content' },
+  { tag: 'noscript', reason: 'Script-related' },
+  { tag: 'template', reason: 'Deferred content' },
+  { tag: 'svg', reason: 'Can carry scripts and external references' },
+  { tag: 'math', reason: 'Can carry external references' },
+  { tag: 'form', reason: 'Form submission' },
+  { tag: 'input', reason: 'Form control' },
+  { tag: 'button', reason: 'Form control' },
+  { tag: 'select', reason: 'Form control' },
+  { tag: 'textarea', reason: 'Form control' },
+  { tag: 'video', reason: 'External media' },
+  { tag: 'audio', reason: 'External media' },
+  { tag: 'canvas', reason: 'Script-driven drawing' },
+  { tag: 'applet', reason: 'Deprecated embedded content' },
+  { tag: 'frame', reason: 'Framed page' },
+  { tag: 'frameset', reason: 'Framed page' },
+  { tag: 'marquee', reason: 'Deprecated tag' },
+  { tag: 'meta', reason: 'Can trigger redirects' },
+  { tag: 'link', reason: 'External stylesheet or resource' },
+  { tag: 'base', reason: 'Changes the base for relative URLs' },
 ]
 
-/** 允许的内联 CSS 属性（与后端净化器白名单一致）。 */
+/** Allowed inline CSS properties (matches the backend sanitizer allowlist). */
 export const HOMEPAGE_CSS_PROPERTIES = [
   'display', 'position', 'top', 'right', 'bottom', 'left', 'z-index', 'float', 'clear',
   'width', 'min-width', 'max-width', 'height', 'min-height', 'max-height',

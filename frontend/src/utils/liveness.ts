@@ -1,14 +1,14 @@
 import { FaceLandmarker, FilesetResolver, type FaceLandmarkerResult } from '@mediapipe/tasks-vision'
 
-/** 随机动作池（与后端 AuthChallengeService 保持一致） */
+/** Random action pool (kept in sync with backend AuthChallengeService) */
 export type LivenessAction = 'BLINK' | 'OPEN_MOUTH' | 'TURN_LEFT' | 'TURN_RIGHT' | 'NOD'
 
 export const LIVENESS_ACTION_LABELS: Record<LivenessAction, string> = {
-  BLINK: '眨眨眼',
-  OPEN_MOUTH: '张张嘴',
-  TURN_LEFT: '向左转头',
-  TURN_RIGHT: '向右转头',
-  NOD: '点点头',
+  BLINK: 'Blink',
+  OPEN_MOUTH: 'Open your mouth',
+  TURN_LEFT: 'Turn left',
+  TURN_RIGHT: 'Turn right',
+  NOD: 'Nod your head',
 }
 
 export interface LivenessActionRecord {
@@ -34,7 +34,7 @@ export interface LivenessProgress {
   actions: LivenessActionRecord[]
   faceCount: number
   hint: string
-  /** 0-1，整体进度 */
+  /** 0-1, overall progress */
   ratio: number
 }
 
@@ -60,7 +60,7 @@ export interface RunLivenessOptions {
   actions: LivenessAction[]
   nonce: string
   challengeId?: string
-  /** 单个动作的最长等待时间（毫秒），默认 20s */
+  /** Max wait time per action (ms), 20s by default */
   actionTimeoutMs?: number
   signal?: AbortSignal
   onProgress?: (state: LivenessProgress) => void
@@ -71,7 +71,7 @@ export interface RunLivenessResult {
   liveness: LivenessPayload
 }
 
-/** 视频认证步骤完成后回传给向导的数据 */
+/** Data returned to the wizard after video verification completes */
 export interface VideoAuthResult {
   videoMediaId: number
   challengeId: string
@@ -83,7 +83,7 @@ const MODEL_URL = `${import.meta.env.BASE_URL || '/'}models/face_landmarker.task
 
 let landmarkerPromise: Promise<FaceLandmarker> | null = null
 
-/** 检测浏览器是否具备活体检测能力 */
+/** Check whether the browser supports liveness detection */
 export function isLivenessSupported(): boolean {
   return (
     typeof navigator !== 'undefined' &&
@@ -107,7 +107,7 @@ async function createLandmarker(): Promise<FaceLandmarker> {
   try {
     return await FaceLandmarker.createFromOptions(fileset, options)
   } catch {
-    // GPU 不可用时回退到 CPU
+    // Fall back to CPU when GPU is unavailable
     return await FaceLandmarker.createFromOptions(fileset, {
       ...options,
       baseOptions: { modelAssetPath: MODEL_URL, delegate: 'CPU' as const },
@@ -115,12 +115,12 @@ async function createLandmarker(): Promise<FaceLandmarker> {
   }
 }
 
-/** 惰性加载并缓存 FaceLandmarker */
+/** Lazily load and cache FaceLandmarker */
 async function getFaceLandmarker(): Promise<FaceLandmarker> {
   if (!landmarkerPromise) {
     landmarkerPromise = createLandmarker().catch((e) => {
       landmarkerPromise = null
-      throw new LivenessError('MODEL_LOAD_FAILED', `活体模型加载失败：${(e as Error)?.message || e}`)
+      throw new LivenessError('MODEL_LOAD_FAILED', `Failed to load the liveness model: ${(e as Error)?.message || e}`)
     })
   }
   return landmarkerPromise
@@ -134,13 +134,13 @@ function blendshapeScore(result: FaceLandmarkerResult, name: string): number {
 }
 
 interface HeadPose {
-  /** 偏航比例：0.5 附近为正向，越大代表鼻子越靠图像右侧 */
+  /** Yaw ratio: around 0.5 means facing forward; larger values mean the nose is farther right in the image */
   yaw: number
-  /** 俯仰比例：越大代表鼻子相对眼线越靠下 */
+  /** Pitch ratio: larger values mean the nose is lower relative to the eye line */
   pitch: number
 }
 
-/** 由面部关键点估计头部姿态比例 */
+/** Estimate head pose ratios from facial landmarks */
 function estimateHeadPose(result: FaceLandmarkerResult): HeadPose | null {
   const lm = result.faceLandmarks?.[0]
   if (!lm || lm.length < 468) return null
@@ -158,18 +158,18 @@ function estimateHeadPose(result: FaceLandmarkerResult): HeadPose | null {
 }
 
 /**
- * 在 videoEl 上执行活体检测与动作序列，同时录制（含 nonce 水印）。
- * 全过程在浏览器端完成，返回 webm Blob 与 liveness 载荷。
+ * Run liveness detection and the action sequence on videoEl while recording (with a nonce watermark).
+ * Everything happens in the browser; returns a webm Blob and the liveness payload.
  */
 export async function runLiveness(options: RunLivenessOptions): Promise<RunLivenessResult> {
   const { videoEl, canvasEl, actions, nonce, challengeId, onProgress, signal } = options
   const actionTimeoutMs = options.actionTimeoutMs ?? 20000
 
   if (!isLivenessSupported()) {
-    throw new LivenessError('UNSUPPORTED', '当前浏览器不支持摄像头活体检测')
+    throw new LivenessError('UNSUPPORTED', 'This browser does not support camera-based liveness detection')
   }
   if (!actions.length) {
-    throw new LivenessError('UNSUPPORTED', '未提供动作序列')
+    throw new LivenessError('UNSUPPORTED', 'No action sequence provided')
   }
 
   let stream: MediaStream | null = null
@@ -177,7 +177,7 @@ export async function runLiveness(options: RunLivenessOptions): Promise<RunLiven
   try {
     landmarker = await getFaceLandmarker()
   } catch (e) {
-    throw e instanceof LivenessError ? e : new LivenessError('MODEL_LOAD_FAILED', '活体模型加载失败')
+    throw e instanceof LivenessError ? e : new LivenessError('MODEL_LOAD_FAILED', 'Failed to load the liveness model')
   }
 
   try {
@@ -188,9 +188,9 @@ export async function runLiveness(options: RunLivenessOptions): Promise<RunLiven
   } catch (e) {
     const name = (e as DOMException)?.name
     if (name === 'NotAllowedError' || name === 'SecurityError') {
-      throw new LivenessError('PERMISSION_DENIED', '摄像头权限被拒绝，请允许后重试')
+      throw new LivenessError('PERMISSION_DENIED', 'Camera permission was denied. Please allow access and try again.')
     }
-    throw new LivenessError('NO_CAMERA', '未检测到可用摄像头')
+    throw new LivenessError('NO_CAMERA', 'No available camera detected')
   }
 
   videoEl.srcObject = stream
@@ -199,7 +199,7 @@ export async function runLiveness(options: RunLivenessOptions): Promise<RunLiven
   try {
     await videoEl.play()
   } catch {
-    /* 部分浏览器需用户手势后才可播放，忽略 */
+    /* Some browsers require a user gesture before playback; ignore */
   }
 
   const ctx = canvasEl.getContext('2d')
@@ -212,14 +212,14 @@ export async function runLiveness(options: RunLivenessOptions): Promise<RunLiven
   let lastProgress = 0
   let lastBlinkClosed = false
   let mouthFrames = 0
-  // 头部姿态基线（默认 0.5），用前若干帧校准
+  // Head pose baseline (default 0.5), calibrated from the first few frames
   let baseYaw = 0.5
   let basePitch = 0.5
   let calibFrames = 0
   let calibSumYaw = 0
   let calibSumPitch = 0
   let calibDone = false
-  // 当前动作的“已越过阈值”标记（用于回正判定）
+  // Flag for whether the current action has crossed its threshold (used for return-to-neutral detection)
   let crossed = false
   let actionStartTs = startTs
   let done = false
@@ -279,7 +279,7 @@ export async function runLiveness(options: RunLivenessOptions): Promise<RunLiven
 
     const abortCheck = () => {
       if (signal?.aborted) {
-        throw new LivenessError('CANCELLED', '已取消')
+        throw new LivenessError('CANCELLED', 'Cancelled')
       }
     }
 
@@ -301,7 +301,7 @@ export async function runLiveness(options: RunLivenessOptions): Promise<RunLiven
         canvasEl.height = h
       }
 
-      // 镜像绘制 + nonce 水印
+      // Mirrored draw + nonce watermark
       if (ctx && videoEl.readyState >= 2) {
         ctx.save()
         ctx.translate(w, 0)
@@ -322,7 +322,7 @@ export async function runLiveness(options: RunLivenessOptions): Promise<RunLiven
         if (result) {
           faceCount = result.faceLandmarks?.length ?? 0
           if (faceCount === 1) {
-            // 基线校准
+            // Baseline calibration
             const pose = estimateHeadPose(result)
             if (pose && !calibDone) {
               calibSumYaw += pose.yaw
@@ -358,7 +358,7 @@ export async function runLiveness(options: RunLivenessOptions): Promise<RunLiven
               }
             }
           } else {
-            // 人脸数量异常时重置校准与当前动作状态
+            // Reset calibration and current action state when the face count is abnormal
             crossed = false
             mouthFrames = 0
           }
@@ -392,19 +392,19 @@ export async function runLiveness(options: RunLivenessOptions): Promise<RunLiven
       }
       const blob = new Blob(chunks, { type: mime || 'video/webm' })
       if (!blob.size) {
-        reject(new LivenessError('UNSUPPORTED', '视频录制失败，请重试或使用降级方式'))
+        reject(new LivenessError('UNSUPPORTED', 'Video recording failed. Please try again or use the fallback method.'))
         return
       }
       resolve({ blob, liveness })
     }
 
     let rafId = requestAnimationFrame(loop)
-    // 允许外部取消
+    // Allow external cancellation
     signal?.addEventListener('abort', () => {
       if (done) return
       done = true
       cleanup()
-      reject(new LivenessError('CANCELLED', '已取消'))
+      reject(new LivenessError('CANCELLED', 'Cancelled'))
     })
   })
 }
@@ -517,10 +517,10 @@ function buildHint(
   faceCount: number,
   actions: LivenessAction[]
 ): string {
-  if (faceCount === 0) return '未检测到人脸，请正对摄像头并保持光线充足'
-  if (faceCount > 1) return '检测到多张人脸，请确保画面中只有你一人'
+  if (faceCount === 0) return 'No face detected. Please face the camera and ensure good lighting.'
+  if (faceCount > 1) return 'Multiple faces detected. Please make sure you are the only person in frame.'
   const action = actions[index]
-  if (!action) return '检测完成'
+  if (!action) return 'Detection complete'
   const label = LIVENESS_ACTION_LABELS[action]
-  return `请按提示完成：${label}（已完成 ${records.filter((r) => r.passed).length}/${actions.length}）`
+  return `Follow the prompt: ${label} (completed ${records.filter((r) => r.passed).length}/${actions.length})`
 }

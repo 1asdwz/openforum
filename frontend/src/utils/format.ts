@@ -1,74 +1,74 @@
 import type { Comment, PageResult, Post, TemplateConfig } from '@/types'
 
-/** 相对时间格式化 */
+/** Relative time formatting */
 export function formatTime(input?: string | null): string {
   if (!input) return ''
   const d = new Date(input)
   if (Number.isNaN(d.getTime())) return input
   const diff = Date.now() - d.getTime()
   const minutes = Math.floor(diff / 60000)
-  if (minutes < 1) return '刚刚'
-  if (minutes < 60) return `${minutes} 分钟前`
+  if (minutes < 1) return 'just now'
+  if (minutes < 60) return `${minutes} min ago`
   const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `${hours} 小时前`
+  if (hours < 24) return `${hours} hours ago`
   const days = Math.floor(hours / 24)
-  if (days < 30) return `${days} 天前`
-  return d.toLocaleDateString('zh-CN')
+  if (days < 30) return `${days} days ago`
+  return d.toLocaleDateString('en-US')
 }
 
-/** 绝对时间格式化 */
+/** Absolute time formatting */
 export function formatDate(input?: string | null): string {
   if (!input) return ''
   const d = new Date(input)
   if (Number.isNaN(d.getTime())) return input
-  return d.toLocaleString('zh-CN', { hour12: false })
+  return d.toLocaleString('en-US', { hour12: false })
 }
 
 export const AUTH_TYPE_LABELS: Record<string, string> = {
-  REAL_NAME: '实名认证',
-  ID_CARD: '身份证',
-  GENDER: '性别',
-  AGE: '年龄',
-  NATIONALITY: '国籍',
-  CITY: '城市',
-  OCCUPATION: '职业',
-  EDUCATION: '学历',
-  DRIVER_LICENSE: '驾驶证',
-  MARRIAGE_CERT: '婚姻状况',
-  PROPERTY_CERT: '房产证明',
-  ASSETS: '资产证明',
-  CUSTOM: '自定义',
+  REAL_NAME: 'Real-name verification',
+  ID_CARD: 'ID card',
+  GENDER: 'Gender',
+  AGE: 'Age',
+  NATIONALITY: 'Nationality',
+  CITY: 'City',
+  OCCUPATION: 'Occupation',
+  EDUCATION: 'Education',
+  DRIVER_LICENSE: "Driver's license",
+  MARRIAGE_CERT: 'Marital status',
+  PROPERTY_CERT: 'Property certificate',
+  ASSETS: 'Proof of assets',
+  CUSTOM: 'Custom',
 }
 
-/** 认证等级标签 */
+/** Auth level labels */
 export const AUTH_LEVEL_LABELS: Record<string, string> = {
-  LOW: '低',
-  MEDIUM: '中',
-  HIGH: '高',
-  EXTREME: '极高',
+  LOW: 'Low',
+  MEDIUM: 'Medium',
+  HIGH: 'High',
+  EXTREME: 'Very high',
 }
 
-/** 等级中文名 */
+/** Human-readable auth level label */
 export function authLevelLabel(level?: string | null): string {
   if (!level) return ''
   return AUTH_LEVEL_LABELS[level] || level
 }
 
-/** 将门槛项（TYPE / TYPE:LEVEL / AGE_n）转为中文标签 */
+/** Convert a gate item (TYPE / TYPE:LEVEL / AGE_n) into a readable label */
 export function authTypeLabel(raw: string): string {
   const t = (raw || '').trim()
   if (!t) return ''
-  if (t.startsWith('AGE_')) return `年龄 ≥ ${t.slice(4)}`
+  if (t.startsWith('AGE_')) return `Age ≥ ${t.slice(4)}`
   const separator = t.indexOf(':')
   if (separator > 0) {
     const type = t.slice(0, separator)
     const level = t.slice(separator + 1)
-    return `${AUTH_TYPE_LABELS[type] || type}（${authLevelLabel(level)}）`
+    return `${AUTH_TYPE_LABELS[type] || type} (${authLevelLabel(level)})`
   }
   return AUTH_TYPE_LABELS[t] || t
 }
 
-/** 解析逗号分隔或数组形式的 requiredAuthTypes */
+/** Parse requiredAuthTypes given as a comma-separated string or an array */
 export function parseRequiredAuthTypes(
   raw?: string | string[] | null
 ): string[] {
@@ -80,7 +80,7 @@ export function parseRequiredAuthTypes(
     .filter(Boolean)
 }
 
-/** 建议的认证类型顺序 */
+/** Recommended auth type order */
 export const AUTH_TYPE_ORDER = [
   'REAL_NAME',
   'ID_CARD',
@@ -97,7 +97,7 @@ export const AUTH_TYPE_ORDER = [
   'CUSTOM',
 ]
 
-/** 容错解析 templateConfig（可能是 JSON 字符串或对象） */
+/** Tolerantly parse templateConfig (may be a JSON string or an object) */
 export function parseTemplateConfig(
   raw?: string | TemplateConfig | null
 ): TemplateConfig {
@@ -112,7 +112,7 @@ export function parseTemplateConfig(
   return {}
 }
 
-/** 容错解析 JSON 字符串 */
+/** Tolerantly parse a JSON string */
 export function safeJsonParse<T = unknown>(raw?: string | null): T | null {
   if (!raw) return null
   try {
@@ -122,7 +122,7 @@ export function safeJsonParse<T = unknown>(raw?: string | null): T | null {
   }
 }
 
-/** 归一化分页返回结构 */
+/** Normalize paginated response structures */
 export function normalizePage<T>(payload: unknown): PageResult<T> {
   if (Array.isArray(payload)) {
     return { items: payload as T[], total: payload.length }
@@ -140,20 +140,20 @@ export function normalizePage<T>(payload: unknown): PageResult<T> {
   return { items, total }
 }
 
-/** 归一化为数组（兼容分页对象或裸数组） */
+/** Normalize to an array (handles paged objects or bare arrays) */
 export function toArray<T>(payload: unknown): T[] {
   if (Array.isArray(payload)) return payload as T[]
   return normalizePage<T>(payload).items
 }
 
-/** 提取错误信息 */
-export function errorMessage(err: unknown, fallback = '请求失败，请稍后重试'): string {
+/** Extract an error message */
+export function errorMessage(err: unknown, fallback = 'Request failed, please try again later'): string {
   if (err instanceof Error && err.message) return err.message
   if (typeof err === 'string') return err
   return fallback
 }
 
-/** 去除 Markdown 语法，提取用于摘要的纯文本 */
+/** Strip Markdown syntax and return plain text for excerpts */
 export function stripMarkdown(md?: string | null): string {
   if (!md) return ''
   let text = md
@@ -171,24 +171,24 @@ export function stripMarkdown(md?: string | null): string {
   return text.replace(/\s+/g, ' ').trim()
 }
 
-/** 取用户名首字母作为头像占位 */
+/** Use the first character of the username as an avatar placeholder */
 export function avatarText(name?: string | null): string {
   if (!name) return '?'
   return name.trim().charAt(0).toUpperCase()
 }
 
-/** 判断图标字段是否为图片 URL（否则视为 emoji/文字图标） */
+/** Check whether the icon field is an image URL (otherwise treat it as emoji/text) */
 export function isImageUrl(value?: string | null): value is string {
   if (!value) return false
   return /^(https?:\/\/|data:image\/|\/)/i.test(value.trim())
 }
 
-/** 返回可用于 img / 头像 src 的图片 URL；非图片值（如 emoji）返回 undefined */
+/** Return an image URL usable as img/avatar src; return undefined for non-image values (e.g. emoji) */
 export function imageSrc(value?: string | null): string | undefined {
   return isImageUrl(value) ? value : undefined
 }
 
-/** 将后端 PostSummaryDTO 归一化为前端 Post（补齐 authorName / content 等字段） */
+/** Normalize backend PostSummaryDTO into frontend Post (filling in authorName / content, etc.) */
 export function normalizePostSummary(raw: unknown): Post {
   const p = (raw ?? {}) as Record<string, unknown>
   const author = (p.author ?? {}) as Record<string, unknown>
@@ -212,7 +212,7 @@ export function normalizePostSummary(raw: unknown): Post {
   }
 }
 
-/** 将后端 CommentDTO（children）归一化为前端 Comment（replies），递归处理子回复 */
+/** Normalize backend CommentDTO (children) into frontend Comment (replies), recursing into child replies */
 export function normalizeComment(raw: unknown): Comment {
   const c = (raw ?? {}) as Record<string, unknown>
   const children = Array.isArray(c.children)

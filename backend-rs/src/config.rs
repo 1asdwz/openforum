@@ -1,7 +1,7 @@
 use std::env;
 
-/// 运行期配置，语义与 Java 端 `application.yml` / `openforum.*` 对齐。
-/// 直接复用现有部署 env（DB_URL/DB_USER/DB_PASSWORD/MINIO_*/JWT_SECRET...）。
+/// Runtime configuration, semantically aligned with the Java side's `application.yml` / `openforum.*`.
+/// Reuses the existing deployment env directly (DB_URL/DB_USER/DB_PASSWORD/MINIO_*/JWT_SECRET...).
 #[derive(Clone, Debug)]
 pub struct Config {
     pub port: u16,
@@ -58,7 +58,7 @@ fn env_f64(key: &str, default: f64) -> f64 {
     env::var(key).ok().and_then(|v| v.trim().parse::<f64>().ok()).unwrap_or(default)
 }
 
-/// 解析 `jdbc:mysql://host:3306/dbname?params`，返回 (host, port, database)。
+/// Parse `jdbc:mysql://host:3306/dbname?params` and return (host, port, database).
 fn parse_jdbc_mysql(url: &str) -> (String, u16, String) {
     let rest = url.trim_start_matches("jdbc:").trim_start_matches("mysql://");
     let no_query = rest.split('?').next().unwrap_or(rest);
@@ -118,19 +118,19 @@ impl Config {
         self.ai_enabled && !self.ai_api_key.trim().is_empty()
     }
 
-    /// 启动期安全校验：密钥强度不足直接拒绝启动（对齐 Java `JwtTokenProvider` 的 <32 字节即失败）。
+    /// Startup security validation: refuse to start if key strength is insufficient (matching Java `JwtTokenProvider` failing below 32 bytes).
     pub fn validate(&self) -> anyhow::Result<()> {
         if self.jwt_secret.len() < 32 {
             anyhow::bail!(
-                "JWT_SECRET 长度必须不少于 32 字节（当前 {}），请通过环境变量配置强随机密钥",
+                "JWT_SECRET must be at least 32 bytes long (currently {}); configure a strong random secret via environment variables",
                 self.jwt_secret.len()
             );
         }
         if self.jwt_secret == "openforum-dev-secret-key-change-me-2026-abcdefgh" {
-            tracing::warn!("检测到使用内置默认 JWT_SECRET，生产环境务必显式配置强随机密钥");
+            tracing::warn!("Detected the built-in default JWT_SECRET; always configure a strong random secret in production");
         }
         if self.db_password == "root123456" {
-            tracing::warn!("检测到内置默认数据库口令，请确认生产环境使用独立强口令");
+            tracing::warn!("Detected the built-in default database password; ensure production uses a separate strong password");
         }
         Ok(())
     }

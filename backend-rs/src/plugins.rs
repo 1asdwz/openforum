@@ -3,7 +3,7 @@ use std::sync::RwLock;
 
 use crate::error::ApiError;
 
-/// 插件元信息，对应 Java `ForumPlugin` 的描述性字段。
+/// Plugin metadata, corresponding to Java's `ForumPlugin` descriptive fields.
 pub struct PluginMeta {
     pub key: &'static str,
     pub name: &'static str,
@@ -13,46 +13,46 @@ pub struct PluginMeta {
     pub description: &'static str,
 }
 
-/// 全部内置插件，按 key 升序排列（对齐 Java `PluginRegistry` 的构造顺序）。
+/// All built-in plugins, sorted ascending by key (matching Java's `PluginRegistry` construction order).
 pub const PLUGINS: [PluginMeta; 5] = [
     PluginMeta {
         key: "ai-review",
-        name: "AI 智能审核",
+        name: "AI Review",
         ptype: "REVIEW",
         enabled_default: false,
-        description: "调用 OpenAI 兼容接口进行智能审核，未配置密钥时自动回退规则引擎",
+        description: "Uses an OpenAI-compatible API for intelligent review; falls back to the rule engine when no key is configured",
     },
     PluginMeta {
         key: "ai-vision-review",
-        name: "AI 证件视觉审核",
+        name: "AI Document Vision Review",
         ptype: "DOCUMENT_REVIEW",
         enabled_default: false,
-        description: "调用多模态大模型审阅证件图片并抽取实名信息，未配置密钥时自动跳过",
+        description: "Uses a multimodal model to review document images and extract identity details; skipped when no key is configured",
     },
     PluginMeta {
         key: "heuristic-document",
-        name: "证件启发式校验",
+        name: "Heuristic Document Validation",
         ptype: "DOCUMENT_REVIEW",
         enabled_default: true,
-        description: "校验证件图片数量、可解码性与分辨率，明显不合格时驳回，否则转人工",
+        description: "Checks document image count, decodability, and resolution; rejects clear failures and routes the rest to manual review",
     },
     PluginMeta {
         key: "hot-score-recommendation",
-        name: "热度推荐",
+        name: "Hot Score Recommendation",
         ptype: "RECOMMENDATION",
         enabled_default: true,
-        description: "按成员数 / 帖子数 / 近 7 天活跃度计算子论坛推荐分",
+        description: "Computes a sub-forum recommendation score from member count, post count, and activity over the last 7 days",
     },
     PluginMeta {
         key: "rule-based-review",
-        name: "规则审核引擎",
+        name: "Rule-based Review Engine",
         ptype: "REVIEW",
         enabled_default: true,
-        description: "校验各认证类型的必填字段与格式（身份证 18 位、年龄 0-120、国籍非空等）",
+        description: "Validates required fields and formats for each verification type (18-digit ID, age 0-120, non-empty nationality, etc.)",
     },
 ];
 
-/// 运行时开关（内存态，与 Java 一致：重启后恢复默认）。
+/// Runtime toggles (in-memory, matching Java: defaults are restored after a restart).
 pub struct PluginRegistry {
     overrides: RwLock<HashMap<&'static str, bool>>,
 }
@@ -97,7 +97,7 @@ impl PluginRegistry {
     pub fn set_enabled(&self, key: &str, enabled: bool) -> Result<(), ApiError> {
         let meta = self
             .by_key(key)
-            .ok_or_else(|| ApiError::not_found(format!("插件不存在: {key}")))?;
+            .ok_or_else(|| ApiError::not_found(format!("Plugin not found: {key}")))?;
         self.overrides.write().unwrap().insert(meta.key, enabled);
         Ok(())
     }

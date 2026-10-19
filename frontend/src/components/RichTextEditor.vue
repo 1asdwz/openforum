@@ -21,17 +21,17 @@
             type="button"
             class="rte-btn rte-heading-btn"
             :class="{ active: headingLevel > 0 }"
-            :title="headingLevel > 0 ? `标题 ${headingLevel}` : '正文'"
+            :title="headingLevel > 0 ? `Heading ${headingLevel}` : 'Paragraph'"
             @mousedown.prevent
           >
             <span class="rte-icon" v-html="ICONS.heading" />
           </button>
           <template #dropdown>
             <el-dropdown-menu>
-              <el-dropdown-item :command="0">正文</el-dropdown-item>
-              <el-dropdown-item :command="1">标题 1</el-dropdown-item>
-              <el-dropdown-item :command="2">标题 2</el-dropdown-item>
-              <el-dropdown-item :command="3">标题 3</el-dropdown-item>
+              <el-dropdown-item :command="0">Paragraph</el-dropdown-item>
+              <el-dropdown-item :command="1">Heading 1</el-dropdown-item>
+              <el-dropdown-item :command="2">Heading 2</el-dropdown-item>
+              <el-dropdown-item :command="3">Heading 3</el-dropdown-item>
             </el-dropdown-menu>
           </template>
         </el-dropdown>
@@ -95,30 +95,30 @@
       </button>
 
       <el-dropdown v-if="mode === 'rich' && !compact" trigger="click" @command="onTableCommand">
-        <button type="button" class="rte-btn" title="表格" @mousedown.prevent>
+        <button type="button" class="rte-btn" title="Table" @mousedown.prevent>
           <span class="rte-icon" v-html="ICONS.table" />
         </button>
         <template #dropdown>
           <el-dropdown-menu>
-            <el-dropdown-item command="insert">插入表格 3×3</el-dropdown-item>
-            <el-dropdown-item command="rowBefore" :disabled="!inTable" divided>上方插入行</el-dropdown-item>
-            <el-dropdown-item command="rowAfter" :disabled="!inTable">下方插入行</el-dropdown-item>
-            <el-dropdown-item command="deleteRow" :disabled="!inTable">删除当前行</el-dropdown-item>
-            <el-dropdown-item command="colBefore" :disabled="!inTable" divided>左侧插入列</el-dropdown-item>
-            <el-dropdown-item command="colAfter" :disabled="!inTable">右侧插入列</el-dropdown-item>
-            <el-dropdown-item command="deleteCol" :disabled="!inTable">删除当前列</el-dropdown-item>
-            <el-dropdown-item command="deleteTable" :disabled="!inTable" divided>删除表格</el-dropdown-item>
+            <el-dropdown-item command="insert">Insert table 3×3</el-dropdown-item>
+            <el-dropdown-item command="rowBefore" :disabled="!inTable" divided>Insert row above</el-dropdown-item>
+            <el-dropdown-item command="rowAfter" :disabled="!inTable">Insert row below</el-dropdown-item>
+            <el-dropdown-item command="deleteRow" :disabled="!inTable">Delete row</el-dropdown-item>
+            <el-dropdown-item command="colBefore" :disabled="!inTable" divided>Insert column left</el-dropdown-item>
+            <el-dropdown-item command="colAfter" :disabled="!inTable">Insert column right</el-dropdown-item>
+            <el-dropdown-item command="deleteCol" :disabled="!inTable">Delete column</el-dropdown-item>
+            <el-dropdown-item command="deleteTable" :disabled="!inTable" divided>Delete table</el-dropdown-item>
           </el-dropdown-menu>
         </template>
       </el-dropdown>
 
       <div class="rte-bar-spacer" />
 
-      <span v-if="uploading" class="rte-uploading">上传中…</span>
-      <span v-else class="rte-count">{{ charCount }} 字</span>
+      <span v-if="uploading" class="rte-uploading">Uploading…</span>
+      <span v-else class="rte-count">{{ charCount }} chars</span>
 
       <el-tooltip :content="modeHint" placement="top">
-        <span class="rte-info" aria-label="使用说明">
+        <span class="rte-info" aria-label="Usage tips">
           <span class="rte-icon" v-html="ICONS.info" />
         </span>
       </el-tooltip>
@@ -131,11 +131,11 @@
         v-model="linkValue"
         class="rte-link-input"
         type="text"
-        placeholder="https:// 或粘贴链接地址"
+        placeholder="https:// or paste a link"
         @keydown.enter.prevent="confirmLink"
         @keydown.esc.prevent="closeLink"
       />
-      <button type="button" class="rte-link-btn primary" @mousedown.prevent @click="confirmLink">确定</button>
+      <button type="button" class="rte-link-btn primary" @mousedown.prevent @click="confirmLink">Confirm</button>
       <button
         v-if="mode === 'rich' && linkExisting"
         type="button"
@@ -143,9 +143,9 @@
         @mousedown.prevent
         @click="removeLink"
       >
-        移除
+        Remove
       </button>
-      <button type="button" class="rte-link-btn" @mousedown.prevent @click="closeLink">取消</button>
+      <button type="button" class="rte-link-btn" @mousedown.prevent @click="closeLink">Cancel</button>
     </div>
 
     <div v-show="mode === 'rich'" class="rte-editor-wrap" :style="{ minHeight: `${resolvedMinHeight}px` }">
@@ -158,7 +158,7 @@
       v-model="mdText"
       class="rte-md-input"
       :style="{ minHeight: `${resolvedMinHeight}px` }"
-      :placeholder="placeholder || '使用 Markdown 语法书写…'"
+      :placeholder="placeholder || 'Write using Markdown…'"
       @input="onMarkdownInput"
       @paste="onMarkdownPaste"
       @dragover.prevent
@@ -227,7 +227,7 @@ const imageInputRef = ref<HTMLInputElement | null>(null)
 const videoInputRef = ref<HTMLInputElement | null>(null)
 const linkInputRef = ref<HTMLInputElement | null>(null)
 const uploading = ref(false)
-// 每次事务递增，用于驱动工具栏激活态刷新
+// Incremented on every transaction to drive toolbar active-state refreshes
 const revision = ref(0)
 
 const linkOpen = ref(false)
@@ -240,12 +240,12 @@ const resolvedMinHeight = computed(() => {
 })
 
 const switchLabel = computed(() =>
-  mode.value === 'rich' ? '切换到 Markdown' : '切换到富文本'
+  mode.value === 'rich' ? 'Switch to Markdown' : 'Switch to rich text'
 )
 const modeHint = computed(() =>
   mode.value === 'rich'
-    ? '使用工具栏格式化内容，保存为 Markdown'
-    : '使用 Markdown 语法书写，支持插入图片与视频'
+    ? 'Format content with the toolbar; saved as Markdown'
+    : 'Write in Markdown; supports inserting images and videos'
 )
 
 const charCount = computed(() => {
@@ -286,7 +286,7 @@ const editor = useEditor({
     }),
     Markdown,
     Placeholder.configure({
-      placeholder: () => props.placeholder || '写点什么…',
+      placeholder: () => props.placeholder || 'Write something…',
     }),
     Image.configure({ inline: false, allowBase64: false }),
     TableKit,
@@ -507,8 +507,8 @@ function pickVideo() {
 }
 
 /**
- * 插入图片/视频后 tiptap 会留下节点选区，直接再次插入会覆盖上一张。
- * 这里把光标折叠到插入内容之后，保证连续插入（多图粘贴/拖拽）逐张追加。
+ * After inserting an image/video, tiptap leaves a node selection, so inserting again would overwrite the previous one.
+ * Collapse the cursor after the inserted content so consecutive inserts (multi-image paste/drag) append one by one.
  */
 function collapseSelection(ed: Editor) {
   const { state, view } = ed
@@ -537,7 +537,7 @@ async function uploadAndInsert(file: File, kind: 'image' | 'video') {
       insertMarkdown(`<video src="${url}" controls></video>`)
     }
   } catch (error) {
-    ElMessage.error(error instanceof Error ? error.message : '上传失败')
+    ElMessage.error(error instanceof Error ? error.message : 'Upload failed')
   } finally {
     uploading.value = false
   }
@@ -554,7 +554,7 @@ function kindOf(file: File): 'image' | 'video' {
   return file.type.startsWith('video/') ? 'video' : 'image'
 }
 
-/** 依次上传并插入媒体（用于粘贴/拖拽） */
+/** Upload and insert media in sequence (used for paste/drag) */
 function handleMediaFiles(files: File[]): boolean {
   if (!files.length) return false
   void (async () => {
@@ -606,33 +606,33 @@ const buttonMap = computed<Record<string, ToolbarButton>>(() => {
   map.undo = {
     key: 'undo',
     icon: ICONS.undo,
-    title: '撤销 (Ctrl+Z)',
+    title: 'Undo (Ctrl+Z)',
     disabled: () => (ed ? !ed.can().undo() : true),
     run: () => ed?.chain().focus().undo().run(),
   }
   map.redo = {
     key: 'redo',
     icon: ICONS.redo,
-    title: '重做 (Ctrl+Shift+Z)',
+    title: 'Redo (Ctrl+Shift+Z)',
     disabled: () => (ed ? !ed.can().redo() : true),
     run: () => ed?.chain().focus().redo().run(),
   }
   map.link = {
     key: 'link',
     icon: ICONS.link,
-    title: '链接 (Ctrl+K)',
+    title: 'Link (Ctrl+K)',
     run: onLinkButton,
   }
   map.image = {
     key: 'image',
     icon: ICONS.image,
-    title: '图片',
+    title: 'Image',
     run: pickImage,
   }
   map.video = {
     key: 'video',
     icon: ICONS.video,
-    title: '视频',
+    title: 'Video',
     run: pickVideo,
   }
 
@@ -640,63 +640,63 @@ const buttonMap = computed<Record<string, ToolbarButton>>(() => {
     map.bold = {
       key: 'bold',
       icon: ICONS.bold,
-      title: '加粗 (Ctrl+B)',
+      title: 'Bold (Ctrl+B)',
       active: () => ed.isActive('bold'),
       run: () => ed.chain().focus().toggleBold().run(),
     }
     map.italic = {
       key: 'italic',
       icon: ICONS.italic,
-      title: '斜体 (Ctrl+I)',
+      title: 'Italic (Ctrl+I)',
       active: () => ed.isActive('italic'),
       run: () => ed.chain().focus().toggleItalic().run(),
     }
     map.strike = {
       key: 'strike',
       icon: ICONS.strike,
-      title: '删除线',
+      title: 'Strikethrough',
       active: () => ed.isActive('strike'),
       run: () => ed.chain().focus().toggleStrike().run(),
     }
     map.superscript = {
       key: 'superscript',
       icon: ICONS.superscript,
-      title: '上标',
+      title: 'Superscript',
       active: () => ed.isActive('superscript'),
       run: () => ed.chain().focus().toggleSuperscript().run(),
     }
     map.bulletList = {
       key: 'bulletList',
       icon: ICONS.bulletList,
-      title: '无序列表',
+      title: 'Bullet list',
       active: () => ed.isActive('bulletList'),
       run: () => ed.chain().focus().toggleBulletList().run(),
     }
     map.orderedList = {
       key: 'orderedList',
       icon: ICONS.orderedList,
-      title: '有序列表',
+      title: 'Ordered list',
       active: () => ed.isActive('orderedList'),
       run: () => ed.chain().focus().toggleOrderedList().run(),
     }
     map.blockquote = {
       key: 'blockquote',
       icon: ICONS.blockquote,
-      title: '引用',
+      title: 'Quote',
       active: () => ed.isActive('blockquote'),
       run: () => ed.chain().focus().toggleBlockquote().run(),
     }
     map.code = {
       key: 'code',
       icon: ICONS.code,
-      title: '行内代码',
+      title: 'Inline code',
       active: () => ed.isActive('code'),
       run: () => ed.chain().focus().toggleCode().run(),
     }
     map.codeBlock = {
       key: 'codeBlock',
       icon: ICONS.codeBlock,
-      title: '代码块',
+      title: 'Code block',
       active: () => ed.isActive('codeBlock'),
       run: () => ed.chain().focus().toggleCodeBlock().run(),
     }

@@ -12,7 +12,6 @@ use crate::error::{ApiError, ApiResult};
 use crate::gate::{self, GateKind};
 use crate::json as j;
 use crate::models::SubForum;
-use crate::sanitizer;
 use crate::security::CurrentUser;
 use crate::state::AppState;
 
@@ -77,8 +76,18 @@ pub struct ForumUpdateRequest {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct CustomPageUpdateRequest {
-    pub html: Option<String>,
+#[serde(rename_all = "camelCase")]
+pub struct AddModeratorRequest {
+    pub username: Option<String>,
+    #[serde(default)]
+    pub permissions: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateModeratorRequest {
+    #[serde(default)]
+    pub permissions: Vec<String>,
 }
 
 fn auth_type_list(csv: Option<&str>) -> Vec<String> {
@@ -154,7 +163,7 @@ fn plugin_score(
 ) -> f64 {
     let base = forum.member_count as f64 * 2.0 + forum.post_count as f64 * 3.0;
     if !hot_enabled {
-        // 与 Java 一致：推荐插件全部关闭时，回退到基础分。
+        // Same as Java: fall back to the base score when all recommendation plugins are disabled.
         return base;
     }
     let mut recent = 0i64;
@@ -220,11 +229,9 @@ async fn build_detail(
     } else {
         forum.template_type.clone()
     };
-    let custom_page_html = if forum.custom_page_status.as_deref() == Some("APPROVED") {
-        forum.custom_page_html.clone()
-    } else {
-        None
-    };
+    let my_permissions = access::permissions_of(&state.pool, forum, user_id).await?;
+    let can_manage = !my_permissions.is_empty();
+    let is_creator = user_id == Some(forum.creator_id);
     Ok(json!({
         "id": forum.id,
         "slug": forum.slug,
@@ -239,29 +246,19 @@ async fn build_detail(
         "operateRule": rules.operate_json(),
         "templateType": template_type,
         "templateConfig": forum.template_config,
-        "customPageStatus": forum.custom_page_status,
-        "customPageHtml": custom_page_html,
         "memberCount": forum.member_count,
         "postCount": forum.post_count,
         "isMember": is_member,
         "canPost": can_post,
         "canOperate": can_post,
+        "canManage": can_manage,
+        "myPermissions": my_permissions,
+        "isCreator": is_creator,
         "isPublic": forum.public,
         "creatorId": forum.creator_id,
         "creatorName": creator_name.map(|(n,)| n),
         "createdAt": j::jts(forum.created_at),
     }))
-}
-
-fn custom_page_dto(forum: &SubForum) -> Value {
-    json!({
-        "forumId": forum.id,
-        "forumSlug": forum.slug,
-        "forumName": forum.name,
-        "html": forum.custom_page_html,
-        "status": forum.custom_page_status,
-        "reviewNote": forum.custom_page_review_note,
-    })
 }
 
 async fn find_forum_by_id(pool: &MySqlPool, id: i64) -> Result<Option<SubForum>, ApiError> {
@@ -274,7 +271,7 @@ async fn find_forum_by_id(pool: &MySqlPool, id: i64) -> Result<Option<SubForum>,
 async fn require_forum(pool: &MySqlPool, id: i64) -> Result<SubForum, ApiError> {
     find_forum_by_id(pool, id)
         .await?
-        .ok_or_else(|| ApiError::not_found("子论坛不存在"))
+        .ok_or_else(|| ApiError::not_found("Forum not found"))
 }
 
 /// GET /forums
@@ -388,14 +385,14 @@ pub async fn create(
     let me = user.require()?;
     let slug = req.slug.as_deref().map(|s| s.trim().to_lowercase()).unwrap_or_default();
     if slug.is_empty() {
-        return Err(ApiError::bad_request("slug slug 不能为空"));
+        return Err(ApiError::bad_request("slug must not be empty"));
     }
     if req.name.as_deref().map(|s| s.trim().is_empty()).unwrap_or(true) {
-        return Err(ApiError::bad_request("name 名称不能为空"));
+        return Err(ApiError::bad_request("name must not be empty"));
     }
     if !slug_valid(&slug) {
         return Err(ApiError::bad_request(
-            "slug 只能包含小写字母、数字、-、_（2-80 位）",
+            "slug may only contain lowercase letters, digits, -, and _ (2-80 characters)",
         ));
     }
     let exists: Option<(i64,)> =
@@ -404,7 +401,7 @@ pub async fn create(
             .fetch_optional(&state.pool)
             .await?;
     if exists.is_some() {
-        return Err(ApiError::bad_request("slug 已存在"));
+        return Err(ApiError::bad_request("slug already exists"));
     }
 
     let name = req.name.as_deref().unwrap().trim().to_string();
@@ -421,10 +418,9 @@ pub async fn create(
 
     let result = sqlx::query(
         "INSERT INTO sub_forums (slug, name, description, icon, theme_color, rules, required_auth_types, \
-         template_type, template_config, custom_page_html, custom_page_status, custom_page_review_note, \
-         creator_id, member_count, post_count, is_public, browse_rule, operate_rule, gate_version, \
-         created_at, updated_at) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, ?, 0, 0, 1, ?, ?, 1, NOW(), NOW())",
+         template_type, template_config, creator_id, member_count, post_count, is_public, browse_rule, \
+         operate_rule, gate_version, created_at, updated_at) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, 1, ?, ?, 1, NOW(), NOW())",
     )
     .bind(&slug)
     .bind(&name)
@@ -443,7 +439,8 @@ pub async fn create(
     let forum_id = result.last_insert_id() as i64;
 
     sqlx::query(
-        "INSERT INTO forum_members (forum_id, user_id, role, joined_at) VALUES (?, ?, 'OWNER', NOW())",
+        "INSERT INTO forum_members (forum_id, user_id, role, permissions, promoted_at, joined_at) \
+         VALUES (?, ?, 'OWNER', 'EVERYTHING', NOW(), NOW())",
     )
     .bind(forum_id)
     .bind(me.id)
@@ -468,7 +465,7 @@ pub async fn detail(
         .bind(&slug)
         .fetch_optional(&state.pool)
         .await?
-        .ok_or_else(|| ApiError::not_found("子论坛不存在"))?;
+        .ok_or_else(|| ApiError::not_found("Forum not found"))?;
     let user_id = user.0.as_ref().map(|u| u.id);
     let is_admin = user.0.as_ref().map(|u| u.is_admin()).unwrap_or(false);
     gate::ensure(&state.pool, user_id, is_admin, &forum, GateKind::Browse).await?;
@@ -484,9 +481,13 @@ pub async fn update(
 ) -> ApiResult<Json<Value>> {
     let me = user.require()?;
     let mut forum = require_forum(&state.pool, id).await?;
-    if !access::can_manage(&state.pool, &forum, Some(me.id)).await? {
-        return Err(ApiError::forbidden("需要坛主或管理员权限"));
-    }
+    access::require_permission(
+        &state.pool,
+        &forum,
+        Some(me.id),
+        access::PERM_CONFIG,
+    )
+    .await?;
     if let Some(v) = req.name {
         forum.name = v;
     }
@@ -549,72 +550,6 @@ pub async fn update(
     Ok(j::ok(build_detail(&state, &forum, Some(me.id), me.is_admin()).await?))
 }
 
-/// PUT /forums/{id}/custom-page
-pub async fn save_custom_page(
-    State(state): State<AppState>,
-    user: CurrentUser,
-    Path(id): Path<i64>,
-    Json(req): Json<CustomPageUpdateRequest>,
-) -> ApiResult<Json<Value>> {
-    let me = user.require()?;
-    let forum = require_forum(&state.pool, id).await?;
-    if !access::can_manage(&state.pool, &forum, Some(me.id)).await? {
-        return Err(ApiError::forbidden("需要坛主或管理员权限"));
-    }
-    let html = req.html.unwrap_or_default();
-    if html.trim().is_empty() {
-        return Err(ApiError::bad_request("html 不能为空"));
-    }
-    let clean = sanitizer::sanitize(&html);
-    sqlx::query(
-        "UPDATE sub_forums SET custom_page_html=?, custom_page_status='DRAFT', custom_page_review_note=NULL, updated_at=NOW() WHERE id=?",
-    )
-    .bind(&clean)
-    .bind(forum.id)
-    .execute(&state.pool)
-    .await?;
-    let forum = require_forum(&state.pool, id).await?;
-    Ok(j::ok(custom_page_dto(&forum)))
-}
-
-/// POST /forums/{id}/custom-page/submit
-pub async fn submit_custom_page(
-    State(state): State<AppState>,
-    user: CurrentUser,
-    Path(id): Path<i64>,
-) -> ApiResult<Json<Value>> {
-    let me = user.require()?;
-    let forum = require_forum(&state.pool, id).await?;
-    if !access::can_manage(&state.pool, &forum, Some(me.id)).await? {
-        return Err(ApiError::forbidden("需要坛主或管理员权限"));
-    }
-    if forum.custom_page_html.as_deref().map(|s| s.trim().is_empty()).unwrap_or(true) {
-        return Err(ApiError::bad_request("请先保存自定义页面 HTML"));
-    }
-    sqlx::query(
-        "UPDATE sub_forums SET custom_page_status='PENDING', custom_page_review_note=NULL, updated_at=NOW() WHERE id=?",
-    )
-    .bind(forum.id)
-    .execute(&state.pool)
-    .await?;
-    let forum = require_forum(&state.pool, id).await?;
-    Ok(j::ok(custom_page_dto(&forum)))
-}
-
-/// GET /forums/{id}/custom-page
-pub async fn get_custom_page(
-    State(state): State<AppState>,
-    user: CurrentUser,
-    Path(id): Path<i64>,
-) -> ApiResult<Json<Value>> {
-    let me = user.require()?;
-    let forum = require_forum(&state.pool, id).await?;
-    if !access::can_manage(&state.pool, &forum, Some(me.id)).await? {
-        return Err(ApiError::forbidden("需要坛主或管理员权限"));
-    }
-    Ok(j::ok(custom_page_dto(&forum)))
-}
-
 /// POST /forums/{id}/join
 pub async fn join(
     State(state): State<AppState>,
@@ -623,7 +558,7 @@ pub async fn join(
 ) -> ApiResult<Json<Value>> {
     let me = user.require()?;
     let forum = require_forum(&state.pool, id).await?;
-    // 入会（成员插入 + member_count 重算）需原子完成（对齐 Java `SubForumService.join` 的 @Transactional）。
+    // Joining (member insert + member_count recount) must be atomic (matches @Transactional in Java `SubForumService.join`).
     let mut tx = state.pool.begin().await?;
     let exists: Option<(i64,)> =
         sqlx::query_as("SELECT 1 FROM forum_members WHERE forum_id=? AND user_id=? LIMIT 1")
@@ -654,9 +589,9 @@ pub async fn leave(
     let me = user.require()?;
     let forum = require_forum(&state.pool, id).await?;
     if me.id == forum.creator_id {
-        return Err(ApiError::bad_request("坛主不能退出自己的子论坛"));
+        return Err(ApiError::bad_request("The forum owner cannot leave their own forum"));
     }
-    // 退会（成员删除 + member_count 重算）需原子完成（对齐 Java `SubForumService.leave` 的 @Transactional）。
+    // Leaving (member delete + member_count recount) must be atomic (matches @Transactional in Java `SubForumService.leave`).
     let mut tx = state.pool.begin().await?;
     sqlx::query("DELETE FROM forum_members WHERE forum_id=? AND user_id=?")
         .bind(forum.id)
@@ -719,91 +654,310 @@ pub async fn members(
     Ok(j::ok(content))
 }
 
-// -------- 管理端自定义页 --------
-
-#[derive(Debug, Deserialize)]
-pub struct CustomPageListQuery {
-    #[serde(default = "default_pending")]
-    pub status: String,
-    #[serde(default)]
-    pub page: i32,
-    #[serde(default = "default_size")]
-    pub size: i32,
+async fn build_moderator(
+    pool: &MySqlPool,
+    forum: &SubForum,
+    user_id: i64,
+    role: &str,
+    permissions_raw: Option<&str>,
+    joined_at: NaiveDateTime,
+    promoted_at: Option<NaiveDateTime>,
+) -> ApiResult<Value> {
+    let user: Option<(String, Option<String>)> =
+        sqlx::query_as("SELECT username, avatar FROM users WHERE id = ?")
+            .bind(user_id)
+            .fetch_optional(pool)
+            .await?;
+    let (username, avatar) = match user {
+        Some((name, avatar)) => (name, avatar),
+        None => (String::new(), None),
+    };
+    let is_creator = user_id == forum.creator_id;
+    let permissions = access::effective_permissions(role, permissions_raw, is_creator);
+    Ok(json!({
+        "userId": user_id,
+        "username": username,
+        "avatar": avatar,
+        "role": role,
+        "isCreator": is_creator,
+        "permissions": permissions,
+        "joinedAt": j::jts(joined_at),
+        "promotedAt": promoted_at.map(j::jts),
+    }))
 }
 
-fn default_pending() -> String {
-    "PENDING".to_string()
-}
+type ModeratorRow = (
+    i64,
+    String,
+    Option<String>,
+    String,
+    Option<String>,
+    NaiveDateTime,
+    Option<NaiveDateTime>,
+);
 
-fn parse_status(value: &str) -> Result<String, ApiError> {
-    if value.trim().is_empty() {
-        return Ok("PENDING".to_string());
-    }
-    let up = value.trim().to_uppercase();
-    match up.as_str() {
-        "PENDING" | "APPROVED" | "REJECTED" | "DRAFT" => Ok(up),
-        _ => Err(ApiError::bad_request(format!("非法的状态: {value}"))),
-    }
-}
-
-/// GET /admin/custom-pages
-pub async fn admin_list_custom_pages(
+/// GET /forums/{id}/moderators
+pub async fn list_moderators(
     State(state): State<AppState>,
-    Query(qp): Query<CustomPageListQuery>,
+    user: CurrentUser,
+    Path(id): Path<i64>,
 ) -> ApiResult<Json<Value>> {
-    let status = parse_status(&qp.status)?;
-    let forums: Vec<SubForum> = sqlx::query_as::<_, SubForum>(
-        "SELECT * FROM sub_forums WHERE custom_page_status = ? ORDER BY updated_at DESC",
+    let me = user.require()?;
+    let forum = require_forum(&state.pool, id).await?;
+    if !access::can_manage(&state.pool, &forum, Some(me.id)).await? {
+        return Err(ApiError::forbidden("Moderator permission required"));
+    }
+
+    let rows: Vec<ModeratorRow> = sqlx::query_as(
+        "SELECT fm.user_id, u.username, u.avatar, fm.role, fm.permissions, fm.joined_at, fm.promoted_at \
+         FROM forum_members fm JOIN users u ON u.id = fm.user_id \
+         WHERE fm.forum_id = ? AND fm.role IN ('OWNER', 'MODERATOR') \
+         ORDER BY FIELD(fm.role, 'OWNER', 'MODERATOR'), fm.joined_at ASC",
     )
-    .bind(&status)
+    .bind(forum.id)
     .fetch_all(&state.pool)
     .await?;
-    let total = forums.len() as i64;
-    let (slice, _) = j::slice_page(forums, qp.page, qp.size);
-    let content: Vec<Value> = slice.iter().map(custom_page_dto).collect();
-    Ok(j::ok(j::PageResponse::of(content, qp.page, qp.size, total)))
+
+    let mut content: Vec<Value> = Vec::with_capacity(rows.len() + 1);
+    let mut has_creator = false;
+    for (user_id, username, avatar, role, raw_permissions, joined_at, promoted_at) in rows {
+        let is_creator = user_id == forum.creator_id;
+        if is_creator {
+            has_creator = true;
+        }
+        let permissions = access::effective_permissions(&role, raw_permissions.as_deref(), is_creator);
+        content.push(json!({
+            "userId": user_id,
+            "username": username,
+            "avatar": avatar,
+            "role": role,
+            "isCreator": is_creator,
+            "permissions": permissions,
+            "joinedAt": j::jts(joined_at),
+            "promotedAt": promoted_at.map(j::jts),
+        }));
+    }
+
+    // Legacy data compatibility: still show the creator when their member row is missing.
+    if !has_creator {
+        content.insert(
+            0,
+            build_moderator(
+                &state.pool,
+                &forum,
+                forum.creator_id,
+                "OWNER",
+                Some(access::PERM_EVERYTHING),
+                forum.created_at,
+                None,
+            )
+            .await?,
+        );
+    }
+
+    Ok(j::ok(content))
 }
 
-/// POST /admin/custom-pages/{id}/approve
-pub async fn admin_approve_custom_page(
+/// POST /forums/{id}/moderators
+pub async fn add_moderator(
     State(state): State<AppState>,
+    user: CurrentUser,
     Path(id): Path<i64>,
+    Json(req): Json<AddModeratorRequest>,
 ) -> ApiResult<Json<Value>> {
+    let me = user.require()?;
     let forum = require_forum(&state.pool, id).await?;
-    sqlx::query(
-        "UPDATE sub_forums SET custom_page_status='APPROVED', custom_page_review_note=NULL, template_type='CUSTOM', updated_at=NOW() WHERE id=?",
+    access::require_permission(
+        &state.pool,
+        &forum,
+        Some(me.id),
+        access::PERM_EVERYTHING,
+    )
+    .await?;
+
+    let username = req
+        .username
+        .as_deref()
+        .map(str::trim)
+        .filter(|name| !name.is_empty())
+        .ok_or_else(|| ApiError::bad_request("Please enter a username"))?;
+    let target: Option<(i64,)> =
+        sqlx::query_as("SELECT id FROM users WHERE username = ? LIMIT 1")
+            .bind(username)
+            .fetch_optional(&state.pool)
+            .await?;
+    let target_id = target
+        .ok_or_else(|| ApiError::not_found("User not found"))?
+        .0;
+    if target_id == forum.creator_id {
+        return Err(ApiError::bad_request("The creator already has all permissions"));
+    }
+
+    let permissions = access::normalize_permissions(req.permissions);
+    if permissions.is_empty() {
+        return Err(ApiError::bad_request("Please select at least one permission"));
+    }
+    let stored = access::serialize_permissions(&permissions);
+
+    let existing: Option<(String,)> = sqlx::query_as(
+        "SELECT role FROM forum_members WHERE forum_id = ? AND user_id = ? LIMIT 1",
     )
     .bind(forum.id)
-    .execute(&state.pool)
+    .bind(target_id)
+    .fetch_optional(&state.pool)
     .await?;
-    let forum = require_forum(&state.pool, id).await?;
-    Ok(j::ok(custom_page_dto(&forum)))
-}
+    if matches!(
+        existing.as_ref().map(|(role,)| role.as_str()),
+        Some("OWNER")
+    ) {
+        return Err(ApiError::bad_request("The creator's permissions cannot be changed"));
+    }
 
-/// POST /admin/custom-pages/{id}/reject
-pub async fn admin_reject_custom_page(
-    State(state): State<AppState>,
-    Path(id): Path<i64>,
-    body: Option<Json<serde_json::Value>>,
-) -> ApiResult<Json<Value>> {
-    let forum = require_forum(&state.pool, id).await?;
-    let reason = body
-        .as_ref()
-        .and_then(|Json(v)| v.get("reason").and_then(|r| r.as_str()).map(|s| s.to_string()))
-        .filter(|s| !s.trim().is_empty())
-        .unwrap_or_else(|| "管理员驳回".to_string());
-    sqlx::query(
-        "UPDATE sub_forums SET custom_page_status='REJECTED', custom_page_review_note=?, updated_at=NOW() WHERE id=?",
+    let mut tx = state.pool.begin().await?;
+    if existing.is_some() {
+        sqlx::query(
+            "UPDATE forum_members SET role = 'MODERATOR', permissions = ?, \
+             promoted_at = NOW(), promoted_by = ? WHERE forum_id = ? AND user_id = ?",
+        )
+        .bind(&stored)
+        .bind(me.id)
+        .bind(forum.id)
+        .bind(target_id)
+        .execute(&mut *tx)
+        .await?;
+    } else {
+        sqlx::query(
+            "INSERT INTO forum_members (forum_id, user_id, role, permissions, promoted_at, promoted_by, joined_at) \
+             VALUES (?, ?, 'MODERATOR', ?, NOW(), ?, NOW())",
+        )
+        .bind(forum.id)
+        .bind(target_id)
+        .bind(&stored)
+        .bind(me.id)
+        .execute(&mut *tx)
+        .await?;
+        recount_members(&mut tx, forum.id).await?;
+    }
+    tx.commit().await?;
+
+    let row: (String, Option<String>, NaiveDateTime, Option<NaiveDateTime>) = sqlx::query_as(
+        "SELECT role, permissions, joined_at, promoted_at \
+         FROM forum_members WHERE forum_id = ? AND user_id = ?",
     )
-    .bind(&reason)
     .bind(forum.id)
-    .execute(&state.pool)
+    .bind(target_id)
+    .fetch_one(&state.pool)
     .await?;
-    let forum = require_forum(&state.pool, id).await?;
-    Ok(j::ok(custom_page_dto(&forum)))
+    Ok(j::ok(
+        build_moderator(
+            &state.pool,
+            &forum,
+            target_id,
+            &row.0,
+            row.1.as_deref(),
+            row.2,
+            row.3,
+        )
+        .await?,
+    ))
 }
 
-/// 供 posts 模块复用。
+/// PUT /forums/{id}/moderators/{userId}
+pub async fn update_moderator(
+    State(state): State<AppState>,
+    user: CurrentUser,
+    Path((id, target_id)): Path<(i64, i64)>,
+    Json(req): Json<UpdateModeratorRequest>,
+) -> ApiResult<Json<Value>> {
+    let me = user.require()?;
+    let forum = require_forum(&state.pool, id).await?;
+    access::require_permission(
+        &state.pool,
+        &forum,
+        Some(me.id),
+        access::PERM_EVERYTHING,
+    )
+    .await?;
+    if target_id == forum.creator_id {
+        return Err(ApiError::bad_request("The creator's permissions cannot be changed"));
+    }
+
+    let permissions = access::normalize_permissions(req.permissions);
+    if permissions.is_empty() {
+        return Err(ApiError::bad_request("Please select at least one permission"));
+    }
+    let stored = access::serialize_permissions(&permissions);
+
+    let result = sqlx::query(
+        "UPDATE forum_members SET permissions = ? \
+         WHERE forum_id = ? AND user_id = ? AND role = 'MODERATOR'",
+    )
+    .bind(&stored)
+    .bind(forum.id)
+    .bind(target_id)
+    .execute(&state.pool)
+    .await?;
+    if result.rows_affected() == 0 {
+        return Err(ApiError::not_found("This user is not a moderator"));
+    }
+
+    let row: (String, Option<String>, NaiveDateTime, Option<NaiveDateTime>) = sqlx::query_as(
+        "SELECT role, permissions, joined_at, promoted_at \
+         FROM forum_members WHERE forum_id = ? AND user_id = ?",
+    )
+    .bind(forum.id)
+    .bind(target_id)
+    .fetch_one(&state.pool)
+    .await?;
+    Ok(j::ok(
+        build_moderator(
+            &state.pool,
+            &forum,
+            target_id,
+            &row.0,
+            row.1.as_deref(),
+            row.2,
+            row.3,
+        )
+        .await?,
+    ))
+}
+
+/// DELETE /forums/{id}/moderators/{userId}
+pub async fn remove_moderator(
+    State(state): State<AppState>,
+    user: CurrentUser,
+    Path((id, target_id)): Path<(i64, i64)>,
+) -> ApiResult<Json<Value>> {
+    let me = user.require()?;
+    let forum = require_forum(&state.pool, id).await?;
+    access::require_permission(
+        &state.pool,
+        &forum,
+        Some(me.id),
+        access::PERM_EVERYTHING,
+    )
+    .await?;
+    if target_id == forum.creator_id {
+        return Err(ApiError::bad_request("The creator cannot be removed"));
+    }
+
+    let result = sqlx::query(
+        "UPDATE forum_members SET role = 'MEMBER', permissions = '', \
+         promoted_at = NULL, promoted_by = NULL \
+         WHERE forum_id = ? AND user_id = ? AND role = 'MODERATOR'",
+    )
+    .bind(forum.id)
+    .bind(target_id)
+    .execute(&state.pool)
+    .await?;
+    if result.rows_affected() == 0 {
+        return Err(ApiError::not_found("This user is not a moderator"));
+    }
+    Ok(j::ok_empty())
+}
+
+/// Reused by the posts module.
 pub async fn find_by_id(pool: &MySqlPool, id: i64) -> Result<Option<SubForum>, ApiError> {
     find_forum_by_id(pool, id).await
 }

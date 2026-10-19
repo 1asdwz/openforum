@@ -3,13 +3,13 @@ use serde_json::{json, Map, Value};
 
 use crate::error::ApiError;
 
-/// 信息项分组（顺序即展示顺序）。
+/// Info field groups (order is display order).
 pub const GROUPS: [(&str, &str); 5] = [
-    ("IDENTITY", "身份"),
-    ("LOCATION", "所在地"),
-    ("CAREER", "职业与学历"),
-    ("PROPERTY", "房产"),
-    ("INTEREST", "兴趣"),
+    ("IDENTITY", "Identity"),
+    ("LOCATION", "Location"),
+    ("CAREER", "Career & education"),
+    ("PROPERTY", "Property"),
+    ("INTEREST", "Interests"),
 ];
 
 pub struct FieldDef {
@@ -24,47 +24,47 @@ pub struct FieldDef {
     pub options: &'static str,
 }
 
-const OPTIONS_GENDER: &str = r#"[{"value":"MALE","label":"男"},{"value":"FEMALE","label":"女"}]"#;
+const OPTIONS_GENDER: &str = r#"[{"value":"MALE","label":"Male"},{"value":"FEMALE","label":"Female"}]"#;
 
 const OPTIONS_COUNTRY: &str = r#"[
-{"value":"CN","label":"中国"},{"value":"HK","label":"中国香港"},{"value":"TW","label":"中国台湾"},
-{"value":"MO","label":"中国澳门"},{"value":"US","label":"美国"},{"value":"JP","label":"日本"},
-{"value":"KR","label":"韩国"},{"value":"SG","label":"新加坡"},{"value":"GB","label":"英国"},
-{"value":"FR","label":"法国"},{"value":"DE","label":"德国"},{"value":"CA","label":"加拿大"},
-{"value":"AU","label":"澳大利亚"},{"value":"NZ","label":"新西兰"},{"value":"RU","label":"俄罗斯"},
-{"value":"IN","label":"印度"},{"value":"TH","label":"泰国"},{"value":"MY","label":"马来西亚"},
-{"value":"ID","label":"印度尼西亚"},{"value":"PH","label":"菲律宾"},{"value":"VN","label":"越南"},
-{"value":"OTHER","label":"其他"}
+{"value":"CN","label":"China"},{"value":"HK","label":"Hong Kong"},{"value":"TW","label":"Taiwan"},
+{"value":"MO","label":"Macao"},{"value":"US","label":"United States"},{"value":"JP","label":"Japan"},
+{"value":"KR","label":"South Korea"},{"value":"SG","label":"Singapore"},{"value":"GB","label":"United Kingdom"},
+{"value":"FR","label":"France"},{"value":"DE","label":"Germany"},{"value":"CA","label":"Canada"},
+{"value":"AU","label":"Australia"},{"value":"NZ","label":"New Zealand"},{"value":"RU","label":"Russia"},
+{"value":"IN","label":"India"},{"value":"TH","label":"Thailand"},{"value":"MY","label":"Malaysia"},
+{"value":"ID","label":"Indonesia"},{"value":"PH","label":"Philippines"},{"value":"VN","label":"Vietnam"},
+{"value":"OTHER","label":"Other"}
 ]"#;
 
 const OPTIONS_OCCUPATION: &str = r#"[
-{"value":"INTERNET","label":"互联网/科技"},{"value":"FINANCE","label":"金融"},
-{"value":"EDUCATION","label":"教育"},{"value":"MEDICAL","label":"医疗健康"},
-{"value":"GOVERNMENT","label":"政府/公共事业"},{"value":"MANUFACTURING","label":"制造业"},
-{"value":"SERVICE","label":"服务业"},{"value":"OTHER","label":"其他"}
+{"value":"INTERNET","label":"Internet/Tech"},{"value":"FINANCE","label":"Finance"},
+{"value":"EDUCATION","label":"Education"},{"value":"MEDICAL","label":"Healthcare"},
+{"value":"GOVERNMENT","label":"Government/Public sector"},{"value":"MANUFACTURING","label":"Manufacturing"},
+{"value":"SERVICE","label":"Services"},{"value":"OTHER","label":"Other"}
 ]"#;
 
 const OPTIONS_EDUCATION: &str = r#"[
-{"value":"HIGH_SCHOOL","label":"高中及以下","order":1},
-{"value":"COLLEGE","label":"大专","order":2},
-{"value":"BACHELOR","label":"本科","order":3},
-{"value":"MASTER","label":"硕士","order":4},
-{"value":"DOCTOR","label":"博士","order":5}
+{"value":"HIGH_SCHOOL","label":"High school or below","order":1},
+{"value":"COLLEGE","label":"Associate degree","order":2},
+{"value":"BACHELOR","label":"Bachelor's degree","order":3},
+{"value":"MASTER","label":"Master's degree","order":4},
+{"value":"DOCTOR","label":"Doctorate","order":5}
 ]"#;
 
 const OPTIONS_INTERESTS: &str = r#"[
-{"value":"sports","label":"运动"},{"value":"reading","label":"读书"},{"value":"travel","label":"旅行"},
-{"value":"music","label":"音乐"},{"value":"movie","label":"电影"},{"value":"food","label":"美食"},
-{"value":"photography","label":"摄影"},{"value":"gaming","label":"游戏"},{"value":"coding","label":"编程"},
-{"value":"fitness","label":"健身"},{"value":"coffee","label":"咖啡"},{"value":"pets","label":"宠物"},
-{"value":"gardening","label":"园艺"},{"value":"painting","label":"绘画"},{"value":"handcraft","label":"手工"}
+{"value":"sports","label":"Sports"},{"value":"reading","label":"Reading"},{"value":"travel","label":"Travel"},
+{"value":"music","label":"Music"},{"value":"movie","label":"Movies"},{"value":"food","label":"Food"},
+{"value":"photography","label":"Photography"},{"value":"gaming","label":"Gaming"},{"value":"coding","label":"Coding"},
+{"value":"fitness","label":"Fitness"},{"value":"coffee","label":"Coffee"},{"value":"pets","label":"Pets"},
+{"value":"gardening","label":"Gardening"},{"value":"painting","label":"Painting"},{"value":"handcraft","label":"Handcraft"}
 ]"#;
 
 pub const VISIBLE_FIELDS: [FieldDef; 10] = [
     FieldDef {
         key: "REAL_NAME",
         group: "IDENTITY",
-        label: "实名",
+        label: "Real name",
         value_type: "text",
         authable: true,
         gate_ops: "",
@@ -75,7 +75,7 @@ pub const VISIBLE_FIELDS: [FieldDef; 10] = [
     FieldDef {
         key: "GENDER",
         group: "IDENTITY",
-        label: "性别",
+        label: "Gender",
         value_type: "enum",
         authable: true,
         gate_ops: "in,not_in",
@@ -86,7 +86,7 @@ pub const VISIBLE_FIELDS: [FieldDef; 10] = [
     FieldDef {
         key: "AGE",
         group: "IDENTITY",
-        label: "年龄",
+        label: "Age",
         value_type: "date",
         authable: true,
         gate_ops: "between,gte,lte",
@@ -97,7 +97,7 @@ pub const VISIBLE_FIELDS: [FieldDef; 10] = [
     FieldDef {
         key: "COUNTRY",
         group: "LOCATION",
-        label: "国家",
+        label: "Country",
         value_type: "enum",
         authable: true,
         gate_ops: "in,not_in",
@@ -108,7 +108,7 @@ pub const VISIBLE_FIELDS: [FieldDef; 10] = [
     FieldDef {
         key: "CITY",
         group: "LOCATION",
-        label: "城市",
+        label: "City",
         value_type: "region",
         authable: true,
         gate_ops: "in,not_in",
@@ -119,7 +119,7 @@ pub const VISIBLE_FIELDS: [FieldDef; 10] = [
     FieldDef {
         key: "OCCUPATION",
         group: "CAREER",
-        label: "职业",
+        label: "Occupation",
         value_type: "enum",
         authable: true,
         gate_ops: "in,not_in",
@@ -130,7 +130,7 @@ pub const VISIBLE_FIELDS: [FieldDef; 10] = [
     FieldDef {
         key: "EDUCATION",
         group: "CAREER",
-        label: "学历",
+        label: "Education",
         value_type: "ordinal",
         authable: true,
         gate_ops: "gte,lte,eq",
@@ -141,7 +141,7 @@ pub const VISIBLE_FIELDS: [FieldDef; 10] = [
     FieldDef {
         key: "PROPERTY_AREA",
         group: "PROPERTY",
-        label: "房产区域",
+        label: "Property area",
         value_type: "region_multi",
         authable: true,
         gate_ops: "in,not_in",
@@ -152,7 +152,7 @@ pub const VISIBLE_FIELDS: [FieldDef; 10] = [
     FieldDef {
         key: "PROPERTY_COUNT",
         group: "PROPERTY",
-        label: "房产数量",
+        label: "Property count",
         value_type: "int",
         authable: true,
         gate_ops: "between,gte,lte",
@@ -163,7 +163,7 @@ pub const VISIBLE_FIELDS: [FieldDef; 10] = [
     FieldDef {
         key: "INTERESTS",
         group: "INTEREST",
-        label: "兴趣",
+        label: "Interests",
         value_type: "tags",
         authable: false,
         gate_ops: "in,not_in",
@@ -173,14 +173,14 @@ pub const VISIBLE_FIELDS: [FieldDef; 10] = [
     },
 ];
 
-/// 旧认证类型对应的隐藏字段，仅用于旧规则兼容。
+/// Hidden fields corresponding to legacy auth types, kept only for backward-compatible rules.
 pub const HIDDEN_FIELDS: [FieldDef; 6] = [
-    hidden("ID_CARD", "身份证", 110),
-    hidden("PROPERTY_CERT", "房产证明", 120),
-    hidden("ASSETS", "资产证明", 130),
-    hidden("MARRIAGE_CERT", "婚姻认证", 140),
-    hidden("DRIVER_LICENSE", "驾驶证", 150),
-    hidden("CUSTOM", "自定义认证", 160),
+    hidden("ID_CARD", "ID card", 110),
+    hidden("PROPERTY_CERT", "Property certificate", 120),
+    hidden("ASSETS", "Asset certificate", 130),
+    hidden("MARRIAGE_CERT", "Marriage certificate", 140),
+    hidden("DRIVER_LICENSE", "Driver's license", 150),
+    hidden("CUSTOM", "Custom verification", 160),
 ];
 
 const fn hidden(key: &'static str, label: &'static str, sort: i32) -> FieldDef {
@@ -223,7 +223,7 @@ pub fn gate_ops(field: &FieldDef) -> Vec<&'static str> {
         .collect()
 }
 
-/// 认证等级目录（信息项可选的认证等级）。
+/// Auth level catalog (the auth levels selectable for an info field).
 pub fn auth_levels(field: &FieldDef) -> Vec<&'static str> {
     if field.authable {
         vec!["LOW", "MEDIUM", "HIGH", "EXTREME"]
@@ -232,12 +232,12 @@ pub fn auth_levels(field: &FieldDef) -> Vec<&'static str> {
     }
 }
 
-// -------- 值校验 --------
+// -------- Value validation --------
 
 fn as_object(value: &Value) -> Result<&Map<String, Value>, ApiError> {
     value
         .as_object()
-        .ok_or_else(|| ApiError::bad_request("value 必须是 JSON 对象"))
+        .ok_or_else(|| ApiError::bad_request("value must be a JSON object"))
 }
 
 fn text_of(map: &Map<String, Value>, key: &str) -> String {
@@ -280,16 +280,16 @@ fn dedup(items: Vec<String>) -> Vec<String> {
 
 pub fn normalize_gender(raw: &str) -> Option<&'static str> {
     match raw.trim().to_ascii_uppercase().as_str() {
-        "MALE" | "M" | "男" | "男性" => Some("MALE"),
-        "FEMALE" | "F" | "女" | "女性" => Some("FEMALE"),
+        "MALE" | "M" | "MAN" => Some("MALE"),
+        "FEMALE" | "F" | "WOMAN" => Some("FEMALE"),
         _ => None,
     }
 }
 
 pub fn gender_label(raw: &str) -> String {
     match normalize_gender(raw) {
-        Some("MALE") => "男".to_string(),
-        Some("FEMALE") => "女".to_string(),
+        Some("MALE") => "Male".to_string(),
+        Some("FEMALE") => "Female".to_string(),
         _ => raw.to_string(),
     }
 }
@@ -304,27 +304,27 @@ pub fn country_code(raw: &str) -> Option<String> {
         return Some(upper);
     }
     let code = match text {
-        "中国" | "中华人民共和国" | "中国大陆" => "CN",
-        "中国香港" | "香港" => "HK",
-        "中国台湾" | "台湾" => "TW",
-        "中国澳门" | "澳门" => "MO",
-        "美国" => "US",
-        "日本" => "JP",
-        "韩国" | "南韩" => "KR",
-        "新加坡" => "SG",
-        "英国" | "大不列颠" => "GB",
-        "法国" => "FR",
-        "德国" => "DE",
-        "加拿大" => "CA",
-        "澳大利亚" | "澳洲" => "AU",
-        "新西兰" => "NZ",
-        "俄罗斯" => "RU",
-        "印度" => "IN",
-        "泰国" => "TH",
-        "马来西亚" => "MY",
-        "印度尼西亚" | "印尼" => "ID",
-        "菲律宾" => "PH",
-        "越南" => "VN",
+        "China" | "People's Republic of China" | "Mainland China" => "CN",
+        "Hong Kong" | "Hong Kong SAR" => "HK",
+        "Taiwan" | "Taiwan region" => "TW",
+        "Macao" | "Macau" | "Macao SAR" => "MO",
+        "United States" | "USA" => "US",
+        "Japan" => "JP",
+        "South Korea" | "Korea" => "KR",
+        "Singapore" => "SG",
+        "United Kingdom" | "Great Britain" => "GB",
+        "France" => "FR",
+        "Germany" => "DE",
+        "Canada" => "CA",
+        "Australia" => "AU",
+        "New Zealand" => "NZ",
+        "Russia" => "RU",
+        "India" => "IN",
+        "Thailand" => "TH",
+        "Malaysia" => "MY",
+        "Indonesia" => "ID",
+        "Philippines" => "PH",
+        "Vietnam" => "VN",
         _ => return None,
     };
     Some(code.to_string())
@@ -357,25 +357,25 @@ pub fn education_rank(raw: &str) -> Option<i32> {
 
 pub fn education_label(raw: &str) -> String {
     match education_rank(raw) {
-        Some(1) => "高中及以下".to_string(),
-        Some(2) => "大专".to_string(),
-        Some(3) => "本科".to_string(),
-        Some(4) => "硕士".to_string(),
-        Some(5) => "博士".to_string(),
+        Some(1) => "High school or below".to_string(),
+        Some(2) => "Associate degree".to_string(),
+        Some(3) => "Bachelor's degree".to_string(),
+        Some(4) => "Master's degree".to_string(),
+        Some(5) => "Doctorate".to_string(),
         _ => raw.to_string(),
     }
 }
 
 pub fn occupation_label(raw: &str) -> String {
     match raw.trim().to_ascii_uppercase().as_str() {
-        "INTERNET" => "互联网/科技".to_string(),
-        "FINANCE" => "金融".to_string(),
-        "EDUCATION" => "教育".to_string(),
-        "MEDICAL" => "医疗健康".to_string(),
-        "GOVERNMENT" => "政府/公共事业".to_string(),
-        "MANUFACTURING" => "制造业".to_string(),
-        "SERVICE" => "服务业".to_string(),
-        "OTHER" => "其他".to_string(),
+        "INTERNET" => "Internet/Tech".to_string(),
+        "FINANCE" => "Finance".to_string(),
+        "EDUCATION" => "Education".to_string(),
+        "MEDICAL" => "Healthcare".to_string(),
+        "GOVERNMENT" => "Government/Public sector".to_string(),
+        "MANUFACTURING" => "Manufacturing".to_string(),
+        "SERVICE" => "Services".to_string(),
+        "OTHER" => "Other".to_string(),
         other => other.to_string(),
     }
 }
@@ -408,56 +408,56 @@ pub fn interest_label(raw: &str) -> String {
     raw.to_string()
 }
 
-/// 校验并规范化用户信息值。
+/// Validate and normalize a user info value.
 pub fn validate_value(field_key: &str, value: &Value) -> Result<Value, ApiError> {
     let field = find_field(field_key)
-        .ok_or_else(|| ApiError::bad_request(format!("未知信息项: {field_key}")))?;
+        .ok_or_else(|| ApiError::bad_request(format!("Unknown info field: {field_key}")))?;
     let map = as_object(value)?;
     match field.key {
         "REAL_NAME" => {
             let full_name = text_of(map, "fullName");
             let len = full_name.chars().count();
             if !(2..=50).contains(&len) {
-                return Err(ApiError::bad_request("真实姓名长度需在 2-50 之间"));
+                return Err(ApiError::bad_request("Real name must be 2-50 characters"));
             }
             Ok(json!({ "fullName": full_name }))
         }
         "GENDER" => {
             let raw = text_of(map, "gender");
             let gender = normalize_gender(&raw)
-                .ok_or_else(|| ApiError::bad_request("性别取值不合法"))?;
+                .ok_or_else(|| ApiError::bad_request("Invalid gender value"))?;
             Ok(json!({ "gender": gender }))
         }
         "AGE" => {
             let birth = text_of(map, "birthDate");
             if !birth.is_empty() {
                 let date = NaiveDate::parse_from_str(&birth, "%Y-%m-%d")
-                    .map_err(|_| ApiError::bad_request("出生日期格式应为 YYYY-MM-DD"))?;
+                    .map_err(|_| ApiError::bad_request("Birth date must use YYYY-MM-DD format"))?;
                 let age = age_from_date(date);
                 if !(0..=120).contains(&age) {
-                    return Err(ApiError::bad_request("年龄需在 0-120 之间"));
+                    return Err(ApiError::bad_request("Age must be between 0 and 120"));
                 }
                 return Ok(json!({ "birthDate": date.format("%Y-%m-%d").to_string() }));
             }
             let raw_age = map
                 .get("age")
                 .and_then(|v| v.as_i64().or_else(|| v.as_str().and_then(|s| s.trim().parse().ok())))
-                .ok_or_else(|| ApiError::bad_request("请填写出生日期"))?;
+                .ok_or_else(|| ApiError::bad_request("Please provide a birth date"))?;
             if !(0..=120).contains(&raw_age) {
-                return Err(ApiError::bad_request("年龄需在 0-120 之间"));
+                return Err(ApiError::bad_request("Age must be between 0 and 120"));
             }
             Ok(json!({ "age": raw_age }))
         }
         "COUNTRY" => {
             let raw = text_of(map, "country");
             let code = country_code(&raw)
-                .ok_or_else(|| ApiError::bad_request("国家取值不合法"))?;
+                .ok_or_else(|| ApiError::bad_request("Invalid country value"))?;
             Ok(json!({ "country": code }))
         }
         "CITY" => {
             let city = text_of(map, "city");
             if city.is_empty() || city.chars().count() > 40 {
-                return Err(ApiError::bad_request("请选择城市"));
+                return Err(ApiError::bad_request("Please select a city"));
             }
             let country = country_code(&text_of(map, "country")).unwrap_or_else(|| "CN".to_string());
             Ok(json!({ "country": country, "city": city }))
@@ -465,18 +465,18 @@ pub fn validate_value(field_key: &str, value: &Value) -> Result<Value, ApiError>
         "OCCUPATION" => {
             let category = text_of(map, "category").to_ascii_uppercase();
             if !is_valid_occupation(&category) {
-                return Err(ApiError::bad_request("职业分类不合法"));
+                return Err(ApiError::bad_request("Invalid occupation category"));
             }
             let title = text_of(map, "title");
             if title.chars().count() > 50 {
-                return Err(ApiError::bad_request("职位名称不能超过 50 字"));
+                return Err(ApiError::bad_request("Job title cannot exceed 50 characters"));
             }
             Ok(json!({ "category": category, "title": title }))
         }
         "EDUCATION" => {
             let raw = text_of(map, "education").to_ascii_uppercase();
             if education_rank(&raw).is_none() {
-                return Err(ApiError::bad_request("学历取值不合法"));
+                return Err(ApiError::bad_request("Invalid education value"));
             }
             Ok(json!({ "education": raw }))
         }
@@ -484,7 +484,7 @@ pub fn validate_value(field_key: &str, value: &Value) -> Result<Value, ApiError>
             let cities = dedup(string_list(map.get("cities")));
             let districts = dedup(string_list(map.get("districts")));
             if cities.is_empty() && districts.is_empty() {
-                return Err(ApiError::bad_request("请至少选择一个房产区域"));
+                return Err(ApiError::bad_request("Select at least one property area"));
             }
             Ok(json!({ "cities": cities, "districts": districts }))
         }
@@ -492,19 +492,19 @@ pub fn validate_value(field_key: &str, value: &Value) -> Result<Value, ApiError>
             let count = map
                 .get("count")
                 .and_then(|v| v.as_i64().or_else(|| v.as_str().and_then(|s| s.trim().parse().ok())))
-                .ok_or_else(|| ApiError::bad_request("请填写房产数量"))?;
+                .ok_or_else(|| ApiError::bad_request("Please provide the property count"))?;
             if !(0..=100).contains(&count) {
-                return Err(ApiError::bad_request("房产数量需在 0-100 之间"));
+                return Err(ApiError::bad_request("Property count must be between 0 and 100"));
             }
             Ok(json!({ "count": count }))
         }
         "INTERESTS" => {
             let tags = dedup(string_list(map.get("tags")));
             if tags.len() > 30 {
-                return Err(ApiError::bad_request("兴趣标签最多 30 个"));
+                return Err(ApiError::bad_request("At most 30 interest tags"));
             }
             if tags.iter().any(|t| t.chars().count() > 30) {
-                return Err(ApiError::bad_request("单个兴趣标签不能超过 30 字"));
+                return Err(ApiError::bad_request("Each interest tag cannot exceed 30 characters"));
             }
             Ok(json!({ "tags": tags }))
         }
@@ -524,9 +524,9 @@ pub fn value_text(field_key: &str, value: &Value) -> String {
             Some(age) => {
                 let birth = text_of(map, "birthDate");
                 if birth.is_empty() {
-                    format!("{age} 岁")
+                    format!("{age} years old")
                 } else {
-                    format!("{age} 岁（{birth}）")
+                    format!("{age} years old ({birth})")
                 }
             }
             None => String::new(),
@@ -555,28 +555,28 @@ pub fn value_text(field_key: &str, value: &Value) -> String {
         "PROPERTY_AREA" => {
             let mut parts = string_list(map.get("cities"));
             parts.extend(string_list(map.get("districts")));
-            parts.join("、")
+            parts.join(", ")
         }
         "PROPERTY_COUNT" => map
             .get("count")
             .and_then(|v| v.as_i64())
-            .map(|n| format!("{n} 套"))
+            .map(|n| format!("{n} properties"))
             .unwrap_or_default(),
         "INTERESTS" => {
             let tags = string_list(map.get("tags"));
-            tags.iter().map(|t| interest_label(t)).collect::<Vec<_>>().join("、")
+            tags.iter().map(|t| interest_label(t)).collect::<Vec<_>>().join(", ")
         }
         _ => {
             if map.is_empty() {
-                "已认证".to_string()
+                "Verified".to_string()
             } else {
-                "已认证".to_string()
+                "Verified".to_string()
             }
         }
     }
 }
 
-/// 是否已填写（空对象/空数组/空字符串视为未填写）。
+/// Whether a value is filled in (empty objects/arrays/strings count as not filled).
 pub fn is_filled(value: &Value) -> bool {
     match value {
         Value::Null => false,
@@ -596,7 +596,7 @@ pub fn age_from_date(birth: NaiveDate) -> i32 {
     age
 }
 
-/// 从值中取年龄：优先出生日期，兼容旧数据的直接年龄。
+/// Extract age from a value: prefer birth date, but support legacy direct-age data.
 pub fn age_of(value: &Value) -> Option<i32> {
     let map = value.as_object()?;
     if let Some(Value::String(birth)) = map.get("birthDate") {
@@ -611,7 +611,7 @@ pub fn age_of(value: &Value) -> Option<i32> {
     })
 }
 
-// -------- 认证类型 → 信息项映射 --------
+// -------- Auth type → info field mapping --------
 
 fn push_if_non_empty(out: &mut Vec<(String, Value)>, key: &str, value: Value) {
     if is_filled(&value) {
@@ -619,7 +619,7 @@ fn push_if_non_empty(out: &mut Vec<(String, Value)>, key: &str, value: Value) {
     }
 }
 
-/// 返回某次认证通过后应授予的信息项值。
+/// Returns the info field values that should be granted after an auth passes.
 pub fn granted_fields(auth_type: &str, data: &Map<String, Value>) -> Vec<(String, Value)> {
     let mut out: Vec<(String, Value)> = Vec::new();
     let full_name = {
@@ -728,7 +728,7 @@ pub fn granted_fields(auth_type: &str, data: &Map<String, Value>) -> Vec<(String
     out
 }
 
-/// 审核通过后写入/更新用户信息项（与审核事务共用连接）。
+/// Write/update the user's info fields after approval (shares the review transaction's connection).
 pub async fn grant_user_info(
     conn: &mut sqlx::MySqlConnection,
     user_id: i64,

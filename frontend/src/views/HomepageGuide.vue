@@ -5,40 +5,40 @@
     <div class="feed-column">
       <div class="content-card guide-head">
         <div>
-          <h1 class="page-title" style="margin: 0">主页组件与标签规范</h1>
+          <h1 class="page-title" style="margin: 0">Profile components and tag guidelines</h1>
           <p class="guide-desc">
-            自定义个人主页支持的 HTML 标签、属性、CSS 与数据组件。保存前请对照本页检查。
+            HTML tags, attributes, CSS, and data components supported by custom profile homepages. Check against this page before saving.
           </p>
         </div>
-        <el-button round @click="goBack">返回装修</el-button>
+        <el-button round @click="goBack">Back to editor</el-button>
       </div>
 
       <section class="content-card">
-        <h2 class="guide-title">快速开始</h2>
+        <h2 class="guide-title">Quick start</h2>
         <p class="guide-text">
-          自定义主页只替换个人主页正文内容区，顶部导航、左侧栏与资料卡保持不变。直接编写
-          HTML，保存后立即生效。
+          A custom homepage only replaces the body content area of your profile page; the top navigation, left rail, and profile card stay unchanged. Write
+          HTML directly and changes take effect immediately after saving.
         </p>
         <pre class="guide-code">{{ QUICK_START }}</pre>
       </section>
 
       <section class="content-card">
-        <h2 class="guide-title">可用标签</h2>
-        <p class="guide-text">以下标签会被保留；未列出的标签会被移除。</p>
+        <h2 class="guide-title">Allowed tags</h2>
+        <p class="guide-text">The following tags are kept; tags not listed here are removed.</p>
         <div class="tag-cloud">
           <code v-for="tag in ALLOWED_TAGS" :key="tag" class="tag-chip">{{ tag }}</code>
         </div>
       </section>
 
       <section class="content-card">
-        <h2 class="guide-title">不可用标签</h2>
-        <p class="guide-text">以下标签会被移除，部分标签连同内部内容一起移除。</p>
+        <h2 class="guide-title">Blocked tags</h2>
+        <p class="guide-text">The following tags are removed; some are removed along with their content.</p>
         <div class="table-wrap">
           <table class="guide-table">
             <thead>
               <tr>
-                <th>标签</th>
-                <th>不可用原因</th>
+                <th>Tag</th>
+                <th>Reason</th>
               </tr>
             </thead>
             <tbody>
@@ -52,13 +52,13 @@
       </section>
 
       <section class="content-card">
-        <h2 class="guide-title">属性规则</h2>
+        <h2 class="guide-title">Attribute rules</h2>
         <div class="table-wrap">
           <table class="guide-table">
             <thead>
               <tr>
-                <th>标签</th>
-                <th>可用属性</th>
+                <th>Tag</th>
+                <th>Allowed attributes</th>
               </tr>
             </thead>
             <tbody>
@@ -72,79 +72,79 @@
 
         <ul class="guide-list">
           <li>
-            链接只允许 <code>http://</code>、<code>https://</code>、<code>mailto:</code>、
-            以单个 <code>/</code> 开头的站内路径和 <code>#</code> 页内锚点。
+            Links may only use <code>http://</code>, <code>https://</code>, <code>mailto:</code>,
+            in-site paths starting with a single <code>/</code>, and <code>#</code> in-page anchors.
           </li>
-          <li>点击外部链接会弹出安全风险提示，展示目标域名，确认后才在新标签页打开。</li>
-          <li>图片只允许站内地址 <code>/forum/api/media/{数字 id}</code>，外链图片会被移除。</li>
+          <li>Clicking an external link shows a security warning with the target domain; the link opens in a new tab only after you confirm.</li>
+          <li>Images must use in-site addresses like <code>/forum/api/media/{numeric id}</code>; external images are removed.</li>
           <li>
-            事件属性（如 <code>onclick</code>、<code>onerror</code>）全部不可用；
-            表单提交、自动跳转也不可用。
+            Event attributes (such as <code>onclick</code> and <code>onerror</code>) are not allowed;
+            form submission and automatic redirects are also blocked.
           </li>
         </ul>
       </section>
 
       <section class="content-card">
-        <h2 class="guide-title">CSS 规则</h2>
+        <h2 class="guide-title">CSS rules</h2>
         <p class="guide-text">
-          只支持 <code>style</code> 属性，不支持 <code>&lt;style&gt;</code> 标签。以下属性可用：
+          Only the <code>style</code> attribute is supported; <code>&lt;style&gt;</code> tags are not. The following properties are allowed:
         </p>
         <div class="tag-cloud">
           <code v-for="prop in CSS_PROPERTIES" :key="prop" class="tag-chip">{{ prop }}</code>
         </div>
-        <p class="guide-text" style="margin-top: 14px">以下写法会被拒绝：</p>
+        <p class="guide-text" style="margin-top: 14px">The following are rejected:</p>
         <ul class="guide-list">
-          <li><code>url(...)</code>、<code>image-set(...)</code> 等外部资源引用。</li>
-          <li><code>@import</code>、<code>expression(...)</code>、<code>var(...)</code>、CSS 转义（反斜杠）。</li>
-          <li>含 <code>&lt;</code>、<code>&gt;</code> 或未闭合注释的值。</li>
+          <li>External resource references such as <code>url(...)</code> and <code>image-set(...)</code>.</li>
+          <li><code>@import</code>, <code>expression(...)</code>, <code>var(...)</code>, and CSS escapes (backslashes).</li>
+          <li>Values containing <code>&lt;</code>, <code>&gt;</code>, or unclosed comments.</li>
         </ul>
-        <p class="guide-note">不在白名单中的声明会被丢弃，其余合法声明继续生效。</p>
+        <p class="guide-note">Declarations not on the allowlist are dropped; other valid declarations still apply.</p>
       </section>
 
       <section class="content-card">
-        <h2 class="guide-title">数据组件</h2>
+        <h2 class="guide-title">Data components</h2>
         <p class="guide-text">
-          组件由系统在安全沙箱内渲染，只展示公开资料与公开统计，不会返回邮箱、认证信息或资料项。
+          Components are rendered by the system in a secure sandbox and only show public profile info and public stats. They never return emails, authentication data, or profile fields.
         </p>
 
         <div class="table-wrap">
           <table class="guide-table">
             <thead>
               <tr>
-                <th>组件</th>
-                <th>作用</th>
-                <th>可用属性</th>
+                <th>Component</th>
+                <th>Purpose</th>
+                <th>Allowed attributes</th>
               </tr>
             </thead>
             <tbody>
               <tr>
                 <td><code>&lt;of-profile&gt;</code></td>
-                <td>头像、用户名、角色、简介、加入时间</td>
+                <td>Avatar, username, role, bio, join date</td>
                 <td><code>heading</code></td>
               </tr>
               <tr>
                 <td><code>&lt;of-stats&gt;</code></td>
-                <td>帖子数、评论数、获赞数</td>
+                <td>Post count, comment count, likes received</td>
                 <td><code>heading</code></td>
               </tr>
               <tr>
                 <td><code>&lt;of-posts&gt;</code></td>
-                <td>帖子、点赞、评论过的帖子列表</td>
-                <td><code>type</code>、<code>limit</code>、<code>heading</code></td>
+                <td>Lists of posts you authored, liked, or commented on</td>
+                <td><code>type</code>, <code>limit</code>, <code>heading</code></td>
               </tr>
             </tbody>
           </table>
         </div>
 
-        <h3 class="guide-subtitle">&lt;of-posts&gt; 参数</h3>
+        <h3 class="guide-subtitle">&lt;of-posts&gt; parameters</h3>
         <div class="table-wrap">
           <table class="guide-table">
             <thead>
               <tr>
-                <th>属性</th>
-                <th>取值</th>
-                <th>默认</th>
-                <th>说明</th>
+                <th>Attribute</th>
+                <th>Values</th>
+                <th>Default</th>
+                <th>Description</th>
               </tr>
             </thead>
             <tbody>
@@ -152,84 +152,84 @@
                 <td><code>type</code></td>
                 <td><code>authored</code> / <code>liked</code> / <code>commented</code></td>
                 <td><code>authored</code></td>
-                <td>我发布的 / 我点赞的 / 我评论过的</td>
+                <td>Posts I authored / liked / commented on</td>
               </tr>
               <tr>
                 <td><code>limit</code></td>
-                <td>1–10 的整数</td>
+                <td>Integer from 1–10</td>
                 <td><code>5</code></td>
-                <td>展示条数</td>
+                <td>Number of items to show</td>
               </tr>
               <tr>
                 <td><code>heading</code></td>
-                <td>不超过 30 个字符</td>
-                <td>无</td>
-                <td>列表标题</td>
+                <td>Up to 30 characters</td>
+                <td>None</td>
+                <td>List heading</td>
               </tr>
             </tbody>
           </table>
         </div>
 
         <ul class="guide-list">
-          <li>组件内的文字是加载中占位，数据到达后会被替换。</li>
-          <li>单页最多 20 个组件，所有组件共用一次数据请求。</li>
-          <li>列表与统计都只覆盖访客有权浏览的板块，最多 10 条；超出部分请用 <code>limit</code> 截断。</li>
-          <li>点赞与评论列表是只读的，不能在主页内发起点赞或评论。</li>
-          <li>数据加载失败时显示「内容加载失败，请刷新重试」，不会自动重试。</li>
-          <li>主页被下架时，访客不会看到自定义内容与数据组件。</li>
+          <li>The text inside a component is a loading placeholder and is replaced once data arrives.</li>
+          <li>A page renders at most 20 components, and all components share a single data request.</li>
+          <li>Lists and stats only cover forums the visitor can view, up to 10 items each; use <code>limit</code> to truncate further.</li>
+          <li>Liked and commented lists are read-only; you can't like or comment from the homepage.</li>
+          <li>If data fails to load, the component shows "Content failed to load. Refresh to try again." and does not retry automatically.</li>
+          <li>When the homepage is taken down, visitors don't see the custom content or data components.</li>
         </ul>
 
-        <p class="guide-text">最简单的组件写法：</p>
+        <p class="guide-text">Simplest component usage:</p>
         <pre class="guide-code">{{ COMPONENT_SNIPPET }}</pre>
       </section>
 
       <section class="content-card">
         <div class="guide-example-head">
-          <h2 class="guide-title" style="margin: 0">完整示例</h2>
-          <el-button size="small" @click="copyExample">复制示例</el-button>
+          <h2 class="guide-title" style="margin: 0">Full example</h2>
+          <el-button size="small" @click="copyExample">Copy example</el-button>
         </div>
         <p class="guide-text">
-          覆盖个人资料、统计、帖子、点赞与评论。复制后可直接粘贴到装修页，或使用装修页的
-          「插入完整示例」。
+          Covers profile info, stats, posts, likes, and comments. After copying, paste it directly into the editor page, or use
+          "Insert full example" there.
         </p>
         <pre class="guide-code">{{ EXAMPLE }}</pre>
       </section>
 
       <section class="content-card">
-        <h2 class="guide-title">常见问题</h2>
+        <h2 class="guide-title">FAQ</h2>
         <div class="faq-item">
-          <p class="faq-q">为什么样式没有生效？</p>
+          <p class="faq-q">Why aren't my styles applied?</p>
           <p class="faq-a">
-            请确认使用的是 <code>style</code> 属性，且属性名在 CSS 白名单内。外部样式表、
-            <code>&lt;style&gt;</code> 标签与 <code>url(...)</code> 都会被移除。
+            Make sure you are using the <code>style</code> attribute and that property names are on the CSS allowlist. External stylesheets,
+            <code>&lt;style&gt;</code> tags, and <code>url(...)</code> are all removed.
           </p>
         </div>
         <div class="faq-item">
-          <p class="faq-q">为什么图片不显示？</p>
+          <p class="faq-q">Why don't my images show?</p>
           <p class="faq-a">
-            图片地址必须是 <code>/forum/api/media/{数字 id}</code>。可以先用装修页的「插入图片」上传，
-            再把生成的地址复制到需要的位置。
+            Image addresses must be <code>/forum/api/media/{numeric id}</code>. You can upload with "Insert image" on the editor page first,
+            then copy the generated address wherever you need it.
           </p>
         </div>
         <div class="faq-item">
-          <p class="faq-q">为什么组件一直显示加载中或加载失败？</p>
+          <p class="faq-q">Why does a component stay in loading state or fail to load?</p>
           <p class="faq-a">
-            请确认组件标签拼写正确、属性值合法。若网络异常，组件会显示「内容加载失败，请刷新重试」，
-            刷新页面即可重试。
+            Make sure the component tag is spelled correctly and the attribute values are valid. If the network fails, the component shows "Content failed to load. Refresh to try again.";
+            refresh the page to retry.
           </p>
         </div>
         <div class="faq-item">
-          <p class="faq-q">type 写错或 limit 超出范围会怎样？</p>
+          <p class="faq-q">What happens if type is wrong or limit is out of range?</p>
           <p class="faq-a">
-            非法的 <code>type</code> 与超出 1–10 的 <code>limit</code> 会被移除，组件不会报错，而是按默认值
-            <code>type="authored"</code>、<code>limit="5"</code> 展示。保存前请对照上表检查属性值。
+            An invalid <code>type</code> or a <code>limit</code> outside 1–10 is dropped. The component doesn't error; it falls back to the defaults
+            <code>type="authored"</code> and <code>limit="5"</code>. Check attribute values against the table above before saving.
           </p>
         </div>
         <div class="faq-item">
-          <p class="faq-q">为什么访客看不到我的自定义主页？</p>
+          <p class="faq-q">Why can't visitors see my custom homepage?</p>
           <p class="faq-a">
-            自定义内容被管理员下架后，访客会看到普通个人主页。修改内容不会自动恢复，
-            需要联系管理员复核。
+            After an admin takes down the custom content, visitors see the normal profile homepage. Editing the content does not restore it automatically;
+            contact an admin for review.
           </p>
         </div>
       </section>
@@ -249,29 +249,29 @@ import {
 } from '@/utils/homepageGuide'
 
 const QUICK_START = `<section style="padding: 24px;">
-  <h1>你好，我是……</h1>
-  <p>欢迎来到我的主页。</p>
+  <h1>Hi, I'm ...</h1>
+  <p>Welcome to my profile.</p>
   <of-profile></of-profile>
 </section>`
 
-const COMPONENT_SNIPPET = `<of-profile heading="关于我"></of-profile>
-<of-stats heading="社区数据"></of-stats>
+const COMPONENT_SNIPPET = `<of-profile heading="About me"></of-profile>
+<of-stats heading="Community stats"></of-stats>
 
-<of-posts type="authored" limit="5" heading="我的帖子"></of-posts>
-<of-posts type="liked" limit="5" heading="我点赞的帖子"></of-posts>
-<of-posts type="commented" limit="5" heading="我评论过的帖子"></of-posts>`
+<of-posts type="authored" limit="5" heading="My posts"></of-posts>
+<of-posts type="liked" limit="5" heading="Posts I liked"></of-posts>
+<of-posts type="commented" limit="5" heading="Posts I commented on"></of-posts>`
 
 const ATTRIBUTE_ROWS = [
-  { tag: '所有标签', attrs: 'class、id、title、dir、lang、style' },
-  { tag: 'a', attrs: 'href、title' },
-  { tag: 'img', attrs: 'src、alt、width、height' },
-  { tag: 'td / th', attrs: 'colspan、rowspan' },
+  { tag: 'All tags', attrs: 'class, id, title, dir, lang, style' },
+  { tag: 'a', attrs: 'href, title' },
+  { tag: 'img', attrs: 'src, alt, width, height' },
+  { tag: 'td / th', attrs: 'colspan, rowspan' },
   { tag: 'col / colgroup', attrs: 'span' },
   { tag: 'ol', attrs: 'start' },
   { tag: 'li', attrs: 'value' },
   { tag: 'details', attrs: 'open' },
   { tag: 'of-profile / of-stats', attrs: 'heading' },
-  { tag: 'of-posts', attrs: 'type、limit、heading' },
+  { tag: 'of-posts', attrs: 'type, limit, heading' },
 ]
 
 const ALLOWED_TAGS = HOMEPAGE_ALLOWED_TAGS
@@ -288,9 +288,9 @@ function goBack() {
 async function copyExample() {
   try {
     await navigator.clipboard.writeText(EXAMPLE)
-    ElMessage.success('示例已复制')
+    ElMessage.success('Example copied')
   } catch {
-    ElMessage.warning('复制失败，请手动选择代码复制')
+    ElMessage.warning('Copy failed. Select the code and copy it manually.')
   }
 }
 </script>

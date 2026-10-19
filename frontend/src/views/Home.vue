@@ -5,7 +5,7 @@
     <div class="feed-column">
       <div class="feed-toolbar">
         <SortChips v-model="sort" :options="sorts" />
-        <el-button size="small" text @click="loadPosts(true)">刷新</el-button>
+        <el-button size="small" text @click="loadPosts(true)">Refresh</el-button>
       </div>
 
       <el-skeleton v-if="loading" :rows="6" animated />
@@ -13,15 +13,15 @@
       <div v-else-if="error" class="state-box error">
         {{ error }}
         <div style="margin-top: 12px">
-          <el-button size="small" @click="loadPosts(true)">重试</el-button>
+          <el-button size="small" @click="loadPosts(true)">Retry</el-button>
         </div>
       </div>
 
       <div v-else-if="!posts.length" class="state-box">
-        <p>还没有帖子。</p>
+        <p>No posts yet.</p>
         <div style="margin-top: 12px">
           <el-button type="primary" round @click="router.push('/create-forum')">
-            创建一个社区
+            Create a community
           </el-button>
         </div>
       </div>
@@ -37,7 +37,7 @@
         </div>
         <div v-if="posts.length < total" class="load-more">
           <el-button round :loading="loadingMore" @click="loadMore">
-            加载更多
+            Load more
           </el-button>
         </div>
       </template>
@@ -47,17 +47,17 @@
       <section class="rail-card about-card">
         <div class="about-banner"></div>
         <div class="about-body">
-          <h3 class="about-title">关于 OpenForum</h3>
+          <h3 class="about-title">About OpenForum</h3>
           <p class="about-desc">
-            OpenForum 是一个开放式中文社区，任何人都可以创建社区、发帖与讨论。
+            OpenForum is an open community where anyone can create communities, post, and discuss.
           </p>
           <div class="about-stats">
             <div class="about-row">
-              <span class="k">社区</span>
+              <span class="k">Communities</span>
               <span class="v">{{ forumCount }}</span>
             </div>
             <div class="about-row">
-              <span class="k">帖子</span>
+              <span class="k">Posts</span>
               <span class="v">{{ postCount }}</span>
             </div>
           </div>
@@ -68,13 +68,13 @@
             @click="router.push('/create-forum')"
           >
             <IconPlus />
-            <span>创建社区</span>
+            <span>Create community</span>
           </el-button>
         </div>
       </section>
 
       <section class="rail-card">
-        <div class="rail-heading">为你推荐</div>
+        <div class="rail-heading">Recommended for you</div>
         <el-skeleton v-if="sideLoading" :rows="3" animated />
         <template v-else>
           <router-link
@@ -93,13 +93,13 @@
             <span class="rail-community-body">
               <span class="rail-community-name">f/{{ f.slug }}</span>
               <span class="rail-community-meta">
-                {{ f.memberCount }} 成员 · {{ f.postCount }} 帖子
+                {{ f.memberCount }} members · {{ f.postCount }} posts
               </span>
             </span>
           </router-link>
-          <p v-if="!recommended.length" class="rail-empty">暂无推荐</p>
+          <p v-if="!recommended.length" class="rail-empty">No recommendations yet</p>
           <router-link to="/search?tab=forums" class="rail-more">
-            查看全部社区
+            View all communities
           </router-link>
         </template>
       </section>
@@ -127,9 +127,9 @@ const route = useRoute()
 type Sort = 'hot' | 'new' | 'top'
 
 const sorts: SortOption<Sort>[] = [
-  { label: '热门', value: 'hot' },
-  { label: '最新', value: 'new' },
-  { label: '最高分', value: 'top' },
+  { label: 'Hot', value: 'hot' },
+  { label: 'Newest', value: 'new' },
+  { label: 'Top', value: 'top' },
 ]
 
 const posts = ref<Post[]>([])
@@ -191,7 +191,7 @@ async function loadSidebar() {
     forumCount.value = pageRes.total || pageRes.items.length
     postCount.value = pageRes.items.reduce((sum, f) => sum + (f.postCount || 0), 0)
   } catch {
-    // 侧栏失败不阻塞主内容
+    // Sidebar failures do not block the main content
   } finally {
     sideLoading.value = false
   }
@@ -200,12 +200,12 @@ async function loadSidebar() {
 async function onVote(payload: { post: Post; value: number }) {
   const { post, value } = payload
   if (!auth.isAuthenticated) {
-    ElMessage.warning('请先登录后投票')
+    ElMessage.warning('Please log in to vote')
     router.push({ name: 'login', query: { redirect: route.fullPath } })
     return
   }
   if (post.canVote === false) {
-    ElMessage.warning('你暂时没有投票权限')
+    ElMessage.warning('You do not have permission to vote at this time')
     return
   }
   try {

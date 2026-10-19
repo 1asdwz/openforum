@@ -45,7 +45,7 @@ async fn main() -> anyhow::Result<()> {
     let cfg = Arc::new(Config::from_env());
     cfg.validate()?;
     tracing::info!(
-        "OpenForum Rust 后端启动中，端口 {}，数据库 {}:{} / {}",
+        "Starting OpenForum Rust backend on port {}, database {}:{} / {}",
         cfg.port,
         cfg.db_host,
         cfg.db_port,
@@ -53,11 +53,11 @@ async fn main() -> anyhow::Result<()> {
     );
 
     let pool = db::connect(&cfg).await?;
-    tracing::info!("MySQL 连接池就绪");
+    tracing::info!("MySQL connection pool ready");
 
     let storage = Arc::new(Storage::from_config(&cfg)?);
     if !cfg.minio_enabled {
-        tracing::warn!("MinIO 未启用（MINIO_ENABLED=false），媒体上传/读取将被拒绝");
+        tracing::warn!("MinIO is disabled (MINIO_ENABLED=false); media uploads and reads will be rejected");
     }
 
     let http = reqwest::Client::builder()
@@ -74,14 +74,14 @@ async fn main() -> anyhow::Result<()> {
         plugins,
     };
 
-    // 种子数据：仅在数据库为空时执行，失败仅告警（不阻断启动）。
+    // Seed data: runs only when the database is empty; failures are logged as warnings (startup is not blocked).
     if let Err(e) = seeder::seed(&state).await {
-        tracing::warn!("种子数据初始化失败（忽略）: {e}");
+        tracing::warn!("Failed to initialize seed data (ignored): {e}");
     }
 
-    // 信息项与板块门槛迁移：幂等执行，失败仅告警（门槛判定会回退旧逻辑）。
+    // Info field and forum gate migrations: idempotent; failures are logged as warnings (gate checks fall back to legacy logic).
     if let Err(e) = migrate::run(&state).await {
-        tracing::warn!("数据迁移失败（忽略）: {e}");
+        tracing::warn!("Data migration failed (ignored): {e}");
     }
 
     let cors = CorsLayer::new()
@@ -89,17 +89,17 @@ async fn main() -> anyhow::Result<()> {
         .allow_methods(Any)
         .allow_headers(Any);
 
-    // 网关中间件需要独立的 `Arc<Config>`（state 随后会被移动进 `.with_state()`）。
+    // The gate middleware needs its own `Arc<Config>` (state is moved into `.with_state()` afterwards).
     let gate_state = cfg.clone();
 
     let app = Router::new()
         .nest("/api", routes::router())
-        // 未匹配路径与 Java `GlobalExceptionHandler.handleNotFound` 对齐：404 + `资源不存在`。
+        // Unmatched paths match Java's `GlobalExceptionHandler.handleNotFound`: 404 + `Resource not found`.
         .fallback(not_found)
-        // 与 Java `spring.servlet.multipart.max-request-size: 60MB` 对齐。
-        // axum 的 Multipart/Json 提取器默认上限仅 2MB，不放开会导致图片(10MB)/视频(50MB)上传失败。
+        // Matches Java's `spring.servlet.multipart.max-request-size: 60MB`.
+        // axum's Multipart/Json extractors default to only 2MB; without raising this, image (10MB) and video (50MB) uploads fail.
         .layer(DefaultBodyLimit::max(60 * 1024 * 1024))
-        // 复刻 Java `SecurityConfig` 的路径级鉴权（过滤器层 401/403）。
+        // Mirrors Java `SecurityConfig` path-level authorization (filter layer 401/403).
         .layer(middleware::from_fn_with_state(gate_state, spring_security_gate))
         .layer(cors)
         .layer(TraceLayer::new_for_http())
@@ -107,7 +107,7 @@ async fn main() -> anyhow::Result<()> {
 
     let addr = format!("0.0.0.0:{}", cfg.port);
     let listener = tokio::net::TcpListener::bind(&addr).await?;
-    tracing::info!("监听 http://{addr}（API 前缀 /api）");
+    tracing::info!("Listening on http://{addr} (API prefix /api)");
     axum::serve(listener, app).await?;
 
     Ok(())
@@ -123,19 +123,19 @@ fn init_tracing() {
         .init();
 }
 
-/// 未匹配任何路由时的兜底，与 Java `GlobalExceptionHandler.handleNotFound` 对齐：
-/// HTTP 404，body `{code:404,message:"资源不存在",data:null}`。
+/// Fallback when no route matches, aligned with Java's `GlobalExceptionHandler.handleNotFound`:
+/// HTTP 404 with body `{code:404,message:"Resource not found",data:null}`.
 async fn not_found() -> crate::error::ApiError {
-    crate::error::ApiError::not_found("资源不存在")
+    crate::error::ApiError::not_found("Resource not found")
 }
 
-/// Spring Ant `prefix/**` 语义：匹配 `prefix` 自身或以 `prefix/` 开头。
+/// Spring Ant `prefix/**` semantics: matches `prefix` itself or anything starting with `prefix/`.
 fn under_prefix(prefix: &str, path: &str) -> bool {
     path == prefix || path.starts_with(&format!("{prefix}/"))
 }
 
-/// 复刻 Java `SecurityConfig.PUBLIC_PATHS` 的匿名放行集合。
-/// 入参为去掉 `/api` 前缀后的路径（Java 同时登记了带/不带前缀两套，这里统一按非前缀形式匹配）。
+/// Mirrors Java `SecurityConfig.PUBLIC_PATHS`, the set of paths allowed anonymously.
+/// The input is the path with the `/api` prefix removed (Java registers both prefixed and unprefixed sets; here we match uniformly without the prefix).
 fn is_public_path(path: &str) -> bool {
     under_prefix("/auth", path)
         || under_prefix("/forums", path)
@@ -146,8 +146,8 @@ fn is_public_path(path: &str) -> bool {
         || path == "/authentications/types"
 }
 
-/// 复刻 Java `SecurityConfig` 的路径级鉴权（过滤器层），保证未认证/无权限的
-/// 响应体为 `{code,message}`（不带 `data`），与 `writeJson` 完全一致。
+/// Mirrors Java `SecurityConfig` path-level authorization (filter layer), ensuring unauthenticated/unauthorized
+/// responses have the body `{code,message}` (without `data`), exactly like `writeJson`.
 async fn spring_security_gate(
     State(cfg): State<Arc<Config>>,
     req: Request,
@@ -155,14 +155,14 @@ async fn spring_security_gate(
 ) -> Response {
     let method = req.method().clone();
     let path = req.uri().path().to_string();
-    // 路由挂载在 `/api` 下，这里统一剥离前缀后按 Java 非前缀形式匹配。
+    // Routes are mounted under `/api`; strip the prefix here to match Java's unprefixed form.
     let p = path.strip_prefix("/api").unwrap_or(&path).to_string();
 
-    // OPTIONS 预检放行（Java `OPTIONS /** permitAll`）。CorsLayer 通常已短路处理，这里兜底。
+    // Allow OPTIONS preflight (Java `OPTIONS /** permitAll`). CorsLayer usually short-circuits this; this is a fallback.
     if method == Method::OPTIONS {
         return next.run(req).await;
     }
-    // GET /media/** permitAll（MinIO 媒体代理）。
+    // GET /media/** permitAll (MinIO media proxy).
     if method == Method::GET && under_prefix("/media", &p) {
         return next.run(req).await;
     }
@@ -176,7 +176,7 @@ async fn spring_security_gate(
     let authenticated = user.is_some();
     let is_admin = user.as_ref().map(|u| u.is_admin()).unwrap_or(false);
 
-    // `/admin/**` 需 ADMIN 角色（对齐全 `ADMIN_PATHS`）。
+    // `/admin/**` requires the ADMIN role (matching the `ADMIN_PATHS` set).
     if under_prefix("/admin", &p) {
         return if is_admin {
             next.run(req).await
@@ -187,12 +187,12 @@ async fn spring_security_gate(
         };
     }
 
-    // 公共路径放行。
+    // Public paths are allowed.
     if is_public_path(&p) {
         return next.run(req).await;
     }
 
-    // 其余路径 `anyRequest().authenticated()`。
+    // All other paths use `anyRequest().authenticated()`.
     if authenticated {
         next.run(req).await
     } else {

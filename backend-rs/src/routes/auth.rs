@@ -49,40 +49,40 @@ fn is_email(v: &str) -> bool {
     !local.is_empty() && domain.contains('.') && !domain.starts_with('.') && !domain.ends_with('.')
 }
 
-/// 对应 Java `AuthService.register`。
+/// Corresponds to Java `AuthService.register`.
 pub async fn register(
     State(state): State<AppState>,
     Json(req): Json<RegisterRequest>,
 ) -> ApiResult<Json<Value>> {
     if blank(&req.username) {
-        return Err(ApiError::bad_request("username 用户名不能为空"));
+        return Err(ApiError::bad_request("username must not be empty"));
     }
     let username = req.username.as_deref().unwrap().trim().to_string();
     let ulen = username.chars().count();
     if !(3..=50).contains(&ulen) {
-        return Err(ApiError::bad_request("username 长度需在 3-50 之间"));
+        return Err(ApiError::bad_request("username must be between 3 and 50 characters"));
     }
     if blank(&req.email) {
-        return Err(ApiError::bad_request("email 邮箱不能为空"));
+        return Err(ApiError::bad_request("email must not be empty"));
     }
     let email = req.email.as_deref().unwrap().trim().to_string();
     if !is_email(&email) {
-        return Err(ApiError::bad_request("email 格式不正确"));
+        return Err(ApiError::bad_request("Invalid email format"));
     }
     if blank(&req.password) {
-        return Err(ApiError::bad_request("password 密码不能为空"));
+        return Err(ApiError::bad_request("password must not be empty"));
     }
     let password = req.password.as_deref().unwrap().to_string();
     let plen = password.chars().count();
     if !(6..=64).contains(&plen) {
-        return Err(ApiError::bad_request("password 长度需在 6-64 之间"));
+        return Err(ApiError::bad_request("password must be between 6 and 64 characters"));
     }
 
     if repo::exists_username(&state.pool, &username).await? {
-        return Err(ApiError::bad_request("用户名已被占用"));
+        return Err(ApiError::bad_request("Username is already taken"));
     }
     if repo::exists_email(&state.pool, &email).await? {
-        return Err(ApiError::bad_request("邮箱已被占用"));
+        return Err(ApiError::bad_request("Email is already taken"));
     }
 
     let hash = hash_password(&password)?;
@@ -104,28 +104,28 @@ pub async fn register(
     Ok(j::ok(json!({ "token": token, "user": user_dto })))
 }
 
-/// 对应 Java `AuthService.login`。
+/// Corresponds to Java `AuthService.login`.
 pub async fn login(
     State(state): State<AppState>,
     Json(req): Json<LoginRequest>,
 ) -> ApiResult<Json<Value>> {
     if blank(&req.username_or_email) {
-        return Err(ApiError::bad_request("usernameOrEmail 账号不能为空"));
+        return Err(ApiError::bad_request("usernameOrEmail must not be empty"));
     }
     if blank(&req.password) {
-        return Err(ApiError::bad_request("password 密码不能为空"));
+        return Err(ApiError::bad_request("password must not be empty"));
     }
     let value = req.username_or_email.as_deref().unwrap().trim().to_string();
     let password = req.password.as_deref().unwrap();
 
     let user = repo::find_user_by_username_or_email(&state.pool, &value)
         .await?
-        .ok_or_else(|| ApiError::unauthorized("账号或密码错误"))?;
+        .ok_or_else(|| ApiError::unauthorized("Incorrect account or password"))?;
     if !user.active {
-        return Err(ApiError::forbidden("账号已被禁用"));
+        return Err(ApiError::forbidden("Account has been disabled"));
     }
     if !verify_password(password, &user.password) {
-        return Err(ApiError::unauthorized("账号或密码错误"));
+        return Err(ApiError::unauthorized("Incorrect account or password"));
     }
 
     let token = create_token(&state.cfg, &user);
@@ -141,13 +141,13 @@ struct GoogleUser {
     picture: Option<String>,
 }
 
-/// 对应 Java `GoogleTokenVerifier.verify`。
+/// Corresponds to Java `GoogleTokenVerifier.verify`.
 async fn verify_google(state: &AppState, credential: &str) -> Result<GoogleUser, ApiError> {
     if !state.cfg.google_configured() {
-        return Err(ApiError::bad_request("Google 登录未配置"));
+        return Err(ApiError::bad_request("Google login is not configured"));
     }
     if credential.trim().is_empty() {
-        return Err(ApiError::unauthorized("Google 登录凭证无效"));
+        return Err(ApiError::unauthorized("Invalid Google login credential"));
     }
     let url = "https://oauth2.googleapis.com/tokeninfo";
     let resp = state
@@ -158,19 +158,19 @@ async fn verify_google(state: &AppState, credential: &str) -> Result<GoogleUser,
         .await
         .map_err(|e| {
             tracing::warn!("Google tokeninfo request failed: {e}");
-            ApiError::unauthorized("Google 登录凭证无效")
+            ApiError::unauthorized("Invalid Google login credential")
         })?;
-    let body = resp.text().await.map_err(|_| ApiError::unauthorized("Google 登录凭证无效"))?;
+    let body = resp.text().await.map_err(|_| ApiError::unauthorized("Invalid Google login credential"))?;
     if body.trim().is_empty() {
-        return Err(ApiError::unauthorized("Google 登录凭证无效"));
+        return Err(ApiError::unauthorized("Invalid Google login credential"));
     }
     let claims: Value =
-        serde_json::from_str(&body).map_err(|_| ApiError::unauthorized("Google 登录凭证无效"))?;
+        serde_json::from_str(&body).map_err(|_| ApiError::unauthorized("Invalid Google login credential"))?;
     if !claims.is_object() {
-        return Err(ApiError::unauthorized("Google 登录凭证无效"));
+        return Err(ApiError::unauthorized("Invalid Google login credential"));
     }
 
-    // audience 校验
+    // audience validation
     let allowed: Vec<String> = state
         .cfg
         .google_client_id
@@ -190,7 +190,7 @@ async fn verify_google(state: &AppState, credential: &str) -> Result<GoogleUser,
         }
     };
     if !aud_ok {
-        return Err(ApiError::unauthorized("Google 登录凭证无效"));
+        return Err(ApiError::unauthorized("Invalid Google login credential"));
     }
 
     // email_verified
@@ -200,12 +200,12 @@ async fn verify_google(state: &AppState, credential: &str) -> Result<GoogleUser,
         None => false,
     };
     if !email_verified {
-        return Err(ApiError::bad_request("Google 账号邮箱未验证"));
+        return Err(ApiError::bad_request("Google account email is not verified"));
     }
 
     let sub = claims.get("sub").and_then(|v| v.as_str()).unwrap_or("").trim();
     if sub.is_empty() {
-        return Err(ApiError::unauthorized("Google 登录凭证无效"));
+        return Err(ApiError::unauthorized("Invalid Google login credential"));
     }
 
     let str_claim = |key: &str| -> Option<String> {
@@ -249,16 +249,16 @@ async fn available_username(
     Ok(candidate)
 }
 
-/// 对应 Java `AuthService.loginWithGoogle`。
+/// Corresponds to Java `AuthService.loginWithGoogle`.
 pub async fn google(
     State(state): State<AppState>,
     Json(req): Json<GoogleLoginRequest>,
 ) -> ApiResult<Json<Value>> {
     if !state.cfg.google_configured() {
-        return Err(ApiError::bad_request("Google 登录未配置"));
+        return Err(ApiError::bad_request("Google login is not configured"));
     }
     if blank(&req.credential) {
-        return Err(ApiError::bad_request("credential Google 登录凭证不能为空"));
+        return Err(ApiError::bad_request("credential must not be empty"));
     }
     let credential = value_of(&req.credential);
     let gu = verify_google(&state, &credential).await?;
@@ -283,7 +283,7 @@ pub async fn google(
 
     if let Some(ref existing) = user {
         if !existing.active {
-            return Err(ApiError::forbidden("账号已被禁用"));
+            return Err(ApiError::forbidden("Account has been disabled"));
         }
     } else {
         let username = available_username(&state, gu.email.as_deref(), gu.name.as_deref()).await?;
@@ -310,7 +310,7 @@ pub async fn google(
     Ok(j::ok(json!({ "token": token, "user": user_dto })))
 }
 
-/// 对应 Java `AuthController.me`。
+/// Corresponds to Java `AuthController.me`.
 pub async fn me(
     State(state): State<AppState>,
     user: CurrentUser,

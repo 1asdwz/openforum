@@ -17,7 +17,7 @@
         <span class="dot">·</span>
         <span>{{ formatTime(post.createdAt) }}</span>
         <el-tag v-if="post.isPinned" size="small" type="danger" effect="plain" class="pin-tag">
-          置顶
+          Pinned
         </el-tag>
       </div>
 
@@ -30,22 +30,22 @@
       <div class="post-footer">
         <router-link class="post-action comments-link" :to="`/post/${post.id}`">
           <IconComment class="ico" />
-          <span>{{ post.commentCount }} 条评论</span>
+          <span>{{ post.commentCount }} comments</span>
         </router-link>
 
         <button class="post-action" type="button" @click="onShare">
           <IconShare class="ico" />
-          <span>分享</span>
+          <span>Share</span>
         </button>
 
         <el-dropdown trigger="click" @command="onMore">
-          <button class="post-action" type="button" aria-label="更多操作">
+          <button class="post-action" type="button" aria-label="More actions">
             <IconMore class="ico" />
           </button>
           <template #dropdown>
             <el-dropdown-menu>
-              <el-dropdown-item command="copy">复制链接</el-dropdown-item>
-              <el-dropdown-item command="open">在新标签页打开</el-dropdown-item>
+              <el-dropdown-item command="copy">Copy link</el-dropdown-item>
+              <el-dropdown-item command="open">Open in new tab</el-dropdown-item>
             </el-dropdown-menu>
           </template>
         </el-dropdown>
@@ -74,7 +74,7 @@ const excerpt = computed(() => {
   return text.length > 180 ? `${text.slice(0, 180)}…` : text
 })
 
-const postUrl = () => `${location.origin}/forum/post/${props.post.id}`
+const postUrl = () => `${location.origin}${import.meta.env.BASE_URL}post/${props.post.id}`
 
 async function onShare() {
   const url = postUrl()
@@ -84,9 +84,9 @@ async function onShare() {
       return
     }
     await navigator.clipboard.writeText(url)
-    ElMessage.success('链接已复制')
+    ElMessage.success('Link copied')
   } catch {
-    // 用户取消分享
+    // User cancelled sharing
   }
 }
 
@@ -94,9 +94,9 @@ async function onMore(command: string) {
   if (command === 'copy') {
     try {
       await navigator.clipboard.writeText(postUrl())
-      ElMessage.success('链接已复制')
+      ElMessage.success('Link copied')
     } catch {
-      ElMessage.error('复制失败，请手动复制地址栏链接')
+      ElMessage.error('Copy failed. Please copy the URL from the address bar manually.')
     }
   } else if (command === 'open') {
     window.open(postUrl(), '_blank')

@@ -9,7 +9,7 @@
         :class="{ active: route.name === 'home' }"
       >
         <IconHome class="rail-ico" />
-        <span>首页</span>
+        <span>Home</span>
       </router-link>
       <router-link
         to="/search?tab=forums"
@@ -17,7 +17,7 @@
         :class="{ active: route.name === 'search' }"
       >
         <IconSearch class="rail-ico" />
-        <span>探索社区</span>
+        <span>Explore communities</span>
       </router-link>
       <router-link
         v-if="auth.user"
@@ -28,7 +28,7 @@
         <el-avatar :size="24" :src="auth.user.avatar || undefined">
           {{ avatarText(auth.user.username) }}
         </el-avatar>
-        <span class="rail-nav-ellipsis">我的主页</span>
+        <span class="rail-nav-ellipsis">My profile</span>
       </router-link>
       <router-link
         v-if="auth.user"
@@ -37,7 +37,7 @@
         :class="{ active: route.name === 'homepage-settings' }"
       >
         <IconUser class="rail-ico" />
-        <span>主页装修</span>
+        <span>Homepage customization</span>
       </router-link>
       <router-link
         v-if="auth.user"
@@ -46,13 +46,13 @@
         :class="{ active: route.name === 'my-info' }"
       >
         <IconUser class="rail-ico" />
-        <span>资料与认证</span>
+        <span>Profile &amp; verification</span>
       </router-link>
     </nav>
 
     <section class="rail-card">
       <div class="rail-heading">
-        {{ showMine ? '我的社区' : '热门社区' }}
+        {{ showMine ? 'My communities' : 'Popular communities' }}
       </div>
 
       <el-skeleton v-if="loading" :rows="4" animated />
@@ -73,23 +73,23 @@
           </span>
           <span class="rail-community-body">
             <span class="rail-community-name">f/{{ f.slug }}</span>
-            <span class="rail-community-meta">{{ f.memberCount }} 成员</span>
+            <span class="rail-community-meta">{{ f.memberCount }} members</span>
           </span>
         </router-link>
 
         <p v-if="!list.length" class="rail-empty">
-          {{ showMine ? '你还没有加入社区' : '还没有社区' }}
+          {{ showMine ? "You haven't joined any communities yet" : 'No communities yet' }}
         </p>
       </template>
 
       <router-link to="/create-forum" class="rail-nav-item rail-create">
         <IconPlus class="rail-ico" />
-        <span>创建社区</span>
+        <span>Create community</span>
       </router-link>
     </section>
 
     <div class="rail-card rail-footer">
-      <router-link to="/search?tab=forums">查看全部社区</router-link>
+      <router-link to="/search?tab=forums">View all communities</router-link>
     </div>
   </aside>
 </template>
@@ -129,7 +129,7 @@ async function load() {
       mine.value = normalizePage<SubForum>(all).items.filter((f) => f.isMember)
     }
   } catch {
-    // 侧栏失败不阻塞主内容
+    // Sidebar failures should not block the main content
   } finally {
     loading.value = false
   }

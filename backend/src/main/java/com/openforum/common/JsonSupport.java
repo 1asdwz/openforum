@@ -56,4 +56,14 @@ public class JsonSupport {
         }
         return objectMapper.readValue(json, STRING_LIST_TYPE);
     }
+
+    /**
+     * 将 JSON 字符串反序列化为指定类型，解析失败返回 null。
+     */
+    public <T> T fromJson(String json, Class<T> type) {
+        if (json == null || json.isBlank()) {
+            return null;
+        }
+        return objectMapper.readValue(json, type);
+    }
 }

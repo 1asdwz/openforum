@@ -14,7 +14,7 @@ pub async fn find_user_by_id(pool: &MySqlPool, id: i64) -> Result<Option<User>, 
 pub async fn require_user(pool: &MySqlPool, id: i64) -> Result<User, ApiError> {
     find_user_by_id(pool, id)
         .await?
-        .ok_or_else(|| ApiError::not_found("用户不存在"))
+        .ok_or_else(|| ApiError::not_found("User not found"))
 }
 
 pub async fn find_user_by_email(pool: &MySqlPool, email: &str) -> Result<Option<User>, ApiError> {
@@ -88,7 +88,7 @@ pub async fn insert_user(
     let id = result.last_insert_id() as i64;
     find_user_by_id(pool, id)
         .await?
-        .ok_or_else(|| ApiError::internal("用户创建失败"))
+        .ok_or_else(|| ApiError::internal("Failed to create user"))
 }
 
 pub async fn update_user_profile(
@@ -135,7 +135,7 @@ pub async fn approved_type_names(pool: &MySqlPool, user_id: i64) -> Result<Vec<S
     Ok(names)
 }
 
-// -------- 认证实体 --------
+// -------- Auth entity --------
 
 pub async fn find_auth_by_id(pool: &MySqlPool, id: i64) -> Result<Option<UserAuthentication>, ApiError> {
     let auth = sqlx::query_as::<_, UserAuthentication>("SELECT * FROM user_authentications WHERE id = ?")
@@ -176,8 +176,8 @@ pub async fn list_auth_by_user(
     Ok(rows)
 }
 
-/// 插入或更新认证记录，并把生成的 id 写入实体。
-/// 泛型 executor：既可传 `&MySqlPool`，也可传 `&mut *tx`（在事务内保证与审核日志的原子性）。
+/// Insert or update an auth record and write the generated id back to the entity.
+/// Generic executor: accepts `&MySqlPool` or `&mut *tx` (keeping review logs atomic within a transaction).
 pub async fn save_auth<'e, E>(executor: E, auth: &mut UserAuthentication) -> Result<(), ApiError>
 where
     E: sqlx::Executor<'e, Database = sqlx::MySql>,
@@ -229,9 +229,10 @@ where
     .execute(executor)
     .await?;
     auth.id = result.last_insert_id() as i64;
-    // 回填时间戳：INSERT 使用数据库的 NOW()，但内存结构体的 created_at/updated_at
-    // 默认是 epoch(1970)。若不回填，接口响应会把 createdAt 序列化成 1970。
-    // 这里用本地墙钟回填，与随后从数据库读回的值落在同一时钟上（均为 UTC）。
+    // Backfill timestamps: INSERT uses the database's NOW(), but the in-memory struct's
+    // created_at/updated_at default to epoch (1970). Without backfilling, API responses
+    // would serialize createdAt as 1970. Using the local wall clock here keeps them on the
+    // same clock as the values read back from the database (both UTC).
     let now = chrono::Local::now().naive_local();
     auth.created_at = now;
     auth.updated_at = now;
@@ -268,7 +269,7 @@ where
     Ok(())
 }
 
-// -------- 认证媒体 --------
+// -------- Auth media --------
 
 pub async fn find_auth_media(pool: &MySqlPool, id: i64) -> Result<Option<AuthMedia>, ApiError> {
     let media = sqlx::query_as::<_, AuthMedia>("SELECT * FROM auth_media WHERE id = ?")
@@ -338,7 +339,7 @@ where
         return Ok(());
     }
     let placeholders = vec!["?"; ids.len()].join(",");
-    // 必须带 user_id 过滤：否则用户可以把他人的 auth_media 绑定到自己的认证记录上（跨用户越权）。
+    // The user_id filter is required: otherwise a user could bind someone else's auth_media to their own auth record (cross-user privilege escalation).
     let sql = format!(
         "UPDATE auth_media SET authentication_id = ? WHERE user_id = ? AND id IN ({placeholders})"
     );
@@ -350,7 +351,7 @@ where
     Ok(())
 }
 
-// -------- 活体挑战 --------
+// -------- Liveness challenges --------
 
 pub async fn find_challenge<'e, E>(
     executor: E,
@@ -392,8 +393,8 @@ pub async fn insert_challenge(
     Ok(())
 }
 
-/// 原子地「消费」活体挑战：仅当记录存在、属于该用户且尚未使用时才写入 used_at。
-/// 返回是否真正抢到本次消费（false 表示已被并发请求抢先消费），用于消除 TOCTOU。
+/// Atomically "consume" a liveness challenge: write used_at only if the record exists, belongs to the user, and is unused.
+/// Returns whether this request actually won the consumption (false means a concurrent request got there first), eliminating TOCTOU.
 pub async fn mark_challenge_used<'e, E>(
     executor: E,
     id: &str,

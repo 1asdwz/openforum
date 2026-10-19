@@ -9,14 +9,14 @@ import DOMPurify from 'dompurify'
 
 const props = defineProps<{ markdown?: string | null }>()
 
-// 独立实例，避免影响其它模块的 marked 默认配置
+// Separate instance to avoid affecting the default marked config in other modules
 const md = new Marked({ gfm: true, breaks: true })
 
 const html = computed(() => {
   const raw = md.parse(props.markdown || '') as string
   return DOMPurify.sanitize(raw, {
     USE_PROFILES: { html: true },
-    // 放行编辑器插入的媒体标签/属性；script、iframe 与 on* 事件仍被默认拦截
+    // Allow media tags/attributes inserted by the editor; script, iframe, and on* events remain blocked by default
     ADD_TAGS: ['video'],
     ADD_ATTR: ['controls', 'poster', 'preload'],
   })

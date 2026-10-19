@@ -47,6 +47,6 @@ pub async fn set_enabled(
     let meta = state
         .plugins
         .by_key(&key)
-        .ok_or_else(|| crate::error::ApiError::not_found(format!("插件不存在: {key}")))?;
+        .ok_or_else(|| crate::error::ApiError::not_found(format!("Plugin not found: {key}")))?;
     Ok(j::ok(plugin_dto(&state, meta)))
 }

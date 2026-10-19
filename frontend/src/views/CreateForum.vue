@@ -1,56 +1,56 @@
 <template>
   <div class="content-card" style="max-width: 760px; margin: 0 auto">
-    <h1 class="page-title">创建子论坛</h1>
+    <h1 class="page-title">Create forum</h1>
 
     <el-form label-position="top">
-      <el-form-item label="名称" required>
-        <el-input v-model="form.name" maxlength="60" placeholder="例如：前端技术交流" />
+      <el-form-item label="Name" required>
+        <el-input v-model="form.name" maxlength="60" placeholder="e.g. Frontend Tech Exchange" />
       </el-form-item>
 
-      <el-form-item label="Slug（URL 标识）" required>
-        <el-input v-model="form.slug" placeholder="例如 frontend（小写字母、数字、连字符）">
+      <el-form-item label="Slug (URL identifier)" required>
+        <el-input v-model="form.slug" placeholder="e.g. frontend (lowercase letters, numbers, hyphens)">
           <template #append>
-            <el-button @click="genSlug">自动生成</el-button>
+            <el-button @click="genSlug">Auto-generate</el-button>
           </template>
         </el-input>
       </el-form-item>
 
-      <el-form-item label="简介">
+      <el-form-item label="Description">
         <el-input v-model="form.description" type="textarea" :rows="3" maxlength="200" show-word-limit />
       </el-form-item>
 
-      <el-form-item label="图标（图片 URL，可选）">
+      <el-form-item label="Icon (image URL, optional)">
         <el-input v-model="form.icon" placeholder="https://…" />
       </el-form-item>
 
-      <el-form-item label="主题色">
+      <el-form-item label="Theme color">
         <el-color-picker v-model="form.themeColor" />
       </el-form-item>
 
-      <el-form-item label="页面模板">
+      <el-form-item label="Page template">
         <el-radio-group v-model="form.templateType">
-          <el-radio value="DEFAULT">默认模板（公告 / 版块 / 链接）</el-radio>
-          <el-radio value="CUSTOM">自定义 HTML 页面（需管理员审核）</el-radio>
+          <el-radio value="DEFAULT">Default template (announcement / sections / links)</el-radio>
+          <el-radio value="CUSTOM">Custom HTML page (requires admin review)</el-radio>
         </el-radio-group>
       </el-form-item>
 
-      <el-form-item label="浏览门槛">
+      <el-form-item label="Browse threshold">
         <GateRuleEditor v-model="form.browseRule" :fields="flatFields" />
       </el-form-item>
 
-      <el-form-item label="操作门槛（发帖 / 评论 / 投票）">
+      <el-form-item label="Action threshold (post / comment / vote)">
         <GateRuleEditor v-model="form.operateRule" :fields="flatFields" />
       </el-form-item>
 
-      <el-form-item label="板块规则">
+      <el-form-item label="Community rules">
         <el-input v-model="form.rules" type="textarea" :rows="4" />
       </el-form-item>
 
       <div class="form-actions">
         <el-button type="primary" :loading="submitting" @click="submit">
-          创建子论坛
+          Create forum
         </el-button>
-        <el-button @click="router.back()">取消</el-button>
+        <el-button @click="router.back()">Cancel</el-button>
       </div>
     </el-form>
   </div>
@@ -95,11 +95,11 @@ function genSlug() {
 
 async function submit() {
   if (!form.name.trim() || !form.slug.trim()) {
-    ElMessage.warning('请填写名称和 Slug')
+    ElMessage.warning('Please enter a name and slug')
     return
   }
   if (!/^[a-z0-9-]+$/.test(form.slug.trim())) {
-    ElMessage.warning('Slug 只能包含小写字母、数字和连字符')
+    ElMessage.warning('Slug can only contain lowercase letters, numbers, and hyphens')
     return
   }
   submitting.value = true
@@ -115,10 +115,10 @@ async function submit() {
       browseRule: form.browseRule,
       operateRule: form.operateRule,
     })
-    ElMessage.success('子论坛创建成功')
+    ElMessage.success('Forum created successfully')
     router.push(`/f/${created.slug || form.slug}`)
   } catch (e) {
-    ElMessage.error(errorMessage(e, '创建失败'))
+    ElMessage.error(errorMessage(e, 'Failed to create forum'))
   } finally {
     submitting.value = false
   }
@@ -128,7 +128,7 @@ onMounted(async () => {
   try {
     fieldGroups.value = (await infoApi.fields()) || []
   } catch {
-    // 目录加载失败时门槛编辑器为空，不影响创建
+    // If loading fields fails, the threshold editor stays empty; creation is unaffected
   }
 })
 </script>

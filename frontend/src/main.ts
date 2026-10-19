@@ -1,10 +1,10 @@
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
-// Element Plus 按需引入：命令式调用的组件需显式引入样式，
-// 模板中的 el-* 组件样式由 unplugin-vue-components 自动注入
+// Element Plus on-demand import: imperatively called components need their styles imported explicitly,
+// while styles for el-* components in templates are injected automatically by unplugin-vue-components
 import 'element-plus/es/components/message/style/css'
 import 'element-plus/es/components/message-box/style/css'
-// 深色模式变量（配合 html.dark）
+// Dark mode variables (used with html.dark)
 import 'element-plus/theme-chalk/dark/css-vars.css'
 
 import App from './App.vue'
@@ -18,10 +18,10 @@ const app = createApp(App)
 app.use(createPinia())
 app.use(router)
 
-// 启动时套用主题（同步，避免首屏闪烁）
+// Apply the theme on startup (synchronously, to avoid a first-paint flash)
 useUiStore().init()
 
-// 启动时恢复登录态（异步，不阻塞挂载）
+// Restore login state on startup (async, does not block mounting)
 useAuthStore().bootstrap()
 
 app.mount('#app')

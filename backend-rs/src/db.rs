@@ -3,7 +3,7 @@ use sqlx::MySqlPool;
 
 use crate::config::Config;
 
-/// 建立 MySQL 连接池。表结构由 Java 端 Hibernate `ddl-auto=update` 维护，Rust 端只读写。
+/// Create the MySQL connection pool. The schema is maintained by the Java side's Hibernate `ddl-auto=update`; the Rust side only reads and writes.
 pub async fn connect(cfg: &Config) -> anyhow::Result<MySqlPool> {
     let options = cfg.mysql_options();
     let pool = MySqlPoolOptions::new()

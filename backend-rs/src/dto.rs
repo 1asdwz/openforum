@@ -5,7 +5,7 @@ use crate::error::ApiError;
 use crate::json as j;
 use crate::models::{AuthorDto, User};
 
-/// 帖子摘要用的内容预览：trim 后截断到 200 字符。
+/// Content preview for post summaries: trim, then truncate to 200 characters.
 pub fn preview(content: Option<&str>) -> Option<String> {
     let content = content?;
     let trimmed = content.trim();
@@ -17,7 +17,7 @@ pub fn preview(content: Option<&str>) -> Option<String> {
     }
 }
 
-/// 作者精简信息，不存在时返回 null（对齐 Java `PostService.toSummary`）。
+/// Condensed author info; returns null when absent (mirrors Java `PostService.toSummary`).
 pub async fn author(pool: &MySqlPool, user_id: i64) -> Result<Option<AuthorDto>, ApiError> {
     let row: Option<(i64, String, Option<String>)> =
         sqlx::query_as("SELECT id, username, avatar FROM users WHERE id = ?")
@@ -31,7 +31,7 @@ pub async fn author(pool: &MySqlPool, user_id: i64) -> Result<Option<AuthorDto>,
     }))
 }
 
-/// 用户公开资料 DTO（对齐 Java `UserService.toDto`）。
+/// Public user profile DTO (mirrors Java `UserService.toDto`).
 pub fn user_dto(user: &User, authentications: Vec<String>, include_email: bool) -> Value {
     let email = if include_email {
         user.email.clone()

@@ -1,21 +1,21 @@
 <template>
   <div>
-    <h1 class="page-title">管理后台</h1>
+    <h1 class="page-title">Admin Console</h1>
 
     <div v-if="!ready" style="padding: 40px; text-align: center">
       <el-skeleton :rows="6" animated />
     </div>
 
-    <div v-else-if="!isAdmin" class="state-box error">仅管理员可访问</div>
+    <div v-else-if="!isAdmin" class="state-box error">Admins only</div>
 
     <el-tabs v-else v-model="activeTab">
-      <el-tab-pane label="待审认证" name="auth">
+      <el-tab-pane label="Pending verifications" name="auth">
         <div class="admin-filter">
-          <span>等级筛选：</span>
+          <span>Level filter:</span>
           <el-select
             v-model="levelFilter"
             clearable
-            placeholder="全部等级"
+            placeholder="All levels"
             size="small"
             style="width: 140px"
             @change="loadAuth"
@@ -29,7 +29,7 @@
           </el-select>
         </div>
         <el-skeleton v-if="authLoading" :rows="4" animated />
-        <div v-else-if="!authItems.length" class="state-box">暂无待审认证</div>
+        <div v-else-if="!authItems.length" class="state-box">No pending verifications</div>
         <div v-else class="record-list">
           <div v-for="item in authItems" :key="item.id" class="record-item">
             <div style="flex: 1">
@@ -39,11 +39,11 @@
                   {{ authLevelLabel(item.level) }}
                 </el-tag>
                 <span style="color: var(--of-text-muted); font-weight: 400">
-                  · 用户 #{{ item.userId ?? item.authorId ?? '-' }}
+                  · User #{{ item.userId ?? item.authorId ?? '-' }}
                 </span>
               </div>
               <div class="sidebar-item-meta">
-                提交于 {{ formatDate(item.createdAt) }}
+                Submitted {{ formatDate(item.createdAt) }}
               </div>
               <div style="margin-top: 6px; display: flex; flex-wrap: wrap; gap: 6px">
                 <el-tag
@@ -65,7 +65,7 @@
                     @click="previewMedia(m.id)"
                   />
                   <el-tag v-else-if="m.kind === 'VIDEO'" size="small" type="warning">
-                    视频已上传
+                    Video uploaded
                   </el-tag>
                   <div v-else class="admin-media-thumb admin-media-loading" />
                 </template>
@@ -76,58 +76,98 @@
             </div>
             <div style="display: flex; gap: 8px">
               <el-button type="success" size="small" @click="approveAuth(item)">
-                通过
+                Approve
               </el-button>
               <el-button type="danger" size="small" plain @click="rejectAuth(item)">
-                驳回
+                Reject
               </el-button>
             </div>
           </div>
         </div>
       </el-tab-pane>
 
-      <el-tab-pane label="待审自定义页面" name="pages">
-        <el-skeleton v-if="pagesLoading" :rows="4" animated />
-        <div v-else-if="!pagesItems.length" class="state-box">暂无待审自定义页面</div>
+      <el-tab-pane label="Forum homepages" name="forum-homepages">
+        <div class="admin-filter">
+          <span>Status filter:</span>
+          <el-select
+            v-model="forumHomepageFilter"
+            size="small"
+            style="width: 140px"
+            @change="loadForumHomepages"
+          >
+            <el-option label="All" value="ALL" />
+            <el-option label="Published" value="ACTIVE" />
+            <el-option label="Blocked" value="BLOCKED" />
+          </el-select>
+        </div>
+        <el-skeleton v-if="forumHomepagesLoading" :rows="4" animated />
+        <div v-else-if="!forumHomepageItems.length" class="state-box">No custom forum homepages</div>
         <div v-else class="record-list">
-          <div v-for="item in pagesItems" :key="item.id" class="record-item">
+          <div
+            v-for="item in forumHomepageItems"
+            :key="item.forumId"
+            class="record-item"
+          >
             <div style="flex: 1">
               <div style="font-weight: 600">
-                {{ item.forumName || item.name || item.slug || `页面 #${item.id}` }}
+                {{ item.forumName }}
+                <span class="sidebar-item-meta">f/{{ item.forumSlug }}</span>
+                <el-tag
+                  size="small"
+                  :type="item.status === 'BLOCKED' ? 'danger' : 'success'"
+                  effect="plain"
+                >
+                  {{ item.status === 'BLOCKED' ? 'Blocked' : 'Published' }}
+                </el-tag>
               </div>
               <div class="sidebar-item-meta">
-                提交于 {{ formatDate(item.createdAt) }}
+                Owner {{ item.creatorName }} · Size {{ sizeText(item.sizeBytes) }} · Reports
+                {{ item.reportCount }} · Updated {{ formatDate(item.updatedAt) || '-' }}
+              </div>
+              <div v-if="item.blockReason" class="sidebar-item-meta">
+                Block reason: {{ item.blockReason }}
               </div>
             </div>
             <div style="display: flex; gap: 8px">
-              <el-button size="small" @click="preview(item)">预览</el-button>
-              <el-button type="success" size="small" @click="approvePage(item)">
-                通过
+              <el-button size="small" @click="openForum(item)">View</el-button>
+              <el-button
+                v-if="item.status === 'BLOCKED'"
+                type="success"
+                size="small"
+                @click="unblockForumHomepage(item)"
+              >
+                Restore
               </el-button>
-              <el-button type="danger" size="small" plain @click="rejectPage(item)">
-                驳回
+              <el-button
+                v-else
+                type="danger"
+                size="small"
+                plain
+                @click="blockForumHomepage(item)"
+              >
+                Block
               </el-button>
             </div>
           </div>
         </div>
       </el-tab-pane>
 
-      <el-tab-pane label="个人主页" name="homepages">
+      <el-tab-pane label="Profile pages" name="homepages">
         <div class="admin-filter">
-          <span>状态筛选：</span>
+          <span>Status filter:</span>
           <el-select
             v-model="homepageFilter"
             size="small"
             style="width: 140px"
             @change="loadHomepages"
           >
-            <el-option label="全部" value="ALL" />
-            <el-option label="已发布" value="ACTIVE" />
-            <el-option label="已下架" value="BLOCKED" />
+            <el-option label="All" value="ALL" />
+            <el-option label="Published" value="ACTIVE" />
+            <el-option label="Blocked" value="BLOCKED" />
           </el-select>
         </div>
         <el-skeleton v-if="homepagesLoading" :rows="4" animated />
-        <div v-else-if="!homepageItems.length" class="state-box">暂无自定义个人主页</div>
+        <div v-else-if="!homepageItems.length" class="state-box">No custom profile pages</div>
         <div v-else class="record-list">
           <div v-for="item in homepageItems" :key="item.userId" class="record-item">
             <div style="flex: 1">
@@ -138,26 +178,26 @@
                   :type="item.status === 'BLOCKED' ? 'danger' : 'success'"
                   effect="plain"
                 >
-                  {{ item.status === 'BLOCKED' ? '已下架' : '已发布' }}
+                  {{ item.status === 'BLOCKED' ? 'Blocked' : 'Published' }}
                 </el-tag>
               </div>
               <div class="sidebar-item-meta">
-                大小 {{ sizeText(item.sizeBytes) }} · 举报 {{ item.reportCount }} · 更新于
+                Size {{ sizeText(item.sizeBytes) }} · Reports {{ item.reportCount }} · Updated
                 {{ formatDate(item.updatedAt) || '-' }}
               </div>
               <div v-if="item.blockReason" class="sidebar-item-meta">
-                下架原因：{{ item.blockReason }}
+                Block reason: {{ item.blockReason }}
               </div>
             </div>
             <div style="display: flex; gap: 8px">
-              <el-button size="small" @click="openHomepage(item)">查看</el-button>
+              <el-button size="small" @click="openHomepage(item)">View</el-button>
               <el-button
                 v-if="item.status === 'BLOCKED'"
                 type="success"
                 size="small"
                 @click="unblockHomepage(item)"
               >
-                恢复
+                Restore
               </el-button>
               <el-button
                 v-else
@@ -166,7 +206,7 @@
                 plain
                 @click="blockHomepage(item)"
               >
-                下架
+                Block
               </el-button>
             </div>
           </div>
@@ -174,16 +214,7 @@
       </el-tab-pane>
     </el-tabs>
 
-    <el-dialog v-model="previewVisible" title="自定义页面预览" width="720px">
-      <iframe
-        v-if="previewHtml"
-        class="admin-preview-frame"
-        sandbox="allow-popups"
-        :srcdoc="previewHtml"
-      ></iframe>
-    </el-dialog>
-
-    <el-dialog v-model="mediaVisible" title="媒体预览" width="640px">
+    <el-dialog v-model="mediaVisible" title="Media preview" width="640px">
       <img v-if="mediaPreviewUrl" :src="mediaPreviewUrl" style="max-width: 100%" />
     </el-dialog>
   </div>
@@ -195,7 +226,7 @@ import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { adminApi, authenticationApi } from '@/api'
 import { useAuthStore } from '@/stores/auth'
-import type { AdminHomepageItem } from '@/types'
+import type { AdminForumHomepageItem, AdminHomepageItem } from '@/types'
 import {
   authLevelLabel,
   authTypeLabel,
@@ -225,17 +256,6 @@ interface AdminAuthItem {
   createdAt?: string
 }
 
-interface AdminPageItem {
-  id: number
-  forumId?: number
-  forumName?: string
-  name?: string
-  slug?: string
-  html?: string
-  customPageHtml?: string
-  createdAt?: string
-}
-
 const auth = useAuthStore()
 const router = useRouter()
 
@@ -246,18 +266,12 @@ const activeTab = ref('auth')
 const authItems = ref<AdminAuthItem[]>([])
 const authLoading = ref(false)
 
-const pagesItems = ref<AdminPageItem[]>([])
-const pagesLoading = ref(false)
-
-const previewVisible = ref(false)
-const previewHtml = ref('')
-
 const levelFilter = ref<string>('')
 const LEVEL_OPTIONS = [
-  { value: 'LOW', label: '低' },
-  { value: 'MEDIUM', label: '中' },
-  { value: 'HIGH', label: '高' },
-  { value: 'EXTREME', label: '极高' },
+  { value: 'LOW', label: 'Low' },
+  { value: 'MEDIUM', label: 'Medium' },
+  { value: 'HIGH', label: 'High' },
+  { value: 'EXTREME', label: 'Extreme' },
 ]
 
 const mediaUrls = ref<Record<number, string>>({})
@@ -283,7 +297,7 @@ async function loadHomepages() {
     })
     homepageItems.value = normalizePage<AdminHomepageItem>(payload).items
   } catch (e) {
-    ElMessage.error(errorMessage(e, '个人主页加载失败'))
+    ElMessage.error(errorMessage(e, 'Failed to load profile pages'))
   } finally {
     homepagesLoading.value = false
   }
@@ -296,51 +310,51 @@ function openHomepage(item: AdminHomepageItem) {
 async function blockHomepage(item: AdminHomepageItem) {
   try {
     const { value } = await ElMessageBox.prompt(
-      `下架 ${item.username} 的自定义主页，请填写原因`,
-      '下架个人主页',
+      `Block ${item.username}'s custom profile page. Please provide a reason`,
+      'Block Profile Page',
       {
-        inputPlaceholder: '下架原因（2-200 字）',
-        confirmButtonText: '确认下架',
-        cancelButtonText: '取消',
+        inputPlaceholder: 'Block reason (2-200 characters)',
+        confirmButtonText: 'Block',
+        cancelButtonText: 'Cancel',
         inputValidator: (v: string) => {
           const len = (v || '').trim().length
-          return len >= 2 && len <= 200 ? true : '原因需为 2-200 个字符'
+          return len >= 2 && len <= 200 ? true : 'Reason must be 2-200 characters'
         },
       }
     )
     await adminApi.blockUserHomepage(item.userId, value.trim())
-    ElMessage.success('已下架')
+    ElMessage.success('Blocked')
     loadHomepages()
   } catch {
-    /* 取消或失败 */
+    /* cancelled or failed */
   }
 }
 
 async function unblockHomepage(item: AdminHomepageItem) {
   try {
     await ElMessageBox.confirm(
-      `恢复 ${item.username} 的自定义主页？恢复后立即重新公开。`,
-      '恢复个人主页',
-      { confirmButtonText: '确认恢复', cancelButtonText: '取消', type: 'warning' }
+      `Restore ${item.username}'s custom profile page? It will be public again immediately.`,
+      'Restore Profile Page',
+      { confirmButtonText: 'Restore', cancelButtonText: 'Cancel', type: 'warning' }
     )
   } catch {
     return
   }
   try {
     await adminApi.unblockUserHomepage(item.userId)
-    ElMessage.success('已恢复')
+    ElMessage.success('Restored')
     loadHomepages()
   } catch (e) {
-    ElMessage.error(errorMessage(e, '恢复失败'))
+    ElMessage.error(errorMessage(e, 'Failed to restore'))
   }
 }
 
 function livenessText(item: AdminAuthItem): string {
   const l = item.liveness
   if (!l) return ''
-  if (l.degraded) return '活体降级（转人工）'
-  if (l.passed === true) return '活体已通过'
-  return '未通过活体'
+  if (l.degraded) return 'Liveness degraded (manual review)'
+  if (l.passed === true) return 'Liveness passed'
+  return 'Liveness failed'
 }
 
 function livenessTag(item: AdminAuthItem): 'success' | 'warning' | 'danger' {
@@ -358,7 +372,7 @@ async function loadMediaThumbs(items: AdminAuthItem[]) {
         const blob = await authenticationApi.mediaBlob(m.id)
         mediaUrls.value[m.id] = URL.createObjectURL(blob)
       } catch {
-        /* 忽略单个媒体加载失败 */
+        /* ignore individual media load failures */
       }
     }
   }
@@ -394,28 +408,88 @@ async function loadAuth() {
     authItems.value = normalizePage<AdminAuthItem>(payload).items
     await loadMediaThumbs(authItems.value)
   } catch (e) {
-    ElMessage.error(errorMessage(e, '待审认证加载失败'))
+    ElMessage.error(errorMessage(e, 'Failed to load pending verifications'))
   } finally {
     authLoading.value = false
   }
 }
 
-async function loadPages() {
-  pagesLoading.value = true
+const forumHomepageItems = ref<AdminForumHomepageItem[]>([])
+const forumHomepagesLoading = ref(false)
+const forumHomepageFilter = ref('ALL')
+
+async function loadForumHomepages() {
+  forumHomepagesLoading.value = true
   try {
-    const payload = await adminApi.customPages({ status: 'PENDING', page: 1, size: 50 })
-    pagesItems.value = normalizePage<AdminPageItem>(payload).items
+    const payload = await adminApi.forumHomepages({
+      status: forumHomepageFilter.value,
+      page: 1,
+      size: 50,
+    })
+    forumHomepageItems.value = normalizePage<AdminForumHomepageItem>(payload).items
   } catch (e) {
-    ElMessage.error(errorMessage(e, '待审页面加载失败'))
+    ElMessage.error(errorMessage(e, 'Failed to load forum homepages'))
   } finally {
-    pagesLoading.value = false
+    forumHomepagesLoading.value = false
+  }
+}
+
+function openForum(item: AdminForumHomepageItem) {
+  window.open(`${import.meta.env.BASE_URL}f/${item.forumSlug}`, '_blank', 'noopener,noreferrer')
+}
+
+async function blockForumHomepage(item: AdminForumHomepageItem) {
+  let reason = ''
+  try {
+    const { value } = await ElMessageBox.prompt(
+      `Block ${item.forumName}'s custom homepage. Please provide a reason`,
+      'Block Forum Homepage',
+      {
+        inputPlaceholder: 'Block reason (5-500 characters)',
+        confirmButtonText: 'Block',
+        cancelButtonText: 'Cancel',
+        inputValidator: (v: string) => {
+          const len = (v || '').trim().length
+          return len >= 5 && len <= 500 ? true : 'Reason must be 5-500 characters'
+        },
+      }
+    )
+    reason = value.trim()
+  } catch {
+    return
+  }
+  try {
+    await adminApi.blockForumHomepage(item.forumId, reason)
+    ElMessage.success('Blocked')
+    loadForumHomepages()
+  } catch (e) {
+    ElMessage.error(errorMessage(e, 'Failed to block'))
+  }
+}
+
+async function unblockForumHomepage(item: AdminForumHomepageItem) {
+  try {
+    await ElMessageBox.confirm(
+      `Restore ${item.forumName}'s custom homepage? It will be public again immediately.`,
+      'Restore Forum Homepage',
+      { confirmButtonText: 'Restore', cancelButtonText: 'Cancel', type: 'warning' }
+    )
+  } catch {
+    return
+  }
+  try {
+    await adminApi.unblockForumHomepage(item.forumId)
+    ElMessage.success('Restored')
+    loadForumHomepages()
+  } catch (e) {
+    ElMessage.error(errorMessage(e, 'Failed to restore'))
   }
 }
 
 async function approveAuth(item: AdminAuthItem) {
   try {
     await adminApi.approveAuthentication(item.id)
-    ElMessage.success('已通过')
+    ElMessage.success('Approved')
     loadAuth()
   } catch (e) {
     ElMessage.error(errorMessage(e))
@@ -424,46 +498,16 @@ async function approveAuth(item: AdminAuthItem) {
 
 async function rejectAuth(item: AdminAuthItem) {
   try {
-    const { value } = await ElMessageBox.prompt('请输入驳回原因', '驳回认证', {
-      inputPlaceholder: '驳回原因',
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
+    const { value } = await ElMessageBox.prompt('Please enter a rejection reason', 'Reject Verification', {
+      inputPlaceholder: 'Rejection reason',
+      confirmButtonText: 'OK',
+      cancelButtonText: 'Cancel',
     })
     await adminApi.rejectAuthentication(item.id, value)
-    ElMessage.success('已驳回')
+    ElMessage.success('Rejected')
     loadAuth()
   } catch {
-    /* 取消或失败 */
-  }
-}
-
-function preview(item: AdminPageItem) {
-  previewHtml.value = item.html || item.customPageHtml || ''
-  previewVisible.value = true
-}
-
-async function approvePage(item: AdminPageItem) {
-  try {
-    await adminApi.approveCustomPage(item.id)
-    ElMessage.success('已通过')
-    loadPages()
-  } catch (e) {
-    ElMessage.error(errorMessage(e))
-  }
-}
-
-async function rejectPage(item: AdminPageItem) {
-  try {
-    const { value } = await ElMessageBox.prompt('请输入驳回原因', '驳回自定义页面', {
-      inputPlaceholder: '驳回原因',
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
-    })
-    await adminApi.rejectCustomPage(item.id, value)
-    ElMessage.success('已驳回')
-    loadPages()
-  } catch {
-    /* 取消或失败 */
+    /* cancelled or failed */
   }
 }
 
@@ -472,12 +516,12 @@ onMounted(async () => {
   isAdmin.value = auth.isAdmin
   ready.value = true
   if (!isAdmin.value) {
-    ElMessage.error('仅管理员可访问管理后台')
+    ElMessage.error('Only admins can access the admin console')
     router.replace('/')
     return
   }
   loadAuth()
-  loadPages()
+  loadForumHomepages()
   loadHomepages()
 })
 

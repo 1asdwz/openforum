@@ -149,10 +149,10 @@ pub async fn update_field(
     let me = user.require()?;
     let field = info::find_field(&field_key)
         .filter(|f| f.enabled)
-        .ok_or_else(|| ApiError::bad_request(format!("未知信息项: {field_key}")))?;
+        .ok_or_else(|| ApiError::bad_request(format!("Unknown info field: {field_key}")))?;
     let raw = req
         .value
-        .ok_or_else(|| ApiError::bad_request("value 不能为空"))?;
+        .ok_or_else(|| ApiError::bad_request("value must not be empty"))?;
     let value = info::validate_value(field.key, &raw)?;
 
     let existing: Option<(Option<String>, Option<String>, Option<String>)> = sqlx::query_as(
@@ -177,7 +177,7 @@ pub async fn update_field(
         .unwrap_or_else(|| "NONE".to_string());
 
     if existing_status == "PENDING" {
-        return Err(ApiError::new(409, "该信息项正在审核中"));
+        return Err(ApiError::new(409, "This info field is under review"));
     }
 
     let changed = existing_value.as_ref() != Some(&value);
@@ -187,7 +187,7 @@ pub async fn update_field(
         (
             "NONE".to_string(),
             "NONE".to_string(),
-            Some("资料已更新，需重新认证"),
+            Some("Information updated; re-authentication required"),
         )
     } else if !changed && existing_status == "APPROVED" {
         (existing_level.clone(), existing_status.clone(), None)

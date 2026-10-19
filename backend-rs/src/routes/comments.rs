@@ -106,7 +106,7 @@ async fn require_comment(pool: &MySqlPool, id: i64) -> Result<Comment, ApiError>
         .bind(id)
         .fetch_optional(pool)
         .await?
-        .ok_or_else(|| ApiError::not_found("评论不存在"))
+        .ok_or_else(|| ApiError::not_found("Comment not found"))
 }
 
 /// GET /comments/post/{postId}
@@ -160,9 +160,9 @@ pub async fn create(
     let me = user.require()?;
     let post_id = req
         .post_id
-        .ok_or_else(|| ApiError::bad_request("postId postId 不能为空"))?;
+        .ok_or_else(|| ApiError::bad_request("postId must not be empty"))?;
     if req.content.as_deref().map(|s| s.trim().is_empty()).unwrap_or(true) {
-        return Err(ApiError::bad_request("content 内容不能为空"));
+        return Err(ApiError::bad_request("content must not be empty"));
     }
     let content = req.content.as_deref().unwrap().to_string();
 
@@ -173,7 +173,7 @@ pub async fn create(
             .await?;
     let forum_id = match post {
         Some((forum_id,)) => forum_id,
-        None => return Err(ApiError::not_found("帖子不存在")),
+        None => return Err(ApiError::not_found("Post not found")),
     };
     if let Some(forum) = crate::routes::forums::find_by_id(&state.pool, forum_id).await? {
         gate::ensure(&state.pool, Some(me.id), me.is_admin(), &forum, GateKind::Operate).await?;
@@ -187,15 +187,15 @@ pub async fn create(
         .fetch_optional(&state.pool)
         .await?;
         match parent {
-            None => return Err(ApiError::bad_request("父评论不存在")),
+            None => return Err(ApiError::bad_request("Parent comment not found")),
             Some((_, ppost)) if ppost != post_id => {
-                return Err(ApiError::bad_request("父评论不属于该帖子"))
+                return Err(ApiError::bad_request("Parent comment does not belong to this post"))
             }
             _ => {}
         }
     }
 
-    // 评论插入与帖子评论数重算需原子完成（对齐 Java `CommentService.create`）。
+    // Comment insert and post comment count recount must be atomic (matches Java `CommentService.create`).
     let mut tx = state.pool.begin().await?;
     let result = sqlx::query(
         "INSERT INTO comments (post_id, author_id, parent_id, content, upvotes, downvotes, score, is_removed, created_at, updated_at) \
@@ -233,15 +233,23 @@ pub async fn delete(
             .await?;
         if let Some((forum_id,)) = post {
             if let Some(forum) = crate::routes::forums::find_by_id(&state.pool, forum_id).await? {
-                authorized = access::can_manage(&state.pool, &forum, Some(me.id)).await?;
+                authorized = access::has_permission(
+                    &state.pool,
+                    &forum,
+                    Some(me.id),
+                    access::PERM_POSTS_COMMENTS,
+                )
+                .await?;
             }
         }
     }
     if !authorized {
-        return Err(ApiError::forbidden("只有作者或坛主可以删除评论"));
+        return Err(ApiError::forbidden(
+            "Only the author or a moderator with the Posts & Comments permission can delete this comment",
+        ));
     }
 
-    // 软删除、清票与评论数重算需原子完成（对齐 Java `CommentService.delete`）。
+    // Soft delete, vote cleanup, and comment count recount must be atomic (matches Java `CommentService.delete`).
     let mut tx = state.pool.begin().await?;
     sqlx::query("UPDATE comments SET is_removed = 1, updated_at = NOW() WHERE id = ?")
         .bind(comment.id)
@@ -282,9 +290,9 @@ pub async fn comment_vote(
     }
     let value = req.value.unwrap_or(0);
     if !(-1..=1).contains(&value) {
-        return Err(ApiError::bad_request("投票值只能是 1、-1 或 0"));
+        return Err(ApiError::bad_request("Vote value must be 1, -1, or 0"));
     }
-    // 票记录变更与评论计数写回需原子完成（对齐 Java `CommentService.vote`）。
+    // Vote record changes and comment count write-back must be atomic (matches Java `CommentService.vote`).
     let mut tx = state.pool.begin().await?;
     let outcome = vote::apply(
         &mut tx,
@@ -309,7 +317,7 @@ pub async fn comment_vote(
     Ok(j::ok(build_single(&comment, name, avatar)))
 }
 
-/// 供 users 模块复用：GET /users/{id}/comments
+/// Reused by the users module: GET /users/{id}/comments
 pub async fn list_by_author(
     state: &AppState,
     author_id: i64,

@@ -2,7 +2,7 @@ use sqlx::MySqlPool;
 
 use crate::error::ApiError;
 
-/// 投票结果，对应 Java `VoteService.VoteOutcome`。
+/// Vote result, corresponding to Java's `VoteService.VoteOutcome`.
 pub struct VoteOutcome {
     pub upvotes: i32,
     pub downvotes: i32,
@@ -11,8 +11,8 @@ pub struct VoteOutcome {
     pub my_vote: i32,
 }
 
-/// 应用一次投票：回退旧票 → 写入新票 → 重新计数。逻辑复刻 Java `VoteService.apply`。
-/// 接收 `&mut MySqlConnection`（通常来自一个事务），以便与调用方的计数写回处于同一事务。
+/// Apply one vote: revert the old vote → write the new vote → recount. Mirrors Java's `VoteService.apply`.
+/// Takes `&mut MySqlConnection` (usually from a transaction) so the count write-back shares the caller's transaction.
 pub async fn apply(
     conn: &mut sqlx::MySqlConnection,
     user_id: i64,
@@ -86,7 +86,7 @@ pub async fn apply(
     })
 }
 
-/// 清空某个目标的全部投票（帖子/评论被删除时调用）。
+/// Remove all votes for a target (called when a post/comment is deleted).
 pub async fn clear_votes(
     conn: &mut sqlx::MySqlConnection,
     target_type: &str,
@@ -100,7 +100,7 @@ pub async fn clear_votes(
     Ok(())
 }
 
-/// 当前用户对目标的投票值；未登录或未投票 → 0。
+/// Current user's vote value for a target; 0 when signed out or not voted.
 pub async fn my_vote(
     pool: &MySqlPool,
     user_id: Option<i64>,

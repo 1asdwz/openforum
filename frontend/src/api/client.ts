@@ -5,7 +5,7 @@ import axios, {
   type InternalAxiosRequestConfig,
 } from 'axios'
 
-/** 生产环境固定为 /forum/api；开发环境由 .env 提供，默认 /forum/api */
+/** Fixed to /forum/api in production; provided by .env in development, defaulting to /forum/api */
 export const BASE_URL = import.meta.env.VITE_API_BASE_URL || '/forum/api'
 
 const http: AxiosInstance = axios.create({
@@ -14,7 +14,7 @@ const http: AxiosInstance = axios.create({
   headers: { 'Content-Type': 'application/json' },
 })
 
-/** 401 时清理登录态并跳转登录页 */
+/** Clear login state and redirect to the login page on 401 */
 function handleUnauthorized() {
   localStorage.removeItem('token')
   localStorage.removeItem('user')
@@ -47,7 +47,7 @@ http.interceptors.response.use(
 )
 
 interface RequestConfigExtra extends AxiosRequestConfig {
-  /** 为 true 时不因 401 自动跳转登录（用于启动时的身份探测） */
+  /** When true, do not auto-redirect to login on 401 (used for identity probing at startup) */
   skipAuthRedirect?: boolean
 }
 
@@ -57,7 +57,7 @@ interface ApiEnvelope<T> {
   data: T
 }
 
-/** 业务错误：保留 HTTP 状态与后端结构化 data（如门槛缺失条件） */
+/** Business error: keeps the HTTP status and structured backend data (e.g. missing gate conditions) */
 export class ApiError extends Error {
   status?: number
   data?: unknown
@@ -82,14 +82,14 @@ async function request<T>(config: RequestConfigExtra): Promise<T> {
       const env = body as ApiEnvelope<T>
       if (env.code !== 200 && env.code !== 0) {
         if (env.code === 401) handleUnauthorized()
-        throw new ApiError(env.message || '请求失败', env.code, env.data)
+        throw new ApiError(env.message || 'Request failed', env.code, env.data)
       }
       return env.data
     }
     return body as T
   } catch (err) {
     if (err instanceof ApiError) throw err
-    // 归一化错误信息，方便页面直接展示
+    // Normalize error messages so pages can display them directly
     const anyErr = err as {
       response?: { data?: { message?: string; data?: unknown }; status?: number }
       message?: string
@@ -99,7 +99,7 @@ async function request<T>(config: RequestConfigExtra): Promise<T> {
       throw new ApiError(serverMsg, anyErr.response?.status, anyErr.response?.data?.data)
     }
     if (err instanceof Error) throw err
-    throw new Error('请求失败，请稍后重试')
+    throw new Error('Request failed, please try again later')
   }
 }
 

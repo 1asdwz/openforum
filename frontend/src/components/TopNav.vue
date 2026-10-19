@@ -4,7 +4,7 @@
       <button
         class="nav-icon-btn only-mobile"
         type="button"
-        aria-label="打开社区导航"
+        aria-label="Open community navigation"
         @click="ui.toggleDrawer()"
       >
         <IconMenu />
@@ -18,7 +18,7 @@
       <div class="topnav-search">
         <el-input
           v-model="keyword"
-          placeholder="搜索 OpenForum"
+          placeholder="Search OpenForum"
           clearable
           @keyup.enter="onSearch"
         >
@@ -31,13 +31,13 @@
       <div class="topnav-actions">
         <el-button class="nav-create-btn" type="primary" round @click="goCreate">
           <IconPlus />
-          <span class="nav-create-text">创建</span>
+          <span class="nav-create-text">Create</span>
         </el-button>
 
         <button
           class="nav-icon-btn"
           type="button"
-          :aria-label="ui.isDark ? '切换到浅色模式' : '切换到深色模式'"
+          :aria-label="ui.isDark ? 'Switch to light mode' : 'Switch to dark mode'"
           @click="ui.toggleTheme()"
         >
           <svg
@@ -68,7 +68,7 @@
 
         <template v-if="!auth.isAuthenticated">
           <el-button class="nav-login-btn" round @click="router.push('/login')">
-            登录
+            Log in
           </el-button>
         </template>
 
@@ -82,14 +82,14 @@
           </span>
           <template #dropdown>
             <el-dropdown-menu>
-              <el-dropdown-item command="profile">我的主页</el-dropdown-item>
-              <el-dropdown-item command="homepage">主页装修</el-dropdown-item>
-              <el-dropdown-item command="info">资料与认证</el-dropdown-item>
-              <el-dropdown-item command="myForums">我的社区</el-dropdown-item>
+              <el-dropdown-item command="profile">My profile</el-dropdown-item>
+              <el-dropdown-item command="homepage">Homepage customization</el-dropdown-item>
+              <el-dropdown-item command="info">Profile &amp; verification</el-dropdown-item>
+              <el-dropdown-item command="myForums">My communities</el-dropdown-item>
               <el-dropdown-item v-if="auth.isAdmin" command="admin" divided>
-                管理后台
+                Admin
               </el-dropdown-item>
-              <el-dropdown-item command="logout" divided>退出登录</el-dropdown-item>
+              <el-dropdown-item command="logout" divided>Log out</el-dropdown-item>
             </el-dropdown-menu>
           </template>
         </el-dropdown>
@@ -131,7 +131,7 @@ function onSearch() {
 
 function goCreate() {
   if (!auth.isAuthenticated) {
-    ElMessage.warning('请先登录')
+    ElMessage.warning('Please log in first')
     router.push({ name: 'login', query: { redirect: '/create-forum' } })
     return
   }
@@ -157,7 +157,7 @@ function onCommand(command: string) {
       break
     case 'logout':
       auth.logout()
-      ElMessage.success('已退出登录')
+      ElMessage.success('Logged out')
       router.push('/')
       break
   }

@@ -13,7 +13,7 @@
 
       <template v-if="activeTab === 'posts'">
         <div v-if="!posts.length" class="state-box">
-          {{ keyword ? '没有找到相关帖子' : '输入关键词以搜索帖子' }}
+          {{ keyword ? 'No matching posts found' : 'Enter a keyword to search posts' }}
         </div>
         <div v-else class="post-list">
           <PostCard
@@ -27,7 +27,7 @@
 
       <template v-else>
         <div v-if="!forums.length" class="state-box">
-          {{ keyword ? '没有找到相关社区' : '还没有社区' }}
+          {{ keyword ? 'No matching communities found' : 'No communities yet' }}
         </div>
         <div v-else class="post-list">
           <router-link
@@ -43,7 +43,7 @@
             <span class="sidebar-item-body">
               <span class="sidebar-item-name">{{ f.name }}</span>
               <span class="sidebar-item-meta">
-                {{ f.description || '暂无简介' }} · {{ f.memberCount }} 成员
+                {{ f.description || 'No description' }} · {{ f.memberCount }} members
               </span>
             </span>
           </router-link>
@@ -78,19 +78,19 @@ const posts = ref<Post[]>([])
 const forums = ref<SubForum[]>([])
 
 const tabs = computed<SortOption<SearchTab>[]>(() => [
-  { label: `帖子 (${posts.value.length})`, value: 'posts' },
-  { label: `社区 (${forums.value.length})`, value: 'forums' },
+  { label: `Posts (${posts.value.length})`, value: 'posts' },
+  { label: `Communities (${forums.value.length})`, value: 'forums' },
 ])
 
 const title = computed(() =>
-  keyword.value ? `搜索：${keyword.value}` : '探索社区',
+  keyword.value ? `Search: ${keyword.value}` : 'Explore communities',
 )
 
 function matches(text: string | undefined | null, q: string) {
   return (text || '').toLowerCase().includes(q.toLowerCase())
 }
 
-/** 无关键词时，论坛页签作为社区目录 */
+/** Without a keyword, the forums tab acts as a community directory */
 async function loadDirectory() {
   loading.value = true
   error.value = ''
@@ -98,7 +98,7 @@ async function loadDirectory() {
     const payload = await forumApi.list({ page: 1, size: 50 })
     forums.value = normalizePage<SubForum>(payload).items
   } catch (e) {
-    error.value = errorMessage(e, '加载社区失败')
+    error.value = errorMessage(e, 'Failed to load communities')
   } finally {
     loading.value = false
   }
@@ -128,7 +128,7 @@ async function search() {
       (f) => matches(f.name, q) || matches(f.description, q) || matches(f.slug, q)
     )
   } catch (e) {
-    error.value = errorMessage(e, '搜索失败')
+    error.value = errorMessage(e, 'Search failed')
   } finally {
     loading.value = false
   }
@@ -137,12 +137,12 @@ async function search() {
 async function onVote(payload: { post: Post; value: number }) {
   const { post, value } = payload
   if (!auth.isAuthenticated) {
-    ElMessage.warning('请先登录后投票')
+    ElMessage.warning('Please log in to vote')
     router.push({ name: 'login', query: { redirect: route.fullPath } })
     return
   }
   if (post.canVote === false) {
-    ElMessage.warning('你暂时没有投票权限')
+    ElMessage.warning('You do not have permission to vote at this time')
     return
   }
   try {
