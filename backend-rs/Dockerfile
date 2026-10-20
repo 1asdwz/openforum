@@ -10,6 +10,7 @@ RUN mkdir -p src && echo 'fn main() {}' > src/main.rs \
     && cargo build --release \
     && rm -rf src
 
+COPY api ./api
 COPY src ./src
 # 让 cargo 感知源码更新后重新编译（占位构建产物时间戳早于真实源码）
 RUN touch src/main.rs && cargo build --release

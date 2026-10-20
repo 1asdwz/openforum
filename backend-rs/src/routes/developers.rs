@@ -17,7 +17,7 @@ use crate::oauth as o;
 use crate::security::CurrentUser;
 use crate::state::AppState;
 
-const OPENAPI_SPEC: &str = include_str!("../../../docs/api/openapi.yaml");
+const OPENAPI_SPEC: &str = include_str!("../../api/openapi.yaml");
 
 fn now() -> NaiveDateTime {
     Utc::now().naive_utc()

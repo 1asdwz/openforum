@@ -1,7 +1,7 @@
 # OpenForum API 接口手册
 
 > 本文档基于现有 Spring Boot(Java) 实现整理，供后续以 Rust(Axum) 重写时逐一对照。
-> 规范文件见同目录 [`openapi.yaml`](./openapi.yaml)。
+> 规范文件见 [`backend-rs/api/openapi.yaml`](../../backend-rs/api/openapi.yaml)（由后端内嵌，`/api/developers/docs` 公开下发）。
 
 ## 1. 概述
 
