@@ -3,8 +3,9 @@
     <LeftRail />
 
     <div class="feed-column">
-      <div class="content-card editor-head">
+      <div v-reveal class="content-card editor-head">
         <div>
+          <span class="of-eyebrow">Homepage</span>
           <h1 class="page-title" style="margin: 0">Homepage editor</h1>
           <p class="editor-desc">
             Choose the standard profile homepage, or design your own with HTML. A custom homepage takes effect immediately after saving.

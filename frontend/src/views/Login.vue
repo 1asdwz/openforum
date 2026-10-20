@@ -1,7 +1,8 @@
 <template>
   <div class="auth-page">
-    <div class="auth-panel">
+    <div v-reveal class="auth-panel">
       <header class="auth-head">
+        <span class="of-eyebrow">Welcome back</span>
         <h1>Log in to OpenForum</h1>
         <p>Welcome back. Join the conversation.</p>
       </header>

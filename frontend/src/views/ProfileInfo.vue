@@ -3,8 +3,9 @@
     <LeftRail />
 
     <div class="feed-column">
-      <div class="content-card info-head">
+      <div v-reveal class="content-card info-head">
         <div>
+          <span class="of-eyebrow">Account</span>
           <h1 class="page-title" style="margin: 0">Profile &amp; Verification</h1>
           <p class="info-desc">
             Your profile is visible only to you. After filling it in, you can raise your verification level as needed to meet the viewing and interaction thresholds of different forums.
@@ -31,7 +32,12 @@
       </div>
 
       <template v-else>
-        <section v-for="group in info?.groups || []" :key="group.groupKey" class="content-card info-group">
+        <section
+          v-for="(group, gi) in info?.groups || []"
+          :key="group.groupKey"
+          v-reveal="Math.min(gi, 5) * 50"
+          class="content-card info-group"
+        >
           <h2 class="info-group-title">{{ group.groupLabel }}</h2>
           <div v-for="item in group.items" :key="item.fieldKey" class="info-item">
             <div class="info-item-main">
@@ -444,7 +450,11 @@ onMounted(load)
   flex-direction: column;
   align-items: center;
   gap: 6px;
-  min-width: 96px;
+  min-width: 132px;
+}
+.info-progress .muted {
+  white-space: nowrap;
+  font-size: 12px;
 }
 .info-group {
   margin-bottom: 14px;

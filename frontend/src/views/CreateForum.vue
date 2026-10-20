@@ -1,6 +1,12 @@
 <template>
-  <div class="content-card" style="max-width: 760px; margin: 0 auto">
-    <h1 class="page-title">Create forum</h1>
+  <div v-reveal class="content-card create-forum-card">
+    <header class="page-head">
+      <span class="of-eyebrow">New community</span>
+      <h1 class="page-title">Create forum</h1>
+      <p class="page-desc">
+        Set the name, look, and access rules. You can refine everything later from community settings.
+      </p>
+    </header>
 
     <el-form label-position="top">
       <el-form-item label="Name" required>
@@ -132,3 +138,10 @@ onMounted(async () => {
   }
 })
 </script>
+
+<style scoped>
+.create-forum-card {
+  max-width: 760px;
+  margin: 0 auto;
+}
+</style>

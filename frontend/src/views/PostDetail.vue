@@ -4,7 +4,7 @@
 
     <div v-else-if="blocked" class="page-grid no-right">
       <LeftRail />
-      <div class="content-card gate-blocked">
+      <div v-reveal class="content-card gate-blocked">
         <h1 class="page-title" style="margin-top: 0">Unable to view this post</h1>
         <p class="gate-blocked-desc">{{ blocked.message }}</p>
         <div v-if="blocked.missing.length" class="gate-missing">
@@ -38,7 +38,7 @@
       <LeftRail />
 
       <div class="feed-column">
-        <article class="post-detail-card">
+        <article v-reveal class="post-detail-card">
           <VoteColumn
             :score="post.score"
             :my-vote="post.myVote"
@@ -74,7 +74,7 @@
           </div>
         </article>
 
-        <div class="comment-box">
+        <div v-reveal="60" class="comment-box">
           <h3 style="margin-bottom: 10px">Add a comment</h3>
           <template v-if="auth.isAuthenticated">
             <RichTextEditor
@@ -98,7 +98,7 @@
           </p>
         </div>
 
-        <div class="comment-section-head">
+        <div v-reveal="90" class="comment-section-head">
           <span class="comment-count">{{ post.commentCount }} comments</span>
           <SortChips v-model="commentSort" :options="commentSorts" />
         </div>
@@ -109,8 +109,9 @@
         </div>
         <div v-else class="comment-list">
           <CommentNode
-            v-for="comment in comments"
+            v-for="(comment, i) in comments"
             :key="comment.id"
+            v-reveal="Math.min(i, 6) * 45"
             :comment="comment"
             :depth="0"
             @vote="onVoteComment"
@@ -362,10 +363,11 @@ onMounted(load)
   margin: 8px 0 16px;
 }
 .gate-missing {
-  border: 1px solid var(--of-border);
-  border-radius: 8px;
-  padding: 12px 14px;
+  border: 1px solid var(--hp-hairline);
+  border-radius: 18px;
+  padding: 14px 16px;
   margin-bottom: 16px;
+  background: var(--hp-shell);
 }
 .gate-missing-title {
   font-weight: 600;

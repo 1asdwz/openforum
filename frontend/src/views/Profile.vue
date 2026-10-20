@@ -13,13 +13,14 @@
       </div>
 
       <template v-else-if="profile">
-        <div class="content-card profile-card">
+        <div v-reveal class="content-card profile-card">
           <div class="profile-banner" />
           <div class="profile-head">
             <el-avatar class="profile-avatar" :size="88" :src="imageSrc(profile.avatar)">
               {{ avatarText(profile.username) }}
             </el-avatar>
             <div class="profile-head-body">
+              <span class="of-eyebrow">Profile</span>
               <h1 class="profile-name">{{ profile.username }}</h1>
               <div class="profile-sub">
                 <span>u/{{ profile.username }}</span>
@@ -47,7 +48,7 @@
             :description="`Reason: ${homepage.blockReason || 'Not provided'}. After editing, a moderator must review it before restoration.`"
             style="margin-bottom: 12px"
           />
-          <div class="content-card homepage-frame-card">
+          <div v-reveal="60" class="content-card homepage-frame-card">
             <SafeHomepageFrame :html="homepage?.html || ''" :load-data="loadHomepageData" />
           </div>
           <div v-if="!isSelf" class="homepage-report-row">
@@ -58,7 +59,7 @@
         </template>
 
         <template v-else>
-        <div class="feed-toolbar profile-toolbar">
+        <div v-reveal="60" class="feed-toolbar profile-toolbar">
           <SortChips v-model="activeTab" :options="tabs" />
         </div>
 
@@ -70,8 +71,9 @@
           <template v-else>
             <div class="post-list">
               <PostCard
-                v-for="post in userPosts"
+                v-for="(post, i) in userPosts"
                 :key="post.id"
+                v-reveal="Math.min(i, 6) * 45"
                 :post="post"
                 @vote="onVote"
               />
@@ -92,8 +94,9 @@
           <template v-else>
             <div class="post-list">
               <article
-                v-for="c in userComments"
+                v-for="(c, i) in userComments"
                 :key="c.id"
+                v-reveal="Math.min(i, 6) * 45"
                 class="content-card profile-comment"
               >
                 <div class="profile-comment-meta">

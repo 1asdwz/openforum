@@ -19,14 +19,14 @@
     </div>
 
     <template v-else-if="forum">
-      <header class="mod-header">
+      <header v-reveal class="mod-header">
         <div class="mod-heading">
           <div class="mod-icon" :style="{ background: forum.themeColor || '#ff4500' }">
             <img v-if="imageSrc(forum.icon)" :src="imageSrc(forum.icon)" alt="" />
             <span v-else>{{ forum.icon || forum.name.slice(0, 1) }}</span>
           </div>
           <div>
-            <div class="mod-eyebrow">Moderation</div>
+            <div class="mod-eyebrow of-eyebrow">Moderation</div>
             <h1 class="mod-title">Moderation · {{ forum.name }}</h1>
             <div class="mod-sub">
               /f/{{ forum.slug }} · {{ forum.memberCount }} members ·
@@ -871,7 +871,7 @@ onMounted(loadForum)
 .mod-icon {
   width: 56px;
   height: 56px;
-  border-radius: 16px;
+  border-radius: 18px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -880,6 +880,7 @@ onMounted(loadForum)
   font-size: 24px;
   font-weight: 700;
   flex: none;
+  box-shadow: var(--hp-soft);
 }
 
 .mod-icon img {
@@ -889,17 +890,19 @@ onMounted(loadForum)
 }
 
 .mod-eyebrow {
-  font-size: 11px;
+  margin-bottom: 8px;
+  font-size: 10.5px;
   font-weight: 700;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: var(--of-text-subtle);
+  color: var(--of-text-muted);
 }
 
 .mod-title {
   margin: 3px 0;
-  font-size: 24px;
-  line-height: 1.25;
+  font-size: clamp(24px, 2.2vw, 30px);
+  line-height: 1.15;
+  letter-spacing: -0.03em;
   color: var(--of-text);
 }
 
@@ -949,8 +952,8 @@ onMounted(loadForum)
 }
 
 .mod-nav button.active {
-  background: var(--of-surface-weak);
-  color: var(--of-primary);
+  background: var(--hp-ink);
+  color: var(--hp-on-ink);
   font-weight: 600;
 }
 

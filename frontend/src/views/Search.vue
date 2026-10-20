@@ -1,13 +1,19 @@
 <template>
   <div>
-    <h1 class="page-title">{{ title }}</h1>
+    <header v-reveal class="page-head">
+      <span class="of-eyebrow">Search</span>
+      <h1 class="page-title">{{ title }}</h1>
+      <p class="page-desc">
+        Look across posts and communities. Try a topic, a community name, or a phrase.
+      </p>
+    </header>
 
     <el-skeleton v-if="loading" :rows="6" animated />
 
     <div v-else-if="error" class="state-box error">{{ error }}</div>
 
     <template v-else>
-      <div class="feed-toolbar">
+      <div v-reveal="40" class="feed-toolbar">
         <SortChips v-model="activeTab" :options="tabs" />
       </div>
 
@@ -17,8 +23,9 @@
         </div>
         <div v-else class="post-list">
           <PostCard
-            v-for="post in posts"
+            v-for="(post, i) in posts"
             :key="post.id"
+            v-reveal="Math.min(i, 6) * 45"
             :post="post"
             @vote="onVote"
           />
@@ -31,8 +38,9 @@
         </div>
         <div v-else class="post-list">
           <router-link
-            v-for="f in forums"
+            v-for="(f, i) in forums"
             :key="f.id"
+            v-reveal="Math.min(i, 6) * 45"
             class="sidebar-item"
             :to="`/f/${f.slug}`"
           >

@@ -1,5 +1,6 @@
 <template>
   <div class="auth-wizard">
+    <span class="of-eyebrow">Verification</span>
     <h1 class="page-title">Verification Wizard</h1>
 
     <div v-if="loadError" class="state-box">{{ loadError }}</div>

@@ -34,27 +34,27 @@
       :root {
         --of-brand: #ff4500;
         --of-primary: #d93900;
-        --of-bg: #f6f8f9;
+        --of-bg: #f3f5f9;
         --of-card: #ffffff;
-        --of-border: #e5ebee;
-        --of-text: #181c1f;
-        --of-text-body: #333d42;
+        --of-border: rgba(16, 18, 22, 0.08);
+        --of-text: #101216;
+        --of-text-body: #3c424b;
         --of-nav-height: 56px;
         --of-rail-left: 270px;
         --of-rail-right: 316px;
-        --of-radius: 16px;
+        --of-radius: 30px;
         --of-max-width: 1460px;
-        --sk-base: #e5ebee;
-        --sk-hi: #f2f5f6;
+        --sk-base: #eaeff5;
+        --sk-hi: #f4f7fa;
       }
       html.dark {
-        --of-bg: #0b1416;
-        --of-card: #181c1f;
-        --of-border: #2a3c42;
-        --of-text: #eef1f3;
-        --of-text-body: #d7dde0;
-        --sk-base: #223237;
-        --sk-hi: #2a3c42;
+        --of-bg: #0b0f13;
+        --of-card: #12171c;
+        --of-border: rgba(255, 255, 255, 0.08);
+        --of-text: #f3f5f7;
+        --of-text-body: #cbd2d9;
+        --sk-base: #1a2128;
+        --sk-hi: #232b33;
       }
       * {
         box-sizing: border-box;
@@ -65,9 +65,8 @@
         padding: 0;
       }
       body {
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
-          'Hiragino Sans GB', 'Microsoft YaHei', 'Helvetica Neue', Helvetica, Arial,
-          sans-serif;
+        font-family: 'Plus Jakarta Sans Variable', -apple-system, BlinkMacSystemFont,
+          'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
         background-color: var(--of-bg);
         color: var(--of-text-body);
         font-size: 14px;
@@ -117,7 +116,7 @@
       .of-sk-logo {
         width: 32px;
         height: 32px;
-        border-radius: 9999px;
+        border-radius: 11px;
         background: var(--of-brand);
         flex-shrink: 0;
       }
@@ -150,7 +149,7 @@
       .of-sk-main {
         max-width: var(--of-max-width);
         margin: 0 auto;
-        padding: 20px 24px 64px;
+        padding: 26px 24px 64px;
       }
       .of-sk-layout {
         display: grid;

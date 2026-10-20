@@ -3,8 +3,9 @@
     <LeftRail />
 
     <div class="feed-column">
-      <div class="content-card guide-head">
+      <div v-reveal class="content-card guide-head">
         <div>
+          <span class="of-eyebrow">Reference</span>
           <h1 class="page-title" style="margin: 0">Profile components and tag guidelines</h1>
           <p class="guide-desc">
             HTML tags, attributes, CSS, and data components supported by custom profile homepages. Check against this page before saving.

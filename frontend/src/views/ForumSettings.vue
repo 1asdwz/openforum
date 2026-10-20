@@ -14,14 +14,21 @@
     </div>
 
     <template v-else-if="forum">
-      <div style="margin-bottom: 12px">
-        <el-button size="small" @click="router.push(`/f/${forum.slug}/mod`)">
-          Back to moderation console
-        </el-button>
-      </div>
-      <h1 class="page-title">Manage {{ forum.name }}</h1>
+      <div v-reveal class="content-card settings-card">
+        <div class="settings-bar">
+          <header class="page-head settings-head">
+            <span class="of-eyebrow">Settings</span>
+            <h1 class="page-title">Manage {{ forum.name }}</h1>
+            <p class="page-desc">
+              Shape how the community looks, what it publishes, and who can take part.
+            </p>
+          </header>
+          <el-button size="small" @click="router.push(`/f/${forum.slug}/mod`)">
+            Back to moderation console
+          </el-button>
+        </div>
 
-      <el-tabs v-model="activeTab">
+        <el-tabs v-model="activeTab">
         <el-tab-pane label="Basic info" name="basic">
           <el-form label-position="top">
             <el-form-item label="Name">
@@ -173,6 +180,7 @@
           </div>
         </el-tab-pane>
       </el-tabs>
+      </div>
     </template>
   </div>
 </template>
@@ -458,6 +466,19 @@ onMounted(async () => {
 </script>
 
 <style scoped>
+.settings-bar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 10px;
+}
+.settings-head {
+  margin-bottom: 0;
+}
+.settings-head .page-title {
+  margin-bottom: 8px;
+}
 .homepage-hint {
   margin: 0 0 12px;
   color: var(--of-text-muted);
@@ -477,14 +498,14 @@ onMounted(async () => {
   font-size: 12px;
 }
 .byte-count.over {
-  color: #d03050;
+  color: #c0263d;
 }
 .html-editor {
   width: 100%;
   min-height: 360px;
-  padding: 12px 14px;
-  border: 1px solid var(--of-border);
-  border-radius: var(--of-radius);
+  padding: 14px 16px;
+  border: 1px solid var(--hp-hairline);
+  border-radius: var(--of-radius-md);
   background: var(--of-surface-weak);
   color: var(--of-text);
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
@@ -492,6 +513,7 @@ onMounted(async () => {
   line-height: 1.7;
   resize: vertical;
   box-sizing: border-box;
+  transition: border-color 0.4s var(--hp-ease), box-shadow 0.4s var(--hp-ease);
 }
 .html-editor:focus {
   outline: none;
@@ -509,5 +531,11 @@ onMounted(async () => {
   gap: 8px;
   align-items: center;
   margin-bottom: 8px;
+}
+@media (max-width: 640px) {
+  .settings-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
 }
 </style>

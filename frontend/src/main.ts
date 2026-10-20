@@ -6,15 +6,19 @@ import 'element-plus/es/components/message/style/css'
 import 'element-plus/es/components/message-box/style/css'
 // Dark mode variables (used with html.dark)
 import 'element-plus/theme-chalk/dark/css-vars.css'
+// Variable grotesk used by the premium community page
+import '@fontsource-variable/plus-jakarta-sans'
 
 import App from './App.vue'
 import router from './router'
+import { reveal } from './directives/reveal'
 import { useAuthStore } from './stores/auth'
 import { useUiStore } from './stores/ui'
 import './styles/main.css'
 
 const app = createApp(App)
 
+app.directive('reveal', reveal)
 app.use(createPinia())
 app.use(router)
 

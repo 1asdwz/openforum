@@ -3,7 +3,15 @@
     <LeftRail />
 
     <div class="feed-column">
-      <div class="feed-toolbar">
+      <header v-reveal class="page-head">
+        <span class="of-eyebrow">Home feed</span>
+        <h1 class="page-title">Today on OpenForum</h1>
+        <p class="page-desc">
+          Fresh discussions from every community — vote, reply, and lift the ideas worth reading.
+        </p>
+      </header>
+
+      <div v-reveal="40" class="feed-toolbar">
         <SortChips v-model="sort" :options="sorts" />
         <el-button size="small" text @click="loadPosts(true)">Refresh</el-button>
       </div>
@@ -29,8 +37,9 @@
       <template v-else>
         <div class="post-list">
           <PostCard
-            v-for="post in posts"
+            v-for="(post, i) in posts"
             :key="post.id"
+            v-reveal="Math.min(i, 6) * 45"
             :post="post"
             @vote="onVote"
           />
@@ -44,7 +53,7 @@
     </div>
 
     <aside class="rail-right">
-      <section class="rail-card about-card">
+      <section v-reveal="80" class="rail-card about-card">
         <div class="about-banner"></div>
         <div class="about-body">
           <h3 class="about-title">About OpenForum</h3>
@@ -73,7 +82,7 @@
         </div>
       </section>
 
-      <section class="rail-card">
+      <section v-reveal="140" class="rail-card">
         <div class="rail-heading">Recommended for you</div>
         <el-skeleton v-if="sideLoading" :rows="3" animated />
         <template v-else>

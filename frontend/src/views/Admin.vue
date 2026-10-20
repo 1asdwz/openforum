@@ -1,6 +1,12 @@
 <template>
   <div>
-    <h1 class="page-title">Admin Console</h1>
+    <header v-reveal class="page-head">
+      <span class="of-eyebrow">Operations</span>
+      <h1 class="page-title">Admin Console</h1>
+      <p class="page-desc">
+        Review verification requests and custom community homepages before they go live.
+      </p>
+    </header>
 
     <div v-if="!ready" style="padding: 40px; text-align: center">
       <el-skeleton :rows="6" animated />
