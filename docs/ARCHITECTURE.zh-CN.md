@@ -175,12 +175,14 @@ sequenceDiagram
 {
   "version": 1,
   "conditions": [
-    { "field": "AUTH_LEVEL", "op": "GTE", "authLevel": "MEDIUM" },
-    { "field": "AGE", "op": "BETWEEN", "min": 18, "max": 60 },
-    { "field": "COUNTRY", "op": "IN", "values": ["CN", "SG"] }
+    { "field": "REAL_NAME", "authLevel": "MEDIUM" },
+    { "field": "AGE", "op": "between", "min": 18, "max": 60 },
+    { "field": "COUNTRY", "op": "in", "values": ["CN", "SG"] }
   ]
 }
 ```
+
+- `field` 为资料字段键（`REAL_NAME`、`AGE`、`COUNTRY` 等）；条件上的 `authLevel` 表示该字段需要至少达到此等级的已通过认证；操作符为小写：`in`、`not_in`、`between`、`gte`、`lte`。
 
 - 条件列表为空表示不设门禁。
 - `auth_gate.rs` 将条件与用户的认证记录、资料字段逐项比对，返回 `GateVerdict`。

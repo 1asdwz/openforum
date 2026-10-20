@@ -2,7 +2,7 @@
 
 [English](README.md) · **简体中文**
 
-一个开源的现代社区论坛系统：子论坛、富文本帖子、嵌套评论、投票、实名认证中心、细粒度访问门禁、自定义主页，以及面向第三方应用的 OAuth 2.0 开放平台。
+一个开源的 AI 原生社区论坛系统：子论坛、富文本帖子、嵌套评论、投票、实名认证中心、每个论坛可自定义准入门槛、论坛与个人主页可写自定义代码，以及一套可自建前端的 OAuth 2.0 开放接口。
 
 线上实例：<https://openforum.yingrest.com>
 
@@ -14,6 +14,7 @@
 
 ## 目录
 
+- [亮点](#亮点)
 - [项目简介](#项目简介)
 - [功能特性](#功能特性)
 - [技术栈](#技术栈)
@@ -27,6 +28,27 @@
 - [安全说明](#安全说明)
 - [贡献](#贡献)
 
+## 亮点
+
+**AI 原生。** 认证材料会经过 AI 视觉审核（`ai-vision-review`）与启发式检查（`heuristic-document`），论坛与帖子排序由 `hot-score-recommendation` 计算。插件注册表还内置 `ai-review` 与 `rule-based-review`，所有插件都能在管理后台运行时开关。AI 调用走任意 OpenAI 兼容接口（`OPENAI_API_BASE`）；未配置密钥时视觉审核返回不可用，材料留在人工审核。
+
+**每个论坛自定义准入门槛。** 论坛可分别配置浏览规则与操作规则，条件覆盖认证等级（Low / Medium / High / Extreme）、年龄、国籍、地区和资料字段。规则在界面中编辑，无需改代码；每次读写都会判定，未通过时返回 `403` 并附带缺失条件，前端可直接告诉用户还差什么。
+
+```json
+{
+  "version": 1,
+  "conditions": [
+    { "field": "REAL_NAME", "authLevel": "MEDIUM" },
+    { "field": "AGE", "op": "between", "min": 18, "max": 60 },
+    { "field": "COUNTRY", "op": "in", "values": ["CN", "SG"] }
+  ]
+}
+```
+
+**论坛与个人主页都能写代码。** 坛主和用户都可以发布自己的 HTML 主页（支持行内样式），用 `<of-*>` 自定义元素读取实时数据——`<of-profile>`、`<of-stats>`、`<of-posts>`、`<of-members>` 以及论坛对应的元素。提交的标记先经过白名单净化，再放入没有同源权限的沙箱 iframe 渲染，因此自定义代码无法读取 Cookie、存储或父页面。
+
+**后端优先，前端可自建。** 自带 Vue 3 应用只是其中一个客户端。它展示的每个界面都对应 `/api` 下已文档化的 REST 接口，OpenAPI 规范可通过 `GET /api/developers/docs` 获取；配合 OAuth 2.0（授权码 + PKCE），第三方 Web 或移动 App 可以自行实现登录与全部接口调用。
+
 ## 项目简介
 
 OpenForum 是一个可直接部署的论坛社区系统，设计目标是把「论坛」做成可扩展的社区基础设施，而不只是一个发帖页面：
@@ -35,7 +57,7 @@ OpenForum 是一个可直接部署的论坛社区系统，设计目标是把「�
 - **身份层**：账号体系 + 实名认证中心，认证结果分为 Low / Medium / High / Extreme 四个等级，可被论坛访问规则直接引用。
 - **权限层**：论坛可配置浏览规则与操作规则（按认证等级、年龄、地区等条件组合），并支持坛主 / 版主的多项管理权限。
 - **表达层**：用户与论坛均可自定义主页（受控 HTML 沙箱渲染），并提供模板与引导。
-- **扩展层**：插件注册表（内容审核、推荐排序）与 OAuth 2.0 开放平台，第三方程序可代表用户调用全部公开 API。
+- **扩展层**：AI 插件层（文本与图片审核、材料识别、热度排序）与 OAuth 2.0 开放平台，第三方程序可代表用户调用全部公开 API。
 
 前端为单页应用，后端为 Rust（axum）实现，数据存储使用 MySQL 8，媒体文件使用 MinIO（S3 兼容）。
 
@@ -50,8 +72,9 @@ OpenForum 是一个可直接部署的论坛社区系统，设计目标是把「�
 | 搜索 | 按标题 / 内容 / 论坛检索 |
 | 认证中心 | 实名、身份证、年龄、国籍、驾照、婚姻、房产、资产等认证类型；材料上传、活体检测、AI / 规则 / 人工审核、等级体系 |
 | 访问门禁 | 浏览规则与操作规则可视化编辑；按认证等级、资料字段、逻辑组合判定 |
-| 自定义主页 | 用户主页与论坛主页；受控 HTML、模板、举报、管理员屏蔽 |
-| 插件 | `ai-review`、`ai-vision-review`、`heuristic-document`、`hot-score-recommendation`、`rule-based-review` |
+| 自定义主页 | 用户主页与论坛主页；受控 HTML（支持行内样式）、`<of-*>` 元素、模板、举报、管理员屏蔽 |
+| AI 与插件 | `ai-review`、`ai-vision-review`、`heuristic-document`、`hot-score-recommendation`、`rule-based-review`；运行时可开关 |
+| 自建客户端 | 完整 REST API、公开 OpenAPI 规范、OAuth 2.0；自带 Vue 应用只是参考实现之一 |
 | 管理后台 | 认证审核、用户列表、主页内容审核与屏蔽 |
 | 开发者平台 | 创建 OAuth 应用、重置密钥、查看公开 API 文档 |
 | OAuth 2.0 | 授权码 + PKCE（S256）、访问令牌、刷新令牌轮换、userinfo、revoke |
@@ -254,6 +277,7 @@ docker run -d --name openforum-rs \
 - **鉴权**：`Authorization: Bearer <JWT>`
 - **在线文档**：站点内 `/developers/docs`，同时公开下发 `GET /api/developers/docs`（OpenAPI 3 YAML）
 - **规范文件**：[backend-rs/api/openapi.yaml](backend-rs/api/openapi.yaml)
+- **自建前端**：自带 Vue 单页应用完全基于这些接口构建，任何 Web 或移动端前端都可以替换它。
 
 示例：
 

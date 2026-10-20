@@ -175,12 +175,14 @@ Rule structure (`gate.rs`):
 {
   "version": 1,
   "conditions": [
-    { "field": "AUTH_LEVEL", "op": "GTE", "authLevel": "MEDIUM" },
-    { "field": "AGE", "op": "BETWEEN", "min": 18, "max": 60 },
-    { "field": "COUNTRY", "op": "IN", "values": ["CN", "SG"] }
+    { "field": "REAL_NAME", "authLevel": "MEDIUM" },
+    { "field": "AGE", "op": "between", "min": 18, "max": 60 },
+    { "field": "COUNTRY", "op": "in", "values": ["CN", "SG"] }
   ]
 }
 ```
+
+- `field` is a profile field key (`REAL_NAME`, `AGE`, `COUNTRY`, ...). `authLevel` on a condition requires an approved verification of at least that level for the field. Supported operators are lowercase: `in`, `not_in`, `between`, `gte`, `lte`.
 
 - An empty condition list means no access gate.
 - `auth_gate.rs` compares each condition against the user's verification records and profile fields, then returns a `GateVerdict`.

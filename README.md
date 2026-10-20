@@ -2,7 +2,7 @@
 
 **English** · [简体中文](README.zh-CN.md)
 
-An open-source modern community forum: sub-forums, rich-text posts, threaded comments, voting, an identity verification center, fine-grained access gates, custom homepages, and an OAuth 2.0 platform for third-party applications.
+An open-source, AI-native community forum: sub-forums, rich-text posts, threaded comments, voting, an identity verification center, per-forum admission thresholds, custom code on forums and profiles, and an OAuth 2.0 API that anyone can build a frontend on.
 
 Live instance: <https://openforum.yingrest.com>
 
@@ -14,6 +14,7 @@ Live instance: <https://openforum.yingrest.com>
 
 ## Table of Contents
 
+- [Highlights](#highlights)
 - [Overview](#overview)
 - [Features](#features)
 - [Tech Stack](#tech-stack)
@@ -27,6 +28,27 @@ Live instance: <https://openforum.yingrest.com>
 - [Security](#security)
 - [Contributing](#contributing)
 
+## Highlights
+
+**AI-native review.** Verification materials run through an AI vision model (`ai-vision-review`) and heuristic checks (`heuristic-document`), while forum and post ordering comes from `hot-score-recommendation`. The plugin registry also ships `ai-review` and `rule-based-review`, and every plugin can be switched on or off at runtime from the admin console. AI calls go to any OpenAI-compatible endpoint (`OPENAI_API_BASE`); without a key the vision plugin reports unavailable, so the submission stays in manual review.
+
+**Admission thresholds owned by each forum.** A forum declares its own browse rule and operate rule over verification level (Low / Medium / High / Extreme), age, nationality, region and profile fields. Rules are edited from the UI without code changes, evaluated on every read and write, and a rejection returns `403` together with the unmet conditions so the client can tell the user exactly what is missing.
+
+```json
+{
+  "version": 1,
+  "conditions": [
+    { "field": "REAL_NAME", "authLevel": "MEDIUM" },
+    { "field": "AGE", "op": "between", "min": 18, "max": 60 },
+    { "field": "COUNTRY", "op": "in", "values": ["CN", "SG"] }
+  ]
+}
+```
+
+**Custom code on every forum and profile.** Forum owners and individual users publish their own HTML homepages (inline styles allowed) using `<of-*>` custom elements for live data — `<of-profile>`, `<of-stats>`, `<of-posts>`, `<of-members>` and their forum equivalents. Submitted markup is sanitized against an allow-list and rendered inside a sandboxed iframe without same-origin access, so custom code cannot read cookies, storage or the parent page.
+
+**Backend-first: build your own frontend.** The bundled Vue 3 app is only one client. Every screen it shows is a documented REST endpoint under `/api`, the OpenAPI spec is served at `GET /api/developers/docs`, and OAuth 2.0 (authorization code + PKCE) lets third-party web or mobile apps sign users in and call the same API on their behalf.
+
 ## Overview
 
 OpenForum is a deployable forum system built as extensible community infrastructure rather than just a posting page:
@@ -35,7 +57,7 @@ OpenForum is a deployable forum system built as extensible community infrastruct
 - **Identity**: accounts plus an identity verification center whose results are graded Low / Medium / High / Extreme and can be referenced directly by forum access rules.
 - **Permissions**: each forum defines browse and operate rules (combinations of verification level, age, region, profile fields), alongside granular owner/moderator permissions.
 - **Expression**: users and forums can publish custom homepages rendered from sanitized HTML inside a sandboxed frame, with templates and authoring guides.
-- **Extension**: a plugin registry (content review, recommendation ranking) and an OAuth 2.0 developer platform that lets third-party apps call the full public API on behalf of a user.
+- **Extension**: an AI plugin layer (text and image review, document heuristics, hot-score ranking) plus an OAuth 2.0 developer platform that lets third-party apps call the full public API on behalf of a user.
 
 The frontend is a single-page application. The backend is implemented in Rust (axum), stores data in MySQL 8, and keeps media in MinIO (S3-compatible).
 
@@ -50,8 +72,9 @@ The frontend is a single-page application. The backend is implemented in Rust (a
 | Search | Query by title, content and forum |
 | Verification center | Real name, ID card, age, nationality, driver license, marriage, property, assets; document upload, liveness check, AI/rule/manual review, level system |
 | Access gates | Visual browse/operate rule editor; evaluated against verification levels, profile fields and logical combinations |
-| Custom homepages | User and forum homepages; constrained HTML, templates, reporting, admin blocking |
-| Plugins | `ai-review`, `ai-vision-review`, `heuristic-document`, `hot-score-recommendation`, `rule-based-review` |
+| Custom homepages | User and forum homepages; constrained HTML with inline styles, `<of-*>` elements, templates, reporting, admin blocking |
+| AI & plugins | `ai-review`, `ai-vision-review`, `heuristic-document`, `hot-score-recommendation`, `rule-based-review`; switchable at runtime |
+| Custom clients | Full REST API, public OpenAPI spec, OAuth 2.0 — the bundled Vue app is one reference client |
 | Admin | Verification review, user list, homepage moderation and blocking |
 | Developer platform | Create OAuth apps, reset secrets, browse the public API reference |
 | OAuth 2.0 | Authorization code + PKCE (S256), access tokens, refresh-token rotation, userinfo, revoke |
@@ -254,6 +277,7 @@ When the database is empty, the backend seeds the following accounts (developmen
 - **Auth**: `Authorization: Bearer <JWT>`
 - **Reference UI**: `/developers/docs`; the OpenAPI 3 YAML is also served publicly at `GET /api/developers/docs`
 - **Spec file**: [backend-rs/api/openapi.yaml](backend-rs/api/openapi.yaml)
+- **Bring your own client**: the bundled Vue SPA is built entirely on these endpoints, so any web or mobile frontend can replace it.
 
 ```bash
 # Log in
