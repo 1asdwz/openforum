@@ -10,6 +10,7 @@ mod info;
 mod json;
 mod migrate;
 mod models;
+mod oauth;
 mod plugins;
 mod repo;
 mod review;
@@ -144,6 +145,11 @@ fn is_public_path(path: &str) -> bool {
         || under_prefix("/users", path)
         || path == "/plugins"
         || path == "/authentications/types"
+        // OAuth endpoints are reachable anonymously; handlers that need a user enforce it themselves
+        // (`CurrentUser` inside `authorize` / `userinfo`).
+        || under_prefix("/oauth", path)
+        // Public API reference download.
+        || path == "/developers/docs"
 }
 
 /// Mirrors Java `SecurityConfig` path-level authorization (filter layer), ensuring unauthenticated/unauthorized

@@ -423,3 +423,42 @@ export interface UserInfoResponse {
   groups: UserInfoGroup[]
 }
 
+export type OAuthClientType = 'CONFIDENTIAL' | 'PUBLIC'
+export type OAuthAppStatus = 'ACTIVE' | 'DISABLED'
+
+/** A third-party application registered in the developer center */
+export interface DeveloperApp {
+  id: number
+  clientId: string
+  name: string
+  description?: string | null
+  homepageUrl?: string | null
+  redirectUris: string[]
+  clientType: OAuthClientType
+  scopes: string
+  status: OAuthAppStatus
+  hasSecret: boolean
+  /** Only present in create / secret-reset responses */
+  clientSecret?: string | null
+  createdAt?: string
+  updatedAt?: string
+}
+
+export interface DeveloperAppList {
+  content: DeveloperApp[]
+  maxApps: number
+  maxRedirectUris: number
+}
+
+/** Public description of an app shown on the consent screen */
+export interface OAuthAuthorizeInfo {
+  clientId: string
+  name: string
+  description?: string | null
+  homepageUrl?: string | null
+  ownerUsername: string
+  clientType: OAuthClientType
+  scope: string
+  redirectUri: string
+}
+

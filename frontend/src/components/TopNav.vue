@@ -86,6 +86,7 @@
               <el-dropdown-item command="homepage">Homepage customization</el-dropdown-item>
               <el-dropdown-item command="info">Profile &amp; verification</el-dropdown-item>
               <el-dropdown-item command="myForums">My communities</el-dropdown-item>
+              <el-dropdown-item command="developers">Developer settings</el-dropdown-item>
               <el-dropdown-item v-if="auth.isAdmin" command="admin" divided>
                 Admin
               </el-dropdown-item>
@@ -151,6 +152,9 @@ function onCommand(command: string) {
       break
     case 'myForums':
       router.push({ path: '/', query: { view: 'mine' } })
+      break
+    case 'developers':
+      router.push('/developers')
       break
     case 'admin':
       router.push('/admin')

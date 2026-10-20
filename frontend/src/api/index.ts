@@ -6,6 +6,8 @@ import type {
   AuthTypeMeta,
   AuthenticationSubmitPayload,
   Comment,
+  DeveloperApp,
+  DeveloperAppList,
   ForumHomepageData,
   ForumHomepageMode,
   ForumMember,
@@ -19,6 +21,7 @@ import type {
   MediaUploadResult,
   MyForumHomepage,
   MyHomepage,
+  OAuthAuthorizeInfo,
   Post,
   PublicForumHomepage,
   PublicHomepage,
@@ -255,4 +258,45 @@ export const adminApi = {
     api.post<{ ok: boolean }>(`/admin/user-homepages/${userId}/block`, { reason }),
   unblockUserHomepage: (userId: number | string) =>
     api.post<{ ok: boolean }>(`/admin/user-homepages/${userId}/unblock`),
+}
+
+export interface DeveloperAppPayload {
+  name: string
+  description?: string
+  homepageUrl?: string
+  redirectUris: string[]
+  clientType?: 'CONFIDENTIAL' | 'PUBLIC'
+}
+
+export const developerApi = {
+  list: () => api.get<DeveloperAppList>('/developers/apps'),
+  create: (payload: DeveloperAppPayload) =>
+    api.post<DeveloperApp>('/developers/apps', payload),
+  get: (id: number | string) => api.get<DeveloperApp>(`/developers/apps/${id}`),
+  update: (
+    id: number | string,
+    payload: Partial<DeveloperAppPayload> & { status?: 'ACTIVE' | 'DISABLED' }
+  ) => api.put<DeveloperApp>(`/developers/apps/${id}`, payload),
+  remove: (id: number | string) => api.delete<unknown>(`/developers/apps/${id}`),
+  resetSecret: (id: number | string) =>
+    api.post<DeveloperApp>(`/developers/apps/${id}/secret`),
+  /** Public OpenAPI document URL */
+  specUrl: () => `${BASE_URL}/developers/docs`,
+}
+
+export const oauthApi = {
+  authorizeInfo: (params: {
+    client_id: string
+    redirect_uri?: string
+    scope?: string
+  }) => api.get<OAuthAuthorizeInfo>('/oauth/authorize/info', { params }),
+  authorize: (payload: {
+    clientId: string
+    redirectUri: string
+    state?: string
+    codeChallenge?: string
+    codeChallengeMethod?: string
+    scope?: string
+    approve: boolean
+  }) => api.post<{ redirectTo: string }>('/oauth/authorize', payload),
 }

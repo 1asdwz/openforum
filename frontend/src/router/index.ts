@@ -95,6 +95,28 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, requiresAdmin: true },
   },
   {
+    path: '/developers',
+    name: 'developers',
+    component: () => import('@/views/Developers.vue'),
+  },
+  {
+    path: '/developers/docs',
+    name: 'api-docs',
+    component: () => import('@/views/ApiDocs.vue'),
+  },
+  {
+    path: '/developers/apps/:id',
+    name: 'developer-app',
+    component: () => import('@/views/DeveloperApp.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/oauth/authorize',
+    name: 'oauth-authorize',
+    component: () => import('@/views/OAuthAuthorize.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
     path: '/:pathMatch(.*)*',
     redirect: '/',
   },

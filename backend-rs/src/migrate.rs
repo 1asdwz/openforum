@@ -83,6 +83,56 @@ CREATE TABLE IF NOT EXISTS forum_homepage_reports (\
   KEY idx_target_time (forum_id, created_at)\
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
 
+const CREATE_OAUTH_CLIENTS: &str = "\
+CREATE TABLE IF NOT EXISTS oauth_clients (\
+  id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,\
+  client_id VARCHAR(48) NOT NULL,\
+  secret_hash VARCHAR(64) NULL,\
+  name VARCHAR(80) NOT NULL,\
+  description VARCHAR(500) NULL,\
+  homepage_url VARCHAR(300) NULL,\
+  redirect_uris TEXT NOT NULL,\
+  client_type VARCHAR(20) NOT NULL DEFAULT 'CONFIDENTIAL',\
+  scopes VARCHAR(120) NOT NULL DEFAULT 'api',\
+  owner_id BIGINT NOT NULL,\
+  status VARCHAR(16) NOT NULL DEFAULT 'ACTIVE',\
+  created_at DATETIME NOT NULL,\
+  updated_at DATETIME NOT NULL,\
+  UNIQUE KEY uk_client_id (client_id),\
+  KEY idx_owner (owner_id)\
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
+
+const CREATE_OAUTH_CODES: &str = "\
+CREATE TABLE IF NOT EXISTS oauth_authorization_codes (\
+  code_hash VARCHAR(64) NOT NULL PRIMARY KEY,\
+  client_id VARCHAR(48) NOT NULL,\
+  user_id BIGINT NOT NULL,\
+  redirect_uri VARCHAR(500) NOT NULL,\
+  scope VARCHAR(120) NOT NULL DEFAULT 'api',\
+  code_challenge VARCHAR(128) NULL,\
+  code_challenge_method VARCHAR(10) NULL,\
+  expires_at DATETIME NOT NULL,\
+  used_at DATETIME NULL,\
+  created_at DATETIME NOT NULL,\
+  KEY idx_client (client_id),\
+  KEY idx_expires (expires_at)\
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
+
+const CREATE_OAUTH_REFRESH_TOKENS: &str = "\
+CREATE TABLE IF NOT EXISTS oauth_refresh_tokens (\
+  id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,\
+  token_hash VARCHAR(64) NOT NULL,\
+  client_id VARCHAR(48) NOT NULL,\
+  user_id BIGINT NOT NULL,\
+  scope VARCHAR(120) NOT NULL DEFAULT 'api',\
+  expires_at DATETIME NOT NULL,\
+  revoked_at DATETIME NULL,\
+  created_at DATETIME NOT NULL,\
+  UNIQUE KEY uk_token_hash (token_hash),\
+  KEY idx_client (client_id),\
+  KEY idx_user (user_id)\
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
+
 /// Idempotent migrations run at startup: create tables, add columns, seed fields, convert legacy rules, backfill legacy authentications.
 pub async fn run(state: &AppState) -> Result<(), ApiError> {
     let pool = &state.pool;
@@ -93,7 +143,10 @@ pub async fn run(state: &AppState) -> Result<(), ApiError> {
     sqlx::query(CREATE_USER_HOMEPAGE_REPORTS).execute(pool).await?;
     sqlx::query(CREATE_FORUM_HOMEPAGES).execute(pool).await?;
     sqlx::query(CREATE_FORUM_HOMEPAGE_REPORTS).execute(pool).await?;
-    tracing::info!("Migration: info_fields / user_info / user_homepages / forum_homepages ready");
+    sqlx::query(CREATE_OAUTH_CLIENTS).execute(pool).await?;
+    sqlx::query(CREATE_OAUTH_CODES).execute(pool).await?;
+    sqlx::query(CREATE_OAUTH_REFRESH_TOKENS).execute(pool).await?;
+    tracing::info!("Migration: info_fields / user_homepages / forum_homepages / oauth tables ready");
 
     ensure_column(pool, "browse_rule", "TEXT NULL").await?;
     ensure_column(pool, "operate_rule", "TEXT NULL").await?;

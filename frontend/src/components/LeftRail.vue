@@ -20,6 +20,16 @@
         <span>Explore communities</span>
       </router-link>
       <router-link
+        to="/developers"
+        class="rail-nav-item"
+        :class="{
+          active: ['developers', 'developer-app', 'api-docs'].includes(String(route.name)),
+        }"
+      >
+        <IconCode class="rail-ico" />
+        <span>Developers</span>
+      </router-link>
+      <router-link
         v-if="auth.user"
         :to="`/u/${auth.user.id}`"
         class="rail-nav-item"
@@ -106,6 +116,7 @@ import IconHome from '@/components/icons/IconHome.vue'
 import IconSearch from '@/components/icons/IconSearch.vue'
 import IconPlus from '@/components/icons/IconPlus.vue'
 import IconUser from '@/components/icons/IconUser.vue'
+import IconCode from '@/components/icons/IconCode.vue'
 
 const auth = useAuthStore()
 const ui = useUiStore()

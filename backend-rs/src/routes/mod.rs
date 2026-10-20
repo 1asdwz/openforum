@@ -6,7 +6,9 @@ pub mod forum_homepages;
 pub mod forums;
 pub mod homepages;
 pub mod info;
+pub mod developers;
 pub mod media;
+pub mod oauth;
 pub mod plugins;
 pub mod posts;
 pub mod users;
@@ -144,6 +146,28 @@ pub fn router() -> Router<AppState> {
         // -------- Plugins --------
         .route("/plugins", get(plugins::list))
         .route("/plugins/:key/enabled", put(plugins::set_enabled))
+        // -------- OAuth 2.0 provider --------
+        .route("/oauth/authorize/info", get(oauth::authorize_info))
+        .route("/oauth/authorize", post(oauth::authorize))
+        .route("/oauth/token", post(oauth::token))
+        .route("/oauth/userinfo", get(oauth::userinfo))
+        .route("/oauth/revoke", post(oauth::revoke))
+        // -------- Developer apps --------
+        .route(
+            "/developers/apps",
+            get(developers::list_apps).post(developers::create_app),
+        )
+        .route(
+            "/developers/apps/:id",
+            get(developers::get_app)
+                .put(developers::update_app)
+                .delete(developers::delete_app),
+        )
+        .route(
+            "/developers/apps/:id/secret",
+            post(developers::reset_secret),
+        )
+        .route("/developers/docs", get(developers::openapi_spec))
 }
 
 #[cfg(test)]

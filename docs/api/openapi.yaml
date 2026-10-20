@@ -50,6 +50,10 @@ tags:
     description: 认证审核、自定义页审核、用户管理（需要 ADMIN）
   - name: 插件
     description: 插件列表与启停
+  - name: OAuth
+    description: OAuth 2.0 授权码流程（PKCE）、令牌交换、用户信息与撤销
+  - name: 开发者
+    description: 第三方应用自助注册与凭据管理
 security:
   - bearerAuth: []
 paths:
@@ -1649,6 +1653,373 @@ paths:
           $ref: '#/components/responses/NotFound'
         '500':
           $ref: '#/components/responses/InternalError'
+  # ---------- OAuth 2.0 ----------
+  /oauth/authorize/info:
+    get:
+      operationId: oauthAuthorizeInfo
+      tags:
+        - OAuth
+      summary: 授权页应用信息
+      description: 公开接口。返回待授权应用的名称、描述、所有者、客户端类型与生效 scope，供同意页展示。
+      security: []
+      parameters:
+        - name: client_id
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: redirect_uri
+          in: query
+          schema:
+            type: string
+        - name: scope
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 应用信息
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+  /oauth/authorize:
+    post:
+      operationId: oauthAuthorize
+      tags:
+        - OAuth
+      summary: 同意或拒绝授权
+      description: |
+        需要登录。校验 redirect_uri 必须与应用登记值完全一致；公共客户端必须提供 PKCE S256 code_challenge。
+        返回 `redirectTo`，由浏览器跳回应用（成功带 `code` 与 `state`，拒绝带 `error=access_denied`）。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [clientId, redirectUri, approve]
+              properties:
+                clientId:
+                  type: string
+                redirectUri:
+                  type: string
+                state:
+                  type: string
+                  maxLength: 512
+                codeChallenge:
+                  type: string
+                codeChallengeMethod:
+                  type: string
+                  enum: [S256]
+                scope:
+                  type: string
+                approve:
+                  type: boolean
+      responses:
+        '200':
+          description: 跳转地址
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /oauth/token:
+    post:
+      operationId: oauthToken
+      tags:
+        - OAuth
+      summary: 换取 / 刷新访问令牌
+      description: |
+        `application/x-www-form-urlencoded`。支持 `authorization_code` 与 `refresh_token`。
+        机密客户端通过 HTTP Basic 或表单 `client_id`/`client_secret` 认证；公共客户端必须携带 `code_verifier`。
+        失败时按 RFC 6749 返回 `{error, error_description}`，成功响应带 `Cache-Control: no-store`。
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [grant_type]
+              properties:
+                grant_type:
+                  type: string
+                  enum: [authorization_code, refresh_token]
+                code:
+                  type: string
+                redirect_uri:
+                  type: string
+                client_id:
+                  type: string
+                client_secret:
+                  type: string
+                code_verifier:
+                  type: string
+                refresh_token:
+                  type: string
+      responses:
+        '200':
+          description: 令牌
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  access_token:
+                    type: string
+                  token_type:
+                    type: string
+                    example: Bearer
+                  expires_in:
+                    type: integer
+                    example: 7200
+                  refresh_token:
+                    type: string
+                  scope:
+                    type: string
+        '400':
+          description: invalid_request / invalid_grant / unsupported_grant_type
+        '401':
+          description: invalid_client
+  /oauth/userinfo:
+    get:
+      operationId: oauthUserinfo
+      tags:
+        - OAuth
+      summary: 当前令牌对应的用户
+      description: 直接返回用户信息（不使用统一信封），便于第三方客户端消费。
+      responses:
+        '200':
+          description: 用户信息
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sub:
+                    type: string
+                  preferred_username:
+                    type: string
+                  name:
+                    type: string
+                  picture:
+                    type: string
+                    nullable: true
+                  role:
+                    type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /oauth/revoke:
+    post:
+      operationId: oauthRevoke
+      tags:
+        - OAuth
+      summary: 撤销 refresh token
+      description: 需要客户端认证；仅撤销属于该客户端的 refresh token，始终返回 200。
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                token:
+                  type: string
+                client_id:
+                  type: string
+                client_secret:
+                  type: string
+      responses:
+        '200':
+          description: 已处理
+        '401':
+          description: invalid_client
+  # ---------- 开发者应用 ----------
+  /developers/apps:
+    get:
+      operationId: listDeveloperApps
+      tags:
+        - 开发者
+      summary: 我的应用列表
+      responses:
+        '200':
+          description: 应用列表与配额
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      operationId: createDeveloperApp
+      tags:
+        - 开发者
+      summary: 创建应用
+      description: 每个用户最多 10 个应用；机密客户端返回的 `clientSecret` 只出现一次。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, redirectUris]
+              properties:
+                name:
+                  type: string
+                  minLength: 2
+                  maxLength: 80
+                description:
+                  type: string
+                  maxLength: 500
+                homepageUrl:
+                  type: string
+                redirectUris:
+                  type: array
+                  maxItems: 5
+                  items:
+                    type: string
+                clientType:
+                  type: string
+                  enum: [CONFIDENTIAL, PUBLIC]
+      responses:
+        '200':
+          description: 已创建的应用（含一次性 secret）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /developers/apps/{id}:
+    get:
+      operationId: getDeveloperApp
+      tags:
+        - 开发者
+      summary: 应用详情
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 应用
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      operationId: updateDeveloperApp
+      tags:
+        - 开发者
+      summary: 更新应用
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+                homepageUrl:
+                  type: string
+                redirectUris:
+                  type: array
+                  items:
+                    type: string
+                status:
+                  type: string
+                  enum: [ACTIVE, DISABLED]
+      responses:
+        '200':
+          description: 更新后的应用
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      operationId: deleteDeveloperApp
+      tags:
+        - 开发者
+      summary: 删除应用及其令牌
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 已删除
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /developers/apps/{id}/secret:
+    post:
+      operationId: resetDeveloperAppSecret
+      tags:
+        - 开发者
+      summary: 重置 client secret
+      description: 仅机密客户端可用；旧 secret 立即失效，新 secret 只返回一次。
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 含新 secret 的应用
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /developers/docs:
+    get:
+      operationId: getOpenApiDocument
+      tags:
+        - 开发者
+      summary: 下载 OpenAPI 文档
+      security: []
+      responses:
+        '200':
+          description: OpenAPI 3.0 YAML
+          content:
+            application/yaml:
+              schema:
+                type: string
 components:
   securitySchemes:
     bearerAuth:

@@ -28,6 +28,13 @@ struct Claims {
     role: String,
     iat: i64,
     exp: i64,
+    /// OAuth client id; absent on first-party login tokens.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    cid: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    scope: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    typ: Option<String>,
 }
 
 /// Aligned with Java's `JwtTokenProvider`: HS256, subject=id, claims=username/role.
@@ -40,6 +47,9 @@ pub fn create_token(cfg: &Config, user: &User) -> String {
         role: user.role.clone(),
         iat: now.timestamp(),
         exp: expiry.timestamp(),
+        cid: None,
+        scope: None,
+        typ: None,
     };
     encode(
         &Header::default(),
@@ -47,6 +57,32 @@ pub fn create_token(cfg: &Config, user: &User) -> String {
         &EncodingKey::from_secret(cfg.jwt_secret.as_bytes()),
     )
     .expect("jwt encode")
+}
+
+/// Issues an OAuth access token. It represents the authorizing user, so it keeps the same
+/// `sub`/`username`/`role` claims and is accepted by every existing authentication path.
+/// Returns `(token, expires_in_seconds)`.
+pub fn create_api_token(cfg: &Config, user: &User, client_id: &str, scope: &str) -> (String, i64) {
+    const ACCESS_TOKEN_HOURS: i64 = 2;
+    let now = Utc::now();
+    let expiry = now + Duration::hours(ACCESS_TOKEN_HOURS);
+    let claims = Claims {
+        sub: user.id.to_string(),
+        username: user.username.clone(),
+        role: user.role.clone(),
+        iat: now.timestamp(),
+        exp: expiry.timestamp(),
+        cid: Some(client_id.to_string()),
+        scope: Some(scope.to_string()),
+        typ: Some("oauth".to_string()),
+    };
+    let token = encode(
+        &Header::default(),
+        &claims,
+        &EncodingKey::from_secret(cfg.jwt_secret.as_bytes()),
+    )
+    .expect("jwt encode");
+    (token, ACCESS_TOKEN_HOURS * 3600)
 }
 
 /// Parse a token; any error yields None (matching the Java filter: a failed parse means unauthenticated).
