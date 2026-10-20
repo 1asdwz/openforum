@@ -29,6 +29,7 @@ target/
 # Database
 *.sql
 *.db
+!backend-rs/sql/schema.sql
 
 # OS
 Thumbs.db

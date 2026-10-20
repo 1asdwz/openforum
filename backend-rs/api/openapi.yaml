@@ -5,9 +5,12 @@ info:
   description: |
     OpenForum 论坛后端接口文档。
 
-    本规范基于现有 Spring Boot(Java) 实现编写，用于后续以 Rust(Axum) 重写并逐一对照。
-    所有业务接口均挂载在 servlet context-path `/api` 之下，因此 `servers` 使用 `{ url: "/api" }`，
+    本规范与 `backend-rs`（Rust + axum）实现保持一致，路由定义见 `src/routes/mod.rs`。
+    所有业务接口均挂载在 `/api` 之下，因此 `servers` 使用 `{ url: "/api" }`，
     `paths` 中以 `/auth/login` 这类相对路径书写。
+
+    第三方应用可通过 OAuth 2.0 获取访问令牌后调用全部公开接口，详见本文件的 `/oauth/*` 端点
+    与仓库中的 `docs/OAUTH.md`。
 
     ## 统一响应信封
     所有非二进制接口返回如下结构（`ApiResponse`）：
@@ -16,7 +19,8 @@ info:
     { "code": 200, "message": "ok", "data": { } }
     ```
 
-    出错时结构相同，`code` 为 HTTP 状态码，`message` 为中文错误文案，`data` 为 `null`。
+    出错时结构相同，`code` 为 HTTP 状态码，`message` 为错误文案，`data` 为 `null`。
+    `/oauth/token`、`/oauth/revoke` 与 `/oauth/userinfo` 例外，按 OAuth 规范返回裸 JSON。
 
     ## 分页响应
     分页接口的 `data` 为 `PageResponse` 结构：
@@ -27,7 +31,7 @@ info:
     `Authorization: Bearer <token>` 请求头。`/admin/**` 与部分插件管理接口需要 `ADMIN` 角色。
 
     ## 时间格式
-    时间字段为无时区的 `LocalDateTime`，JSON 形如 `"2026-10-08T12:34:56"`。
+    时间字段为无时区日期时间，JSON 形如 `"2026-10-08T12:34:56"`。
 servers:
   - url: /api
     description: 直连后端（server.servlet.context-path = /api）
@@ -491,107 +495,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponseForumDetailDTO'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '500':
-          $ref: '#/components/responses/InternalError'
-  /forums/{id}/custom-page:
-    get:
-      operationId: getCustomPage
-      tags:
-        - 子论坛
-      summary: 读取子论坛自定义页面
-      description: 需要登录且具备坛主或管理员权限，否则 403「需要坛主或管理员权限」，未登录 401「请先登录」。
-      parameters:
-        - name: id
-          in: path
-          required: true
-          description: 子论坛 ID
-          schema:
-            type: integer
-            format: int64
-      responses:
-        '200':
-          description: 自定义页面数据
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponseCustomPageDTO'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '500':
-          $ref: '#/components/responses/InternalError'
-    put:
-      operationId: saveCustomPage
-      tags:
-        - 子论坛
-      summary: 保存自定义页面 HTML（草稿）
-      description: |
-        需要登录且具备坛主或管理员权限。HTML 会先去危险标签/事件后再保存，状态置为 DRAFT，
-        并清空审核备注。`html` 为空返回 400「html 不能为空」。
-      parameters:
-        - name: id
-          in: path
-          required: true
-          description: 子论坛 ID
-          schema:
-            type: integer
-            format: int64
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CustomPageUpdateRequest'
-      responses:
-        '200':
-          description: 保存后的自定义页面数据
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponseCustomPageDTO'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '500':
-          $ref: '#/components/responses/InternalError'
-  /forums/{id}/custom-page/submit:
-    post:
-      operationId: submitCustomPage
-      tags:
-        - 子论坛
-      summary: 提交自定义页面审核
-      description: 需要登录且具备坛主或管理员权限。若尚未保存 HTML 返回 400「请先保存自定义页面 HTML」。状态置为 PENDING。
-      parameters:
-        - name: id
-          in: path
-          required: true
-          description: 子论坛 ID
-          schema:
-            type: integer
-            format: int64
-      responses:
-        '200':
-          description: 提交后的自定义页面数据
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponseCustomPageDTO'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -1457,115 +1360,6 @@ paths:
           $ref: '#/components/responses/NotFound'
         '500':
           $ref: '#/components/responses/InternalError'
-  /admin/custom-pages:
-    get:
-      operationId: adminListCustomPages
-      tags:
-        - 管理后台
-      summary: 自定义页审核列表
-      description: "需要 ADMIN 角色。按更新时间倒序分页。非法状态返回 400「非法的状态: X」。"
-      parameters:
-        - name: status
-          in: query
-          required: false
-          schema:
-            $ref: '#/components/schemas/CustomPageStatus'
-            default: PENDING
-        - name: page
-          in: query
-          required: false
-          schema:
-            type: integer
-            format: int32
-            default: 0
-        - name: size
-          in: query
-          required: false
-          schema:
-            type: integer
-            format: int32
-            default: 20
-      responses:
-        '200':
-          description: 分页自定义页数据
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponsePageResponseCustomPageDTO'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '500':
-          $ref: '#/components/responses/InternalError'
-  /admin/custom-pages/{id}/approve:
-    post:
-      operationId: approveCustomPage
-      tags:
-        - 管理后台
-      summary: 通过自定义页
-      description: 需要 ADMIN 角色。状态置为 APPROVED，清空审核备注，并将子论坛模板类型置为 CUSTOM。
-      parameters:
-        - name: id
-          in: path
-          required: true
-          description: 子论坛 ID
-          schema:
-            type: integer
-            format: int64
-      responses:
-        '200':
-          description: 自定义页数据
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponseCustomPageDTO'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '500':
-          $ref: '#/components/responses/InternalError'
-  /admin/custom-pages/{id}/reject:
-    post:
-      operationId: rejectCustomPage
-      tags:
-        - 管理后台
-      summary: 驳回自定义页
-      description: 需要 ADMIN 角色。状态置为 REJECTED，`reason` 缺省为「管理员驳回」。请求体可省略。
-      parameters:
-        - name: id
-          in: path
-          required: true
-          description: 子论坛 ID
-          schema:
-            type: integer
-            format: int64
-      requestBody:
-        required: false
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ReviewDecisionRequest'
-      responses:
-        '200':
-          description: 自定义页数据
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponseCustomPageDTO'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '500':
-          $ref: '#/components/responses/InternalError'
   /admin/users:
     get:
       operationId: adminListUsers
@@ -2091,7 +1885,7 @@ components:
           example: 200
         message:
           type: string
-          description: 提示信息（成功为 ok，错误为中文文案）
+          description: 提示信息（成功为 ok，出错时为错误文案）
           example: ok
         data:
           nullable: true

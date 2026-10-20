@@ -1,286 +1,346 @@
-# OpenForum 开放式论坛系统
+# OpenForum
 
-一个开放式的论坛平台，支持子论坛创建、用户认证、权限控制和插件扩展。
+**English** · [简体中文](README.zh-CN.md)
 
-## 🎯 核心功能
+An open-source modern community forum: sub-forums, rich-text posts, threaded comments, voting, an identity verification center, fine-grained access gates, custom homepages, and an OAuth 2.0 platform for third-party applications.
 
-### 1. 子论坛系统
-- ✅ 用户可创建自己的子论坛
-- ✅ 坛主可编辑论坛规则和页面
-- ✅ 支持使用默认模板或自定义 HTML
-- ✅ 热门论坛推荐和个性化推荐
+Live instance: <https://openforum.yingrest.com>
 
-### 2. 用户信息认证
-支持多种认证类型：
-- ✅ 实名认证
-- ✅ 身份证认证
-- ✅ 驾驶证认证
-- ✅ 结婚证认证
-- ✅ 房产证认证
-- ✅ 资产认证
-- ✅ 国籍认证
-- ✅ 年龄认证
-
-认证特性：
-- ✅ AI 自动审核（占位符）
-- ✅ 管理员手动审核
-- ✅ 用户可查看认证状态
-
-### 3. 权限控制
-- ✅ 用户可浏览论坛而无需认证
-- ✅ 部分论坛可设置认证要求
-- ✅ 只有满足要求的用户才能发表/投票
-- ✅ 论坛创建者权限管理
-
-### 4. 首页功能
-- ✅ 论坛列表展示
-- ✅ 热门论坛推荐
-- ✅ 个性化论坛推荐
-- ✅ 现代化导航栏
-- ✅ 全站搜索功能
-- ✅ 用户菜单
-
-### 5. 文章系统
-- ✅ 发布、编辑、删除文章
-- ✅ 点赞/点踩投票
-- ✅ 评论功能（基础框架）
-- ✅ 文章排序和分页
-- ✅ 置顶文章功能
-
-### 6. 用户系统
-- ✅ 注册和登录
-- ✅ 个人资料管理
-- ✅ 用户头像和简介
-- ✅ 用户统计信息
-- ✅ JWT Token 认证
-
-## 📋 技术栈
-
-### 前端
-- **框架**: Vue 3.x
-- **构建工具**: Vite
-- **语言**: TypeScript
-- **状态管理**: Pinia
-- **UI 框架**: Element Plus
-- **HTTP 客户端**: Axios
-- **路由**: Vue Router
-
-### 后端
-- **语言**: Java 25
-- **框架**: Spring Boot 4.1.1
-- **ORM**: Spring Data JPA
-- **认证**: Spring Security + JWT
-- **数据库**: MySQL 8.0
-- **缓存**: Redis
-- **API**: RESTful
-
-## 📁 项目结构
-
-```
-openforum/
-├── frontend/                 # Vue 前端项目
-│   ├── src/
-│   │   ├── components/      # 可复用组件
-│   │   ├── views/           # 页面文件
-│   │   ├── stores/          # Pinia 状态管理
-│   │   ├── api/             # API 客户端
-│   │   ├── router/          # 路由配置
-│   │   ├── App.vue
-│   │   └── main.ts
-│   ├── index.html
-│   ├── vite.config.ts
-│   ├── tsconfig.json
-│   ├── package.json
-│   └── README.md
-│
-├── backend/                  # Java Spring Boot 后端
-│   ├── src/main/java/com/openforum/
-│   │   ├── config/          # 配置类
-│   │   ├── controller/      # API 控制器
-│   │   ├── service/         # 业务逻辑
-│   │   ├── repository/      # 数据访问
-│   │   ├── entity/          # 实体类
-│   │   ├── dto/             # 数据传输对象
-│   │   ├── exception/       # 异常处理
-│   │   ├── util/            # 工具类
-│   │   └── OpenForumApplication.java
-│   ├── src/main/resources/
-│   │   └── application.yml  # 配置文件
-│   ├── pom.xml
-│   └── README.md
-│
-├── docs/                     # 文档
-├── .gitignore
-└── README.md                # 本文件
-```
-
-## 🚀 快速开始
-
-### 前置要求
-
-- Java 25+
-- Node.js 18+
-- MySQL 8.0+
-- Redis (可选)
-
-### 后端启动
-
-```bash
-cd backend
-
-# 1. 修改配置
-# 编辑 src/main/resources/application.yml
-# 配置数据库和 Redis 连接
-
-# 2. 编译运行
-mvn spring-boot:run
-
-# 或打包后运行
-mvn clean package
-java -jar target/openforum-backend-0.1.0.jar
-```
-
-后端服务地址：`http://localhost:8080/api`
-
-### 前端启动
-
-```bash
-cd frontend
-
-# 1. 安装依赖
-npm install
-
-# 2. 开发模式
-npm run dev
-
-# 3. 构建生产版本
-npm run build
-```
-
-前端访问地址：`http://localhost:5173`
-
-## 📖 API 文档
-
-详见各模块 README.md：
-- [后端 API 文档](./backend/README.md)
-- [前端使用指南](./frontend/README.md)
-
-## 🔧 配置说明
-
-### 后端配置 (application.yml)
-
-```yaml
-spring:
-  datasource:
-    url: jdbc:mysql://localhost:3306/openforum
-    username: root
-    password: password
-  redis:
-    host: localhost
-    port: 6379
-  jwt:
-    secret: your-secret-key-change-in-production
-    expiration: 86400000  # 24小时
-```
-
-### 前端配置 (.env.development)
-
-```
-VITE_API_BASE_URL=http://localhost:8080/api
-VITE_APP_NAME=OpenForum Dev
-```
-
-## 🎨 主要页面
-
-1. **首页** - 热门论坛、个性化推荐
-2. **登录/注册** - 用户认证
-3. **个人资料** - 用户信息管理
-4. **论坛详情** - 浏览文章、发布文章
-5. **信息认证** - 用户认证管理
-6. **论坛创建** - 创建新论坛
-
-## 🔐 安全特性
-
-- ✅ JWT Token 认证
-- ✅ 密码加密存储 (BCrypt)
-- ✅ 权限验证和访问控制
-- ✅ CORS 跨域配置
-- ✅ SQL 注入防护 (JPA)
-- ✅ CSRF 防护
-
-## 🚢 部署
-
-### Docker 部署
-
-```bash
-# 构建后端镜像
-cd backend
-docker build -t openforum-backend:latest .
-
-# 构建前端镜像
-cd frontend
-docker build -t openforum-frontend:latest .
-
-# 使用 docker-compose
-docker-compose up -d
-```
-
-### 手动部署
-
-1. 部署 MySQL 和 Redis
-2. 修改后端配置文件
-3. 启动后端服务
-4. 构建并部署前端静态文件
-5. 配置 Nginx 反向代理
-
-## 🔌 插件扩展
-
-系统预留了扩展点：
-- 认证审核模块（可集成 AI 服务）
-- 评论系统（基础框架已建立）
-- 推荐算法（可自定义）
-- 内容审核（可扩展）
-
-## 🐛 常见问题
-
-**Q: 如何重置密码？**
-A: 暂不支持，可通过数据库直接修改或扩展实现
-
-**Q: 如何实现标签和分类？**
-A: 可扩展 SubForum 实体添加标签字段
-
-**Q: 如何处理大文件上传？**
-A: 可集成对象存储（OSS/S3）
-
-**Q: 支持多语言吗？**
-A: 当前仅支持中文，可通过 i18n 扩展
-
-## 📝 待实现功能
-
-- [ ] 完整的评论系统
-- [ ] 用户通知系统
-- [ ] 站内消息功能
-- [ ] 高级搜索功能
-- [ ] 论坛分析仪表板
-- [ ] 用户分级系统
-- [ ] 标签系统
-- [ ] 关注功能
-- [ ] 收藏夹功能
-
-## 🤝 贡献指南
-
-欢迎提交 Issue 和 Pull Request！
-
-## 📄 许可证
-
-MIT License
-
-## 👨‍💻 作者
-
-CC - AI 助理
+[![Rust](https://img.shields.io/badge/backend-Rust%20%2B%20axum-000000)](https://github.com/1asdwz/openforum)
+![Vue](https://img.shields.io/badge/frontend-Vue%203%20%2B%20TypeScript-42b883)
+![MySQL](https://img.shields.io/badge/database-MySQL%208-4479A1)
 
 ---
 
-**最后更新**: 2024年10月
+## Table of Contents
 
-🎉 感谢使用 OpenForum！
+- [Overview](#overview)
+- [Features](#features)
+- [Tech Stack](#tech-stack)
+- [Repository Layout](#repository-layout)
+- [Getting Started](#getting-started)
+- [Environment Variables](#environment-variables)
+- [Default Accounts](#default-accounts)
+- [API & Developer Platform](#api--developer-platform)
+- [Deployment](#deployment)
+- [Documentation](#documentation)
+- [Security](#security)
+- [Contributing](#contributing)
+
+## Overview
+
+OpenForum is a deployable forum system built as extensible community infrastructure rather than just a posting page:
+
+- **Content**: sub-forums, rich-text posts, Markdown, images/videos, threaded comments, voting and hot ranking.
+- **Identity**: accounts plus an identity verification center whose results are graded Low / Medium / High / Extreme and can be referenced directly by forum access rules.
+- **Permissions**: each forum defines browse and operate rules (combinations of verification level, age, region, profile fields), alongside granular owner/moderator permissions.
+- **Expression**: users and forums can publish custom homepages rendered from sanitized HTML inside a sandboxed frame, with templates and authoring guides.
+- **Extension**: a plugin registry (content review, recommendation ranking) and an OAuth 2.0 developer platform that lets third-party apps call the full public API on behalf of a user.
+
+The frontend is a single-page application. The backend is implemented in Rust (axum), stores data in MySQL 8, and keeps media in MinIO (S3-compatible).
+
+## Features
+
+| Area | Capabilities |
+| --- | --- |
+| Accounts | Registration, login, Google sign-in, JWT auth, profiles |
+| Sub-forums | Create/edit, join/leave, members and moderators, public/private, theme color and icon |
+| Posts | Create, edit, delete, pin, vote, images and videos, pagination and sorting |
+| Comments | Nested tree, voting, deletion, aggregated by post |
+| Search | Query by title, content and forum |
+| Verification center | Real name, ID card, age, nationality, driver license, marriage, property, assets; document upload, liveness check, AI/rule/manual review, level system |
+| Access gates | Visual browse/operate rule editor; evaluated against verification levels, profile fields and logical combinations |
+| Custom homepages | User and forum homepages; constrained HTML, templates, reporting, admin blocking |
+| Plugins | `ai-review`, `ai-vision-review`, `heuristic-document`, `hot-score-recommendation`, `rule-based-review` |
+| Admin | Verification review, user list, homepage moderation and blocking |
+| Developer platform | Create OAuth apps, reset secrets, browse the public API reference |
+| OAuth 2.0 | Authorization code + PKCE (S256), access tokens, refresh-token rotation, userinfo, revoke |
+
+## Tech Stack
+
+### Backend (`backend-rs/`, production)
+
+| Component | Choice |
+| --- | --- |
+| Language / runtime | Rust 2021, Tokio |
+| Web framework | axum 0.7 (multipart, macros) |
+| Data access | sqlx 0.8 (MySQL, chrono, json) |
+| Auth | jsonwebtoken (HS256) + bcrypt |
+| Object storage | MinIO / S3 via `rust-s3` (path-style) |
+| HTML sanitization | ammonia |
+| Image processing | `image` (JPEG / PNG / WebP / GIF) |
+| Observability | tracing + tracing-subscriber |
+| Middleware | tower / tower-http (CORS, trace, body limit) |
+
+### Frontend (`frontend/`)
+
+Vue 3 + TypeScript + Vite 5 + Pinia + Vue Router + Element Plus + Axios + Tiptap.
+
+### Data & hosting
+
+MySQL 8 and MinIO; the frontend is hosted on Cloudflare Pages and the backend runs as a Docker container.
+
+### Legacy implementation (`backend/`)
+
+`backend/` is the earlier Java 25 / Spring Boot 4.1.1 implementation. Production now runs the Rust backend; the Java code is kept for reference on legacy schema, API semantics and migration history. **New work should target `backend-rs/` only.**
+
+## Repository Layout
+
+```text
+openforum/
+├── backend-rs/              # Rust backend (production)
+│   ├── api/openapi.yaml     # OpenAPI 3 specification (served publicly)
+│   ├── deploy/              # Environment variable example
+│   ├── sql/schema.sql       # Full schema (21 tables)
+│   └── src/
+│       ├── main.rs          # Startup, routing, security gate middleware
+│       ├── routes/          # HTTP handlers per module
+│       ├── repo.rs          # Data access
+│       ├── oauth.rs         # OAuth primitives (PKCE, tokens, clients)
+│       ├── access.rs        # Forum owner / moderator permissions
+│       ├── gate.rs          # Access rule engine
+│       ├── info.rs          # Profile field definitions
+│       ├── plugins.rs       # Plugin registry
+│       ├── storage.rs       # MinIO storage
+│       └── ...
+├── frontend/                # Vue 3 SPA
+│   ├── public/_worker.js    # Same-origin API proxy for Cloudflare Pages
+│   └── src/{views,components,api,router,stores}
+├── backend/                 # Legacy Java implementation (reference only)
+├── docs/                    # Technical documentation
+│   ├── ARCHITECTURE.md
+│   ├── API.md
+│   ├── OAUTH.md
+│   ├── DATABASE.md
+│   ├── DEPLOYMENT.md
+│   └── DEVELOPMENT.md
+├── docker-compose.yml       # Local stack for the legacy Java backend
+└── CONTRIBUTING.md
+```
+
+## Getting Started
+
+### Prerequisites
+
+- Rust (stable; the Docker image builds with 1.93)
+- MySQL 8.0+
+- Node.js 18+ and npm
+- Optional: MinIO (required for media uploads and reads)
+
+### 1. Prepare the database
+
+```bash
+mysql -uroot -p -e "CREATE DATABASE openforum CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+mysql -uroot -p openforum < backend-rs/sql/schema.sql
+```
+
+`backend-rs/sql/schema.sql` contains the full 21-table schema. On first start the backend also runs idempotent migrations (profile, homepage and OAuth tables) and inserts seed data.
+
+### 2. Start the backend
+
+```bash
+cd backend-rs
+
+export SERVER_PORT=8080
+export DB_URL='jdbc:mysql://127.0.0.1:3306/openforum'
+export DB_USER=root
+export DB_PASSWORD='your-password'
+export JWT_SECRET='replace-with-a-random-secret-at-least-32-bytes'
+
+# Optional: enable media storage
+export MINIO_ENABLED=true
+export MINIO_ENDPOINT='http://127.0.0.1:9000'
+export MINIO_ACCESS_KEY=minioadmin
+export MINIO_SECRET_KEY=minioadmin
+export MINIO_BUCKET=openforum-auth
+
+cargo run
+```
+
+The backend listens on `http://localhost:8080` and mounts all routes under `/api`:
+
+```bash
+curl http://localhost:8080/api/plugins
+```
+
+> The process refuses to start when `JWT_SECRET` is shorter than 32 bytes. Always replace the built-in defaults in production.
+
+### 3. Start the frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+The dev server runs at `http://localhost:5173` and proxies `/forum/api` to `http://localhost:8080` (see [vite.config.ts](frontend/vite.config.ts)).
+
+Production build:
+
+```bash
+npm run type-check
+npm run build
+```
+
+### 4. Run the backend with Docker
+
+Copy the example env file, adjust the database URL, then build and run:
+
+```bash
+cp backend-rs/deploy/openforum-rs.env.example backend-rs/.env.local
+# Edit backend-rs/.env.local: at minimum DB_URL, DB_PASSWORD and JWT_SECRET
+
+docker build -t openforum-rs:latest backend-rs
+docker run -d --name openforum-rs \
+  -p 8080:8080 \
+  --env-file backend-rs/.env.local \
+  openforum-rs:latest
+```
+
+`docker-compose.yml` describes the legacy Java backend + Redis + MySQL + frontend stack. The Rust backend does not use Redis.
+
+## Environment Variables
+
+All backend configuration is read from the environment; see [openforum-rs.env.example](backend-rs/deploy/openforum-rs.env.example).
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `SERVER_PORT` | `8080` | Listen port |
+| `DB_URL` | `jdbc:mysql://localhost:3306/openforum` | MySQL URL; the `jdbc:mysql://` prefix is accepted |
+| `DB_USER` | `root` | Database user |
+| `DB_PASSWORD` | `root123456` | Database password |
+| `JWT_SECRET` | built-in dev key | JWT signing key, **must be ≥ 32 bytes** |
+| `JWT_EXPIRATION_HOURS` | `168` | Login token lifetime (hours) |
+| `MINIO_ENABLED` | `false` | Enable object storage |
+| `MINIO_ENDPOINT` | `http://localhost:9000` | MinIO endpoint |
+| `MINIO_ACCESS_KEY` | `minioadmin` | MinIO access key |
+| `MINIO_SECRET_KEY` | `minioadmin` | MinIO secret key |
+| `MINIO_BUCKET` | `openforum-auth` | Bucket name |
+| `AI_ENABLED` | `false` | Enable AI review plugins |
+| `OPENAI_API_KEY` | empty | AI service key |
+| `OPENAI_API_BASE` | `https://api.openai.com/v1` | AI service base URL |
+| `OPENAI_API_MODEL` | `gpt-4o-mini` | Model name |
+| `AI_TIMEOUT_SECONDS` | `20` | AI request timeout |
+| `GOOGLE_CLIENT_ID` | empty | Google sign-in client ID |
+| `AUTH_CHALLENGE_TTL_MINUTES` | `10` | Verification challenge TTL (minutes) |
+| `AUTH_MAX_DOCUMENT_COUNT` | `5` | Max documents per submission |
+| `AUTH_MAX_IMAGE_BYTES` | `10485760` | Image size limit (10 MB) |
+| `AUTH_MAX_VIDEO_BYTES` | `52428800` | Video size limit (50 MB) |
+| `AUTH_AUTO_APPROVE_THRESHOLD` | `0.85` | Auto-approval confidence threshold |
+
+Frontend variables (`frontend/.env.*`):
+
+| Variable | Description |
+| --- | --- |
+| `VITE_API_BASE_URL` | API base URL; defaults to `/forum/api` in development |
+| `VITE_APP_NAME` | Site name |
+| `VITE_GOOGLE_CLIENT_ID` | Google client ID; leave empty to hide Google sign-in |
+| `VITE_BASE_PATH` | Build-time base path; defaults to `/forum/`, use `/` for a standalone domain |
+
+## Default Accounts
+
+When the database is empty, the backend seeds the following accounts (development only — change the passwords before deploying):
+
+| Username | Password | Role |
+| --- | --- | --- |
+| `admin` | `admin123` | ADMIN |
+| `alice` | `alice123` | USER |
+| `bob` | `bob123` | USER |
+
+## API & Developer Platform
+
+- **Base URL**: `https://openforum.yingrest.com/api` (local: `http://localhost:8080/api`)
+- **Response envelope**: `{"code":200,"message":"ok","data":...}`
+- **Auth**: `Authorization: Bearer <JWT>`
+- **Reference UI**: `/developers/docs`; the OpenAPI 3 YAML is also served publicly at `GET /api/developers/docs`
+- **Spec file**: [backend-rs/api/openapi.yaml](backend-rs/api/openapi.yaml)
+
+```bash
+# Log in
+curl -X POST http://localhost:8080/api/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"usernameOrEmail":"admin","password":"admin123"}'
+
+# Call an authenticated endpoint
+curl http://localhost:8080/api/auth/me \
+  -H 'Authorization: Bearer <access_token>'
+```
+
+### Third-party apps (OAuth 2.0)
+
+1. Sign in, open `/developers`, and create an app with redirect URIs (HTTPS; `http://localhost` and `http://127.0.0.1` are allowed for development).
+2. Choose a client type:
+   - `CONFIDENTIAL`: server-side app using `client_secret` (HTTP Basic).
+   - `PUBLIC`: browser/mobile app without a secret; **PKCE is mandatory**.
+3. After the user grants access, exchange the authorization code for tokens and call any public API with `Authorization: Bearer`.
+
+| Endpoint | Purpose |
+| --- | --- |
+| `GET /api/oauth/authorize/info` | App details for the consent screen |
+| `POST /api/oauth/authorize` | Approve/deny and receive the redirect URL |
+| `POST /api/oauth/token` | `authorization_code` / `refresh_token` grants |
+| `GET /api/oauth/userinfo` | User profile for the access token |
+| `POST /api/oauth/revoke` | Revoke a refresh token |
+
+Access tokens live for 2 hours; refresh tokens live for 30 days and rotate on every use. See [docs/OAUTH.md](docs/OAUTH.md) for the full flow, parameters and error codes.
+
+## Deployment
+
+### Frontend (Cloudflare Pages)
+
+```bash
+cd frontend
+VITE_BASE_PATH=/ VITE_API_BASE_URL=/api npm run build
+npx wrangler pages deploy dist --project-name openforum --branch main
+```
+
+`frontend/public/_worker.js` proxies same-origin `/api/*` requests to `BACKEND_BASE` (configure it in the Pages project), serves static assets, and falls back to `index.html`.
+
+### Backend (GitHub Actions + Docker)
+
+[.github/workflows/deploy-rs.yml](.github/workflows/deploy-rs.yml) runs when `backend-rs/**` changes: build image → compress → SCP to the server → start the container with `--env-file` (published on `8091:8080` by default).
+
+Configure the `SSH_PRIVATE_KEY` repository secret and prepare the environment file on the server. Manual deployment also works:
+
+```bash
+docker build -t openforum-rs:latest backend-rs
+docker run -d --name openforum-rs --restart unless-stopped \
+  -p 8091:8080 --env-file /path/to/openforum-rs.env openforum-rs:latest
+```
+
+See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for reverse proxy, Nginx and legacy pipeline details.
+
+## Documentation
+
+| Document | Contents |
+| --- | --- |
+| [ARCHITECTURE.md](docs/ARCHITECTURE.md) | Architecture, request lifecycle, modules, design decisions |
+| [API.md](docs/API.md) | Conventions, route index, errors, pagination |
+| [OAUTH.md](docs/OAUTH.md) | Authorization code + PKCE flow with examples |
+| [DATABASE.md](docs/DATABASE.md) | The 21-table schema and initialization |
+| [DEPLOYMENT.md](docs/DEPLOYMENT.md) | Cloudflare Pages, Docker, Nginx, CI/CD |
+| [DEVELOPMENT.md](docs/DEVELOPMENT.md) | Local development, builds, tests, troubleshooting |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Contribution workflow and code style |
+
+Chinese versions of every document are kept next to the English ones with a `.zh-CN.md` suffix: [README.zh-CN.md](README.zh-CN.md), [docs/](docs/), [CONTRIBUTING.zh-CN.md](CONTRIBUTING.zh-CN.md).
+
+## Security
+
+- Never commit real secrets. `JWT_SECRET`, database passwords, `MINIO_SECRET_KEY`, `OPENAI_API_KEY` and `GOOGLE_CLIENT_ID` are injected through environment variables.
+- `JWT_SECRET` must be at least 32 bytes; use a high-entropy random value in production.
+- Custom homepage HTML is sanitized and rendered in a sandboxed frame.
+- Verification documents are stored in a private MinIO bucket and only served through authenticated media endpoints.
+- Please report vulnerabilities privately to the maintainers instead of opening a public issue.
+
+## Contributing
+
+Issues and pull requests are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) first:
+
+```bash
+# Backend
+cd backend-rs && cargo fmt && cargo test && cargo build --release
+
+# Frontend
+cd frontend && npm run type-check && npm run build
+```
+

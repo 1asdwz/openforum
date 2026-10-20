@@ -1,275 +1,156 @@
-# OpenForum 开发贡献指南
+# Contributing Guide
 
-## 代码规范
+[English](CONTRIBUTING.md) · [简体中文](CONTRIBUTING.zh-CN.md)
 
-### 后端 (Java)
+Thanks for contributing to OpenForum. This document covers the development environment, code style, and submission workflow.
 
-#### 命名规范
+## 1. Before You Start
 
-- 类名：PascalCase (例：`UserService`)
-- 方法名：camelCase (例：`getUserById`)
-- 常量：UPPER_SNAKE_CASE (例：`DEFAULT_PAGE_SIZE`)
-- 包名：全小写，按功能分类 (例：`com.openforum.service`)
+- Read [README.md](README.md) and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) to understand the project structure.
+- Build new features on `backend-rs/` (Rust) and `frontend/` (Vue 3).
+- `backend/` is the retired Java implementation. It is kept for historical reference only and does not accept new features.
+- For larger changes, open an Issue first to discuss and avoid duplicate work.
 
-#### 代码风格
-
-```java
-// ✅ Good
-@Service
-@RequiredArgsConstructor
-public class UserService {
-    private final UserRepository userRepository;
-    
-    public User getUserById(Long id) {
-        return userRepository.findById(id)
-            .orElseThrow(() -> new ApiException.NotFoundException("用户不存在"));
-    }
-}
-
-// ❌ Bad
-public class userService {
-    UserRepository userRepository;
-    
-    public User getUserById(Long id) {
-        return userRepository.findById(id).get();
-    }
-}
-```
-
-#### 注释规范
-
-```java
-/**
- * 获取用户信息
- * 
- * @param userId 用户ID
- * @return 用户对象
- * @throws NotFoundException 用户不存在时抛出
- */
-@Transactional(readOnly = true)
-public User getUserById(Long userId) {
-    // ...
-}
-```
-
-### 前端 (Vue)
-
-#### 命名规范
-
-- 组件名：PascalCase (例：`NavBar.vue`)
-- 方法名：camelCase (例：`handleSubmit`)
-- 常量：UPPER_SNAKE_CASE (例：`API_BASE_URL`)
-
-#### 代码风格
-
-```vue
-<!-- ✅ Good -->
-<template>
-  <div class="user-card">
-    <h1>{{ user.name }}</h1>
-    <el-button @click="handleSubmit">提交</el-button>
-  </div>
-</template>
-
-<script setup lang="ts">
-import { ref, computed } from 'vue'
-
-interface User {
-  id: number
-  name: string
-}
-
-const user = ref<User | null>(null)
-const loading = ref(false)
-
-const isLoading = computed(() => loading.value)
-
-const handleSubmit = () => {
-  // ...
-}
-</script>
-
-<!-- ❌ Bad -->
-<template>
-  <div>
-    <h1>{{ userData.name }}</h1>
-    <button @click="submit">提交</button>
-  </div>
-</template>
-
-<script>
-export default {
-  data() {
-    return {
-      userData: null
-    }
-  },
-  methods: {
-    submit() {
-      // ...
-    }
-  }
-}
-</script>
-```
-
-## 提交流程
-
-### 1. Fork 项目
+## 2. Development Environment
 
 ```bash
-git clone https://github.com/your-username/openforum.git
+# Backend
+cd backend-rs
+cargo build
+
+# Frontend
+cd frontend
+npm install
+npm run dev
+```
+
+See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for database setup and the full startup steps.
+
+## 3. Code Style
+
+### 3.1 Rust Backend
+
+- Format code with `cargo fmt`. Run `cargo fmt --check` before committing.
+- Check for common issues with `cargo clippy -- -D warnings`.
+- Types / functions: `snake_case`; structs / enums: `PascalCase`; constants: `UPPER_SNAKE_CASE`.
+- HTTP handlers should only parse parameters, authorize, and assemble responses. Put SQL in `repo.rs` or the relevant module.
+- Use `ApiError` / `ApiResult` for all errors. Do not construct response bodies directly.
+- Write comments and logs in English. Do not commit debug `println!` calls or temporary files.
+
+```rust
+pub async fn detail(
+    State(state): State<AppState>,
+    Path(id): Path<i64>,
+) -> ApiResult<Json<Value>> {
+    let forum = repo::require_forum(&state.pool, id).await?;
+    Ok(j::ok(dto::forum_detail(&forum)))
+}
+```
+
+### 3.2 Vue / TypeScript Frontend
+
+- Use `<script setup lang="ts">` for pages and components.
+- Component files: `PascalCase.vue`; variables / functions: `camelCase`; constants: `UPPER_SNAKE_CASE`.
+- Put all API calls in `src/api/`. Do not hardcode URLs inside components.
+- Reuse types from `src/types/` and avoid `any`.
+- Write UI copy in English. Reuse the design variables in `styles/main.css` where possible.
+- `npm run type-check` and `npm run build` must pass before committing.
+
+### 3.3 Database
+
+- When changing the table schema, update both `backend-rs/sql/schema.sql` and `backend-rs/src/migrate.rs`.
+- Migrations must be idempotent so existing databases can upgrade smoothly.
+- Describe compatibility and rollback steps in the PR.
+
+### 3.4 API and Documentation
+
+- When adding or changing endpoints, update `backend-rs/api/openapi.yaml` and [docs/API.md](docs/API.md).
+- For OAuth-related changes, also update [docs/OAUTH.md](docs/OAUTH.md).
+- Write documentation in Markdown and include runnable examples.
+
+## 4. Branches and Commits
+
+```bash
+git clone https://github.com/1asdwz/openforum.git
 cd openforum
-```
-
-### 2. 创建特性分支
-
-```bash
 git checkout -b feature/your-feature-name
 ```
 
-分支命名规范：
-- `feature/` - 新功能
-- `bugfix/` - bug 修复
-- `docs/` - 文档
-- `refactor/` - 代码重构
+Branch naming:
 
-### 3. 提交代码
+- `feature/`: new features
+- `bugfix/`: bug fixes
+- `docs/`: documentation
+- `refactor/`: refactoring
+
+Use Conventional Commits for commit messages:
+
+```text
+feat: add forum bookmark API
+
+- add bookmark table and repository
+- expose POST /api/forums/:id/bookmark
+- document the endpoint in openapi.yaml
+```
+
+Common types: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `chore`.
+
+## 5. Tests and Checks
 
 ```bash
-git add .
-git commit -m "feat: 添加用户认证功能
+# Backend
+cd backend-rs
+cargo fmt --check
+cargo clippy -- -D warnings
+cargo test
 
-- 实现 JWT token 生成
-- 添加认证中间件
-- 完成单元测试"
-```
-
-提交信息格式：
-```
-<type>: <subject>
-
-<body>
-
-<footer>
-```
-
-Type 类型：
-- `feat:` - 新功能
-- `fix:` - bug 修复
-- `docs:` - 文档更新
-- `style:` - 代码格式调整
-- `refactor:` - 代码重构
-- `perf:` - 性能优化
-- `test:` - 测试相关
-
-### 4. 推送分支
-
-```bash
-git push origin feature/your-feature-name
-```
-
-### 5. 创建 Pull Request
-
-在 GitHub 创建 PR，说明：
-- 功能描述
-- 变更内容
-- 测试方式
-- 相关 Issue
-
-## 测试
-
-### 后端测试
-
-```bash
-cd backend
-
-# 运行所有测试
-mvn test
-
-# 运行特定测试
-mvn test -Dtest=UserServiceTest
-```
-
-### 前端测试
-
-```bash
+# Frontend
 cd frontend
-
-# 运行测试
-npm run test
-
-# 测试覆盖率
-npm run test:coverage
+npm run type-check
+npm run build
 ```
 
-## 代码审查清单
+For changes involving the database, MinIO, or OAuth, include manual verification steps and results in the PR.
 
-提交 PR 前请确认：
+## 6. Pull Request
 
-- [ ] 代码遵循项目规范
-- [ ] 添加了必要的注释
-- [ ] 代码已测试
-- [ ] 没有硬编码配置
-- [ ] 没有调试代码
-- [ ] 文档已更新
-- [ ] 提交信息清晰
+The PR description should include:
 
-## 报告 Issue
+- Purpose and background of the change
+- Main changes
+- Verification approach (commands, screenshots, or endpoint examples)
+- Related Issue
+- Whether the change involves the database, configuration, or breaking changes
 
-### Bug 报告
+Code review checklist:
 
-```markdown
-## 描述
-清晰地描述 bug
+- [ ] Logic is correct and edge cases are handled
+- [ ] No hardcoded secrets or environment-specific configuration
+- [ ] No debug code or temporary files
+- [ ] Formatting, static checks, and tests pass
+- [ ] API / database / documentation are updated together
+- [ ] Commit messages are clear
 
-## 重现步骤
-1. 打开页面
-2. 点击按钮
-3. 观察结果
+## 7. Reporting Issues
 
-## 预期行为
-应该发生什么
+A bug report should include:
 
-## 实际行为
-实际发生了什么
+- Environment (operating system, browser, version / commit)
+- Steps to reproduce
+- Expected behavior and actual behavior
+- Relevant logs, screenshots, or API responses
 
-## 环境
-- OS: Windows 10
-- Browser: Chrome 120
-- Version: v0.1.0
-```
+For feature requests, describe the use case and expected behavior. Do not report security issues publicly in an Issue. Contact the maintainers privately first.
 
-### 功能请求
+## 8. Documentation Locations
 
-```markdown
-## 功能描述
-新功能的简要说明
+| Document | Contents |
+| --- | --- |
+| [README.md](README.md) | Project introduction and quick start |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Architecture and design decisions |
+| [docs/API.md](docs/API.md) | API conventions and route overview |
+| [docs/OAUTH.md](docs/OAUTH.md) | OAuth 2.0 integration |
+| [docs/DATABASE.md](docs/DATABASE.md) | Database schema |
+| [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | Deployment |
+| [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) | Local development |
 
-## 使用场景
-为什么需要这个功能
-
-## 可能的实现方案
-如果你有想法
-```
-
-## 文档贡献
-
-文档位置：
-- README.md - 项目概览
-- QUICK_START.md - 快速开始
-- 各模块 README.md - 模块文档
-- docs/ - 详细文档
-
-文档格式：
-- 使用 Markdown
-- 包含示例代码
-- 清晰的章节结构
-
-## 许可证
-
-所有贡献均采用 MIT 许可证。
-
----
-
-感谢你的贡献！🎉
