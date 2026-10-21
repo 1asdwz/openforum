@@ -11,7 +11,7 @@
       </button>
 
       <router-link to="/" class="brand">
-        <span class="brand-logo">OF</span>
+        <img class="brand-logo" :src="logoUrl" alt="" width="36" height="36" />
         <span class="brand-name">OpenForum</span>
       </router-link>
 
@@ -109,6 +109,7 @@ import { avatarText } from '@/utils/format'
 import IconSearch from '@/components/icons/IconSearch.vue'
 import IconPlus from '@/components/icons/IconPlus.vue'
 import IconMenu from '@/components/icons/IconMenu.vue'
+import logoUrl from '@/assets/logo.svg'
 
 const auth = useAuthStore()
 const ui = useUiStore()
