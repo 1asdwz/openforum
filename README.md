@@ -2,7 +2,7 @@
 
 **English** · [简体中文](README.zh-CN.md)
 
-An open-source, AI-native community forum: sub-forums, rich-text posts, threaded comments, voting, an identity verification center, per-forum admission thresholds, custom code on forums and profiles, and an OAuth 2.0 API that anyone can build a frontend on.
+An open-source, AI-native community forum: member-created sub-forums, rich-text posts, threaded comments, voting, an identity verification center, per-forum admission thresholds, custom code on forums and profiles, and an OAuth 2.0 API that anyone can build a frontend on.
 
 Live instance: <https://openforum.yingrest.com>
 
@@ -29,6 +29,8 @@ Live instance: <https://openforum.yingrest.com>
 - [Contributing](#contributing)
 
 ## Highlights
+
+**Reddit-style sub-forums, created by members.** The site is a hub of communities: any signed-in user can create a sub-forum at `f/{slug}`, give it a name, icon and theme color, choose public or private, write its rules, and become its owner. Owners appoint moderators with per-permission roles, and every forum has its own feed, member list and optional custom homepage.
 
 **AI-native review.** Verification materials run through an AI vision model (`ai-vision-review`) and heuristic checks (`heuristic-document`), while forum and post ordering comes from `hot-score-recommendation`. The plugin registry also ships `ai-review` and `rule-based-review`, and every plugin can be switched on or off at runtime from the admin console. AI calls go to any OpenAI-compatible endpoint (`OPENAI_API_BASE`); without a key the vision plugin reports unavailable, so the submission stays in manual review.
 
@@ -66,7 +68,7 @@ The frontend is a single-page application. The backend is implemented in Rust (a
 | Area | Capabilities |
 | --- | --- |
 | Accounts | Registration, login, Google sign-in, JWT auth, profiles |
-| Sub-forums | Create/edit, join/leave, members and moderators, public/private, theme color and icon |
+| Sub-forums | User-created communities at `f/{slug}`: create/edit, join/leave, members and moderators, public/private, theme color and icon |
 | Posts | Create, edit, delete, pin, vote, images and videos, pagination and sorting |
 | Comments | Nested tree, voting, deletion, aggregated by post |
 | Search | Query by title, content and forum |
